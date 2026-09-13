@@ -1,0 +1,2 @@
+Original package aggregate fingerprint (path SHA + content SHA, v1.1 input)
+68f5f7b4e59a4e2b736b8c89b83b001b1378347fc96c77eb8eb5ca389797e05a

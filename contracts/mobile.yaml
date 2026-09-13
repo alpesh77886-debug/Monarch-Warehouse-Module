@@ -1,0 +1,28 @@
+version: "1.0"
+contract: MOBILE_ACCEPTANCE
+status: LOCKED
+intent: >
+  Mobile-first operational UI contract. The supplied HTML is a visual reference only;
+  the real deliverable is the Next.js application.
+breakpoints:
+  - 320
+  - 360
+  - 390
+  - 430
+  - 768
+requirements:
+  min_touch_target_css_px: 48
+  horizontal_scroll_forbidden: true
+  critical_workflows_must_be_usable_at_320: true
+  desktop_reference_must_not_define_mobile_behavior: true
+  critical_workflows:
+    - authentication
+    - receiving_sheet
+    - dual_confirmation
+    - receiving_lock
+    - hold_release
+    - fifo_override
+    - transfer
+    - dispatch_loading
+    - stock_ledger
+    - maintenance_issue

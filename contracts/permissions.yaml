@@ -1,0 +1,26 @@
+# IBF FG Warehouse — Permission Matrix Contract
+# Status: LOCKED | Authority: SAFETY | Enforcement: H4 Runtime (Clerk role check + API guard)
+
+version: 1.0
+status: LOCKED
+authority: SAFETY
+enforcement: H4_RUNTIME
+auth_provider: Clerk
+
+roles:
+  R01: {name: Warehouse Executive, permissions: [receiving_sheet.create, receiving_sheet.confirm_warehouse, loading_sheet.create, loading_sheet.verify, maintenance.create, maintenance.close, stock.view_ledger, stock.view_summary]}
+  R02: {name: Warehouse Operator, permissions: [putaway.confirm_location, putaway.move_pallet, loading_sheet.load, maintenance.create, maintenance.verify_fix]}
+  R03: {name: Warehouse Incharge, permissions: [receiving_sheet.create, receiving_sheet.confirm_warehouse, putaway.confirm_location, putaway.override_location, holds.view, holds.followup_nudge, fifo.override, loading_sheet.create, loading_sheet.verify, transfers.create, transfers.dispatch, dispatch_orders.create, dispatch_orders.generate_pick_list, gate_pass.generate, maintenance.create, maintenance.view, stock.view_ledger, stock.view_summary, stock.export]}
+  R04: {name: QC Lab Officer, permissions: [receiving_sheet.view, holds.view, holds.create, holds.release, holds.reject, export_container.approve, loading_sheet.view, stock.view_ledger]}
+  R05: {name: QC Head, permissions: [inherits: R04, holds.bulk_release, holds.escalation_authority]}
+  R06: {name: Packing Supervisor, permissions: [receiving_sheet.confirm_packing, receiving_sheet.view, bulk.view, bulk.receive_for_repack]}
+  R07: {name: Packing Operator, permissions: [receiving_sheet.confirm_packing, receiving_sheet.view]}
+  R08: {name: Production Executive, permissions: [holds.view, holds.acknowledge, holds.request_reinspection, bulk.view]}
+  R09: {name: Logistics Coordinator, permissions: [dispatch_orders.create, dispatch_orders.generate_pick_list, loading_sheet.create, transfers.create, transfers.dispatch, fifo.override, stock.view_ledger, stock.export]}
+  R10: {name: Security/Gate, permissions: [loading_sheet.view, gate_pass.verify, gate_pass.record_exit]}
+  R11: {name: Maintenance Technician, permissions: [maintenance.acknowledge, maintenance.resolve, maintenance.view]}
+  R12: {name: Admin, permissions: [all, masters.edit, users.manage, system.configure]}
+
+server_side_enforcement:
+  rule: "Every API endpoint MUST: (1) verify Clerk session, (2) check user role from Clerk metadata, (3) check business rule preconditions, (4) log to audit, (5) return 403 if unauthorized"
+  ui_hiding_is_not_security: true

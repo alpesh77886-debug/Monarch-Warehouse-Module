@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IBF FG Warehouse — Premium Design v5 (Responsive Auto-Fit)</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+--ink:#0B1F3A;--ink2:#334155;--muted:#64748b;--muted2:#94a3b8;
+--bg:#f0f4f8;--surface:#fff;--line:#e2e8f0;
+--navy:#0B1F3A;--navy2:#13294b;--navy3:#1C3A66;
+--teal:#0D9488;--teal2:#0F766E;--tealL:#CCFBF1;
+--sky:#0284C7;--skyL:#E0F2FE;
+--gold:#D97706;--goldL:#FEF3C7;
+--green:#059669;--greenL:#D1FAE5;
+--red:#DC2626;--redL:#FEE2E2;
+--amber:#F59E0B;--amberL:#FEF3C7;
+--violet:#7C3AED;--violetL:#EDE9FE;
+--slate:#475569;
+--shadow:0 1px 3px rgba(15,23,42,.06),0 8px 24px -6px rgba(15,23,42,.1);
+--shadow2:0 20px 50px -12px rgba(15,23,42,.22);
+}
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Plus Jakarta Sans',-apple-system,sans-serif}
+body{background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+
+/* ============ AUTO-FIT SYSTEM ============ */
+.fit-wrap{width:100%;overflow:hidden;position:relative}
+.fit-inner{width:1240px;transform-origin:top left;}
+
+/* ============ SELECTOR ============ */
+.selector-wrap{padding:28px 16px 0;max-width:1240px;margin:0 auto}
+.brand-row{display:flex;align-items:center;gap:14px;margin-bottom:20px;flex-wrap:wrap}
+.logo-mark{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--navy),var(--navy3) 70%,var(--teal));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:17px;box-shadow:0 8px 24px -6px rgba(11,31,58,.5)}
+.brand-row h1{font-size:21px;font-weight:800;letter-spacing:-.4px;color:var(--navy)}
+.brand-row h1 em{font-style:normal;color:var(--teal)}
+.brand-row p{font-size:12.5px;color:var(--muted);margin-top:2px}
+.fit-badge{background:linear-gradient(90deg,#d1fae5,#ccfbf1);border:1px solid #6ee7b7;color:#065f46;font-size:11.5px;font-weight:700;padding:7px 14px;border-radius:10px;margin-bottom:16px;display:inline-block}
+.screen-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:26px}
+@media(max-width:760px){.screen-grid{grid-template-columns:repeat(2,1fr)}}
+.sg-btn{background:var(--surface);border:1.5px solid var(--line);border-radius:12px;padding:13px 12px;cursor:pointer;text-align:left;transition:all .2s}
+.sg-btn:hover{border-color:var(--teal);transform:translateY(-2px);box-shadow:var(--shadow)}
+.sg-btn.on{background:linear-gradient(135deg,var(--navy),var(--navy3));border-color:var(--navy)}
+.sg-btn .n{font-size:9.5px;font-weight:800;letter-spacing:.7px;color:var(--muted2);text-transform:uppercase}
+.sg-btn.on .n{color:rgba(255,255,255,.5)}
+.sg-btn .t{font-size:12.5px;font-weight:700;margin-top:3px;color:var(--navy)}
+.sg-btn.on .t{color:#fff}
+.sg-btn .ic{font-size:18px;margin-bottom:4px;display:block}
+
+.screen{display:none}
+.screen.on{display:block}
+
+/* ============ APP FRAME (fixed 1240 width inside fit-inner) ============ */
+.frame{background:var(--surface);border-radius:20px;box-shadow:var(--shadow2);border:1px solid #d3dce8;overflow:hidden}
+.app{display:flex;min-height:820px}
+.side{width:238px;background:linear-gradient(180deg,var(--navy),#0A1F3F);color:#8fa3c0;flex-shrink:0;display:flex;flex-direction:column;position:relative}
+.side .brand{padding:20px 18px 16px;display:flex;gap:11px;align-items:center;border-bottom:1px solid rgba(255,255,255,.07)}
+.side .brand .bm{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,#0EA5A4,#0D9488);display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:14px}
+.side .brand .t1{color:#fff;font-weight:800;font-size:14.5px}
+.side .brand .t2{font-size:9px;color:#5d7899;letter-spacing:1.3px;font-weight:700;text-transform:uppercase}
+.ns{padding:14px 16px 5px;font-size:9px;font-weight:800;letter-spacing:1.2px;color:#4d6484;text-transform:uppercase}
+.ni{padding:10px 14px;font-size:13px;display:flex;align-items:center;gap:11px;cursor:pointer;border-radius:10px;margin:1px 10px;position:relative;transition:all .15s}
+.ni .ic{font-size:15px;width:20px;text-align:center}
+.ni:hover{background:rgba(255,255,255,.06);color:#dbe7f5}
+.ni.on{background:linear-gradient(90deg,rgba(13,148,136,.25),rgba(13,148,136,.05));color:#2DD4BF;font-weight:700}
+.ni.on::before{content:'';position:absolute;left:0;width:3.5px;height:22px;border-radius:0 4px 4px 0;background:#2DD4BF}
+.ni .bdg{margin-left:auto;background:#EF4444;color:#fff;font-size:9.5px;padding:2px 8px;border-radius:10px;font-weight:800}
+.ni .bdg.am{background:#F59E0B}
+.side .who{margin-top:auto;padding:16px;border-top:1px solid rgba(255,255,255,.07);display:flex;gap:11px;align-items:center}
+.av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#F59E0B,#D97706);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px}
+.side .who .n{color:#fff;font-size:12.5px;font-weight:700}
+.side .who .r{font-size:10.5px;color:#5d7899}
+
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.top{background:rgba(255,255,255,.92);padding:13px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
+.crumb{font-size:11.5px;color:var(--muted2);font-weight:600}
+.crumb b{color:var(--ink2)}
+.top .h{font-size:17px;font-weight:800;color:var(--navy);letter-spacing:-.3px;margin-top:1px}
+.top .rt{display:flex;gap:12px;align-items:center}
+.search{background:#f1f5f9;border-radius:10px;padding:8px 14px 8px 34px;font-size:12.5px;color:var(--muted);width:220px;position:relative}
+.search::before{content:'⌕';position:absolute;left:12px;font-size:16px;color:var(--muted2)}
+.bell{position:relative;width:38px;height:38px;border-radius:10px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:16px}
+.bell .d{position:absolute;top:7px;right:8px;width:8px;height:8px;border-radius:50%;background:#EF4444;border:2px solid #fff}
+.stamp{font-size:11.5px;color:var(--muted);font-weight:700;background:#f1f5f9;padding:7px 12px;border-radius:10px}
+.body{padding:22px 24px;flex:1;overflow:hidden}
+
+.pt{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}
+.pt .t{font-size:20px;font-weight:800;color:var(--navy)}
+.pt .d{font-size:12.5px;color:var(--muted);margin-top:3px}
+.pt .acts{display:flex;gap:10px}
+
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:11px;border:none;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s}
+.btn-p{background:linear-gradient(135deg,var(--navy3),var(--navy));color:#fff;box-shadow:0 6px 18px -6px rgba(11,31,58,.5)}
+.btn-t{background:linear-gradient(135deg,#0D9488,#0F766E);color:#fff;box-shadow:0 6px 18px -6px rgba(13,148,136,.5)}
+.btn-o{background:#fff;color:var(--navy3);border:1.5px solid #c9d5e3}
+.btn-g{background:linear-gradient(135deg,#F59E0B,#D97706);color:#fff;box-shadow:0 6px 16px -6px rgba(217,119,6,.5)}
+.btn-r{background:linear-gradient(135deg,#EF4444,#DC2626);color:#fff}
+.btn-sm{padding:6px 13px;font-size:11.5px;border-radius:8px}
+.btn-lg{padding:13px 26px;font-size:14px;border-radius:12px}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+.ch{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.ch h4{font-size:13.5px;font-weight:800;color:var(--navy)}
+.ch .sub{font-size:11px;color:var(--muted2);font-weight:600}
+.cb{padding:16px 18px}
+.lnk{font-size:11.5px;color:var(--teal);font-weight:700;cursor:pointer}
+
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:18px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px 16px 12px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--kc,var(--navy3))}
+.kpi .lb{font-size:10px;font-weight:800;letter-spacing:.8px;color:var(--muted);text-transform:uppercase}
+.kpi .vl{font-size:26px;font-weight:800;letter-spacing:-.8px;margin:5px 0 2px}
+.kpi .ft{display:flex;justify-content:space-between;align-items:center}
+.dt{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:6px}
+.up{background:var(--greenL);color:var(--green)}
+.dn{background:var(--redL);color:var(--red)}
+.wt{background:var(--amberL);color:var(--amber)}
+
+.pl{display:inline-flex;align-items:center;gap:5px;padding:3.5px 11px;border-radius:8px;font-size:10.5px;font-weight:800}
+.pl-ok{background:var(--greenL);color:var(--green)}
+.pl-hd{background:var(--amberL);color:#B45309}
+.pl-qc{background:var(--skyL);color:var(--sky)}
+.pl-bk{background:var(--violetL);color:var(--violet)}
+.pl-rj{background:var(--redL);color:var(--red)}
+.pl-tr{background:#e2e8f0;color:var(--slate)}
+.pl-gn{background:#cffafe;color:#0E7490}
+.age{font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:7px}
+.a-g{background:var(--greenL);color:var(--green)}
+.a-a{background:var(--amberL);color:#B45309}
+.a-r{background:var(--redL);color:var(--red)}
+
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;padding:10px 12px;background:#f8fafc;color:var(--muted);font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:.7px;border-bottom:1px solid var(--line)}
+td{padding:11px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr:hover{background:#f8fafc}
+.b{font-weight:700;color:var(--ink)}
+.sm{font-size:10.5px;color:var(--muted2);margin-top:2px}
+
+.inp{padding:12px 14px;border:1.5px solid #d6dfe9;border-radius:11px;font-size:13.5px;background:#fff}
+select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2364748b' stroke-width='2' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
+
+.steps{display:flex;margin-bottom:20px;border-radius:12px;overflow:hidden;box-shadow:var(--shadow);border:1px solid var(--line)}
+.st{flex:1;padding:13px 10px;background:#fff;font-size:12px;font-weight:800;color:var(--muted2);display:flex;align-items:center;justify-content:center;gap:9px;border-right:1px solid var(--line)}
+.st:last-child{border-right:none}
+.st .n{width:22px;height:22px;border-radius:50%;background:#e2e8f0;color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:11px}
+.st.on{background:linear-gradient(135deg,var(--navy3),var(--navy));color:#fff}
+.st.on .n{background:var(--teal);color:#fff}
+.st.dn{color:var(--teal)} .st.dn .n{background:var(--tealL);color:var(--teal)}
+
+.rf-ok{box-shadow:inset 3px 0 0 var(--green)}
+.rf-wa{box-shadow:inset 3px 0 0 var(--amber);background:#fffbeb}
+.rf-cr{box-shadow:inset 3px 0 0 var(--red);background:#fef2f2}
+.rf-vi{box-shadow:inset 3px 0 0 var(--violet);background:#f5f3ff}
+
+.cf{border:1.5px solid var(--line);border-radius:14px;padding:18px;background:#fafbfc}
+.cf.ok{border-color:#a7f3d0;background:#f0fdf9}
+.cf.wa{border-color:#fde68a;background:#fffbeb}
+.sigr{margin-top:11px;padding:11px 14px;border:1.5px dashed #cbd5e1;border-radius:10px;background:#fff;display:flex;justify-content:space-between;align-items:center;font-size:12.5px}
+.sigr.solid{border-style:solid;border-color:var(--teal);background:var(--tealL)}
+.tick{color:var(--green);font-weight:800;font-size:14px}
+
+.rack{display:grid;grid-template-columns:64px repeat(5,1fr);gap:9px}
+.rc{height:58px;border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;cursor:pointer;font-weight:700;border:1.5px solid transparent;transition:all .16s}
+.rc:hover{transform:translateY(-3px) scale(1.04);box-shadow:0 10px 22px -8px rgba(15,23,42,.35);z-index:4}
+.rc .l1{font-size:11.5px;font-weight:800}
+.rc .l2{font-size:8.5px;opacity:.8;margin-top:2px}
+.fl{background:transparent!important;border:none!important;color:var(--muted2);font-weight:800;cursor:default}
+.fl:hover{transform:none!important;box-shadow:none!important}
+.rc-e{background:#ecfdf5;border-color:#a7f3d0;color:#047857}
+.rc-f{background:#fee2e2;border-color:#fca5a5;color:#b91c1c}
+.rc-p{background:#dbeafe;border-color:#93c5fd;color:#1d4ed8}
+.rc-m{background:#fef9c3;border-color:#fde047;color:#a16207}
+.rc-h{background:#ffedd5;border-color:#fdba74;color:#c2410c}
+.rc-x{background:#e2e8f0;border-color:#cbd5e1;color:#64748b}
+.leg{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;font-weight:600;color:var(--ink2);align-items:center}
+.leg .i{display:flex;align-items:center;gap:6px}
+.leg .s{width:14px;height:14px;border-radius:4px;border:1px solid rgba(0,0,0,.12)}
+
+.ls{background:#fff;border:1.5px solid #cbd5e1;border-radius:14px;padding:22px;position:relative}
+.ls::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;border-radius:14px 14px 0 0;background:linear-gradient(90deg,var(--navy3),var(--teal))}
+.ls .hd{display:flex;justify-content:space-between;border-bottom:2.5px solid var(--navy);padding-bottom:11px;margin-bottom:14px}
+.ls .hd h3{font-size:16px;letter-spacing:2px;color:var(--navy);font-weight:800}
+
+.tl{display:flex;align-items:flex-start;gap:0;margin:10px 0}
+.tl .nd{display:flex;flex-direction:column;align-items:center;gap:5px;flex:0 0 auto;width:80px}
+.tl .dot{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;border:2.5px solid}
+.tl .lbl{font-size:9px;font-weight:800;letter-spacing:.5px;color:var(--muted2);text-transform:uppercase;text-align:center}
+.tl .bar{flex:1;height:3px;background:#e2e8f0;margin-top:12px}
+.tl .bar.fill{background:linear-gradient(90deg,var(--teal),#06B6D4)}
+
+.g2{display:grid;grid-template-columns:1.55fr 1fr;gap:16px}
+.g2e{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.legend-dot{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:6px}
+.axis{font-size:9.5px;fill:#94a3b8;font-weight:600}
+.gridline{stroke:#f1f5f9;stroke-width:1}
+.note{background:linear-gradient(90deg,#fffbeb,#fff8e6);border:1px solid #fde68a;border-left:4px solid var(--gold);padding:11px 18px;border-radius:0 10px 10px 0;font-size:12.5px;color:#78350f;margin:12px 0 18px;line-height:1.6}
+.tagchip{display:inline-block;padding:2px 9px;border-radius:6px;font-size:9.5px;font-weight:800}
+.tg-n{background:#e0f2f1;color:#0F766E}.tg-h{background:#ffedd5;color:#c2410c}.tg-b{background:#ede9fe;color:#6d28d9}
+.approve{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,var(--navy),var(--navy3));border-radius:16px;padding:22px 26px;margin-top:20px;box-shadow:var(--shadow2);flex-wrap:wrap;gap:14px}
+.approve .tx{color:#fff}
+.approve .tx .t{font-size:16px;font-weight:800}
+.approve .tx .s{font-size:12px;color:#8fa3c0;margin-top:3px}
+.footer{background:var(--navy);color:#7d95b8;padding:30px 20px;text-align:center;font-size:12px;line-height:2}
+.footer b{color:#2DD4BF}
+</style>
+</head>
+<body>
+
+<div class="selector-wrap">
+<div class="brand-row">
+<div class="logo-mark">IBF</div>
+<div>
+<h1>FG Warehouse <em>·</em> Premium Design <em>v4</em></h1>
+<p>Auto-fit: har screen poora dikhega — mobile, tablet, desktop sab pe · pinch-zoom for detail</p>
+</div>
+</div>
+<div class="fit-badge">✓ Auto-fit ON — screen switch karke dekho, kuch bhi cut nahi hoga</div>
+<div class="screen-grid">
+<div class="sg-btn on" onclick="showScreen(1,this)"><span class="ic">◧</span><div class="n">01</div><div class="t">Dashboard</div></div>
+<div class="sg-btn" onclick="showScreen(2,this)"><span class="ic">⇩</span><div class="n">02</div><div class="t">Receiving Sheet</div></div>
+<div class="sg-btn" onclick="showScreen(3,this)"><span class="ic">▦</span><div class="n">03</div><div class="t">Rack Map</div></div>
+<div class="sg-btn" onclick="showScreen(4,this)"><span class="ic">⚠</span><div class="n">04</div><div class="t">Hold Tracking</div></div>
+<div class="sg-btn" onclick="showScreen(5,this)"><span class="ic">◫</span><div class="n">05</div><div class="t">Bulk Tracking</div></div>
+<div class="sg-btn" onclick="showScreen(6,this)"><span class="ic">⇗</span><div class="n">06</div><div class="t">Dispatch / Loading</div></div>
+<div class="sg-btn" onclick="showScreen(7,this)"><span class="ic">⇄</span><div class="n">07</div><div class="t">Transfers</div></div>
+<div class="sg-btn" onclick="showScreen(8,this)"><span class="ic">⚙</span><div class="n">08</div><div class="t">Maintenance</div></div>
+<div class="sg-btn" onclick="showScreen(9,this)"><span class="ic">☰</span><div class="n">09</div><div class="t">Stock Ledger</div></div>
+<div class="sg-btn" onclick="showScreen(10,this)"><span class="ic">◔</span><div class="n">10</div><div class="t">IN-OUT Report</div></div>
+</div>
+</div>
+
+<!-- SCREEN 1: DASHBOARD -->
+<div class="screen on" id="scr1">
+<div class="fit-wrap"><div class="fit-inner">
+<div class="frame"><div class="app">
+<div class="side">
+<div class="brand"><div class="bm">IBF</div><div><div class="t1">FG Warehouse</div><div class="t2">Limbasi Plant</div></div></div>
+<div class="ns">Main</div>
+<div class="ni on"><span class="ic">◧</span>Dashboard</div>
+<div class="ns">Operations</div>
+<div class="ni"><span class="ic">⇩</span>Receiving Sheet</div>
+<div class="ni"><span class="ic">▦</span>Rack Map<span class="bdg am">2</span></div>
+<div class="ni"><span class="ic">⚠</span>Hold Tracking<span class="bdg">7</span></div>
+<div class="ni"><span class="ic">◫</span>Bulk Tracking</div>
+<div class="ni"><span class="ic">⇗</span>Dispatch & Loading</div>
+<div class="ni"><span class="ic">⇄</span>Transfers</div>
+<div class="ns">Support</div>
+<div class="ni"><span class="ic">⚙</span>Maintenance<span class="bdg">1</span></div>
+<div class="ni"><span class="ic">☰</span>Stock Ledger</div>
+<div class="ni"><span class="ic">◔</span>IN-OUT Report</div>
+<div class="who"><div class="av">RS</div><div><div class="n">Rohan S.</div><div class="r">Warehouse Incharge</div></div></div>
+</div>
+<div class="main">
+<div class="top">
+<div><div class="crumb">Home / <b>Dashboard</b></div><div class="h">Good Morning, Rohan</div></div>
+<div class="rt"><div class="search">Search material, batch, pallet…</div><div class="bell">🔔<span class="d"></span></div><div class="stamp">Fri, 12 Sep · Shift A</div></div>
+</div>
+<div class="body">
+
+<div class="pt"><div><div class="t">Warehouse Overview</div><div class="d">Limbasi FG Warehouse · CR1 + CR2 + 4 3PL locations · live snapshot</div></div>
+<div class="acts"><button class="btn btn-o btn-sm">⇩ Export DSR</button><button class="btn btn-t">＋ New Receiving Sheet</button></div></div>
+
+<div class="kpis">
+<div class="kpi" style="--kc:#059669"><div class="lb">OK / Available</div><div class="vl">4,260</div><div class="ft"><span class="dt up">▲ 6.2%</span><svg width="72" height="24" viewBox="0 0 72 24"><path d="M2,18L12,15L22,16L32,11L42,13L52,8L62,10L70,5" fill="none" stroke="#059669" stroke-width="2"/><path d="M2,18L12,15L22,16L32,11L42,13L52,8L62,10L70,5L70,24L2,24Z" fill="#059669" opacity=".1"/></svg></div></div>
+<div class="kpi" style="--kc:#DC2626"><div class="lb">On Hold</div><div class="vl">7</div><div class="ft"><span class="dt dn">oldest 6d</span><svg width="72" height="24" viewBox="0 0 72 24"><path d="M2,8L12,12L22,9L32,15L42,12L52,17L62,14L70,19" fill="none" stroke="#DC2626" stroke-width="2"/></svg></div></div>
+<div class="kpi" style="--kc:#D97706"><div class="lb">QC Pending</div><div class="vl">5</div><div class="ft"><span class="dt wt">2 new today</span><svg width="72" height="24" viewBox="0 0 72 24"><path d="M2,14L12,10L22,12L32,7L42,11L52,6L62,9L70,4" fill="none" stroke="#D97706" stroke-width="2"/></svg></div></div>
+<div class="kpi" style="--kc:#7C3AED"><div class="lb">Bulk Pending</div><div class="vl">312</div><div class="ft"><span class="dt wt">repack queue</span><svg width="72" height="24" viewBox="0 0 72 24"><path d="M2,16L12,14L22,17L32,13L42,15L52,11L62,13L70,9" fill="none" stroke="#7C3AED" stroke-width="2"/></svg></div></div>
+<div class="kpi" style="--kc:#2563EB"><div class="lb">Today Dispatch</div><div class="vl">2</div><div class="ft"><span class="dt up">on time</span><svg width="72" height="24" viewBox="0 0 72 24"><path d="M2,12L12,8L22,14L32,10L42,16L52,9L62,12L70,7" fill="none" stroke="#2563EB" stroke-width="2"/></svg></div></div>
+<div class="kpi" style="--kc:#EF4444"><div class="lb">Maintenance</div><div class="vl">1 <span style="font-size:13px;color:#DC2626;font-weight:800">CRIT</span></div><div class="ft"><span class="dt dn">CR1 temp</span><svg width="72" height="24" viewBox="0 0 72 24"><path d="M2,6L12,8L22,5L32,10L42,7L52,13L62,11L70,16" fill="none" stroke="#EF4444" stroke-width="2"/></svg></div></div>
+</div>
+
+<div class="g2" style="margin-bottom:16px">
+<div class="card">
+<div class="ch"><h4>◕ Stock Status Breakdown <span class="sub">· by cartons</span></h4><span class="lnk">Ledger →</span></div>
+<div class="cb" style="display:flex;gap:22px;align-items:center">
+<svg width="180" height="180" viewBox="0 0 130 130">
+<circle cx="65" cy="65" r="52" fill="none" stroke="#f1f5f9" stroke-width="17"/>
+<circle cx="65" cy="65" r="52" fill="none" stroke="#059669" stroke-width="17" stroke-dasharray="259 327" transform="rotate(-90 65 65)"/>
+<circle cx="65" cy="65" r="52" fill="none" stroke="#0284C7" stroke-width="17" stroke-dasharray="12 327" stroke-dashoffset="-261" transform="rotate(-90 65 65)"/>
+<circle cx="65" cy="65" r="52" fill="none" stroke="#D97706" stroke-width="17" stroke-dasharray="20 327" stroke-dashoffset="-275" transform="rotate(-90 65 65)"/>
+<circle cx="65" cy="65" r="52" fill="none" stroke="#7C3AED" stroke-width="17" stroke-dasharray="20 327" stroke-dashoffset="-297" transform="rotate(-90 65 65)"/>
+<circle cx="65" cy="65" r="52" fill="none" stroke="#DC2626" stroke-width="17" stroke-dasharray="8 327" stroke-dashoffset="-319" transform="rotate(-90 65 65)"/>
+<text x="65" y="60" text-anchor="middle" font-size="21" font-weight="800" fill="#0f172a">5,180</text>
+<text x="65" y="76" text-anchor="middle" font-size="8.5" font-weight="700" fill="#94a3b8" letter-spacing="1">CARTONS</text>
+</svg>
+<div style="flex:1;font-size:12px;line-height:2.15">
+<div><span class="legend-dot" style="background:#059669"></span><b>OK / Available</b> — 4,260 <span style="color:#94a3b8">(82.2%)</span></div>
+<div><span class="legend-dot" style="background:#D97706"></span><b>Hold</b> — 320 <span style="color:#94a3b8">(6.2%)</span></div>
+<div><span class="legend-dot" style="background:#7C3AED"></span><b>Bulk</b> — 312 <span style="color:#94a3b8">(6.0%)</span></div>
+<div><span class="legend-dot" style="background:#0284C7"></span><b>QC Hold</b> — 180 <span style="color:#94a3b8">(3.5%)</span></div>
+<div><span class="legend-dot" style="background:#DC2626"></span><b>Rejected</b> — 60 <span style="color:#94a3b8">(1.2%)</span></div>
+<div><span class="legend-dot" style="background:#94a3b8"></span><b>Sample</b> — 48 <span style="color:#94a3b8">(0.9%)</span></div>
+<div style="margin-top:8px;padding-top:9px;border-top:1px solid #f1f5f9;color:#64748b;font-size:11px">SAP sync: LMFGA 4,260 · LMFGH 320 · LMFGBULK 312 · LMFGQ 180</div>
+</div>
+</div>
+</div>
+<div class="card">
+<div class="ch"><h4>◮ 14-Day Flow <span class="sub">· inward vs dispatch</span></h4><div style="font-size:11px;font-weight:700"><span class="legend-dot" style="background:#0D9488"></span>Inward&nbsp;&nbsp;<span class="legend-dot" style="background:#64748b"></span>Dispatch</div></div>
+<div class="cb" style="padding-top:8px">
+<svg width="100%" height="190" viewBox="0 0 620 190" preserveAspectRatio="none">
+<defs>
+<linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0D9488" stop-opacity=".3"/><stop offset="100%" stop-color="#0D9488" stop-opacity="0"/></linearGradient>
+<linearGradient id="gb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#64748b" stop-opacity=".18"/><stop offset="100%" stop-color="#64748b" stop-opacity="0"/></linearGradient>
+</defs>
+<line x1="0" y1="40" x2="620" y2="40" class="gridline"/><line x1="0" y1="85" x2="620" y2="85" class="gridline"/><line x1="0" y1="130" x2="620" y2="130" class="gridline"/><line x1="0" y1="175" x2="620" y2="175" class="gridline"/>
+<text x="4" y="36" class="axis">2.5k</text><text x="4" y="81" class="axis">1.5k</text><text x="4" y="126" class="axis">0.8k</text><text x="4" y="171" class="axis">0</text>
+<path d="M30,140L72,120L114,132L156,100L198,118L240,88L282,104L324,70L366,92L408,58L450,78L492,44L534,66L576,36L576,175L30,175Z" fill="url(#ga)"/>
+<path d="M30,140L72,120L114,132L156,100L198,118L240,88L282,104L324,70L366,92L408,58L450,78L492,44L534,66L576,36" fill="none" stroke="#0D9488" stroke-width="2.6" stroke-linecap="round"/>
+<path d="M30,158L72,150L114,155L156,138L198,148L240,128L282,140L324,118L366,130L408,108L450,122L492,100L534,115L576,96L576,175L30,175Z" fill="url(#gb)"/>
+<path d="M30,158L72,150L114,155L156,138L198,148L240,128L282,140L324,118L366,130L408,108L450,122L492,100L534,115L576,96" fill="none" stroke="#64748b" stroke-width="2.2" stroke-dasharray="5 4" stroke-linecap="round"/>
+<circle cx="492" cy="44" r="4.5" fill="#0D9488" stroke="#fff" stroke-width="2"/>
+<rect x="440" y="8" width="104" height="30" rx="7" fill="#0f172a"/>
+<text x="492" y="20" text-anchor="middle" font-size="9" fill="#2DD4BF" font-weight="700">09 Sep · Inward</text>
+<text x="492" y="32" text-anchor="middle" font-size="11" fill="#fff" font-weight="800">2,148 cartons</text>
+<text x="30" y="188" class="axis">30 Aug</text><text x="290" y="188" class="axis">06 Sep</text><text x="555" y="188" class="axis">12 Sep</text>
+</svg>
+</div>
+</div>
+</div>
+
+<div class="g3" style="margin-bottom:16px">
+<div class="card"><div class="ch"><h4>▥ FIFO Aging</h4><span class="sub">4,260 OK cartons</span></div><div class="cb">
+<div style="display:flex;height:30px;border-radius:9px;overflow:hidden;font-size:10px;font-weight:800;color:#fff;box-shadow:var(--shadow)">
+<div style="background:linear-gradient(135deg,#34D399,#059669);width:38%;display:flex;align-items:center;justify-content:center">0–30d · 1,620</div>
+<div style="background:linear-gradient(135deg,#60A5FA,#2563EB);width:27%;display:flex;align-items:center;justify-content:center">31–60d · 1,150</div>
+<div style="background:linear-gradient(135deg,#FBBF24,#D97706);width:20%;display:flex;align-items:center;justify-content:center">61–90d · 850</div>
+<div style="background:linear-gradient(135deg,#F87171,#DC2626);width:15%;display:flex;align-items:center;justify-content:center">90d+ · 640</div>
+</div>
+<div style="margin-top:11px;font-size:11.5px;color:#B45309;background:#fffbeb;border:1px dashed #fde68a;border-radius:8px;padding:8px 12px;line-height:1.6">⚠ <b>90+ days:</b> LFG00391, LFG00519 — priority dispatch ya QC re-review</div>
+</div></div>
+<div class="card"><div class="ch"><h4>Warehouse-wise Stock</h4><span class="lnk">Transfers →</span></div><div class="cb" style="font-size:11.5px">
+<div style="display:grid;grid-template-columns:74px 1fr 44px;gap:9px;align-items:center;row-gap:11px">
+<b>Limbasi</b><div style="background:#eef2f7;border-radius:6px;height:17px"><div style="width:86%;height:100%;border-radius:6px;background:linear-gradient(90deg,#0D9488,#0F766E)"></div></div><b>3,120</b>
+<b>Coldman</b><div style="background:#eef2f7;border-radius:6px;height:17px"><div style="width:36%;height:100%;border-radius:6px;background:linear-gradient(90deg,#38BDF8,#0284C7)"></div></div><span>850</span>
+<b>Coldrush</b><div style="background:#eef2f7;border-radius:6px;height:17px"><div style="width:27%;height:100%;border-radius:6px;background:linear-gradient(90deg,#A78BFA,#7C3AED)"></div></div><span>640</span>
+<b>RK Cold</b><div style="background:#eef2f7;border-radius:6px;height:17px"><div style="width:20%;height:100%;border-radius:6px;background:linear-gradient(90deg,#FBBF24,#D97706)"></div></div><span>480</span>
+<b>Others</b><div style="background:#eef2f7;border-radius:6px;height:17px"><div style="width:14%;height:100%;border-radius:6px;background:linear-gradient(90deg,#94A3B8,#64748b)"></div></div><span>340</span>
+</div>
+<div style="margin-top:10px;color:#64748b;font-size:10.5px">SAP: LMFGA · LMFGA-CM · LMFGA-CR · LMFGA-RK · 3PL others</div>
+</div></div>
+<div class="card"><div class="ch"><h4>◉ Cold Room Temp</h4><span class="pl-rj">1 CRITICAL</span></div><div class="cb" style="display:flex;gap:14px;justify-content:space-around">
+<div style="text-align:center">
+<svg width="120" height="76" viewBox="0 0 160 92"><path d="M18,82A62,62 0 0 1 142,82" fill="none" stroke="#fca5a5" stroke-width="13" stroke-linecap="round"/><path d="M18,82A62,62 0 0 1 142,82" fill="none" stroke="#DC2626" stroke-width="13" stroke-linecap="round" stroke-dasharray="128 195"/><line x1="80" y1="82" x2="103" y2="38" stroke="#0f172a" stroke-width="3.5" stroke-linecap="round"/><circle cx="80" cy="82" r="6" fill="#0f172a"/></svg>
+<div style="font-size:17px;font-weight:800;color:#DC2626">-15.2°C</div><div style="font-size:10px;font-weight:800;color:#DC2626;letter-spacing:.5px">CR1 · RISING ⚠</div>
+</div>
+<div style="text-align:center">
+<svg width="120" height="76" viewBox="0 0 160 92"><path d="M18,82A62,62 0 0 1 142,82" fill="none" stroke="#a7f3d0" stroke-width="13" stroke-linecap="round"/><path d="M18,82A62,62 0 0 1 142,82" fill="none" stroke="#059669" stroke-width="13" stroke-linecap="round" stroke-dasharray="150 195"/><line x1="80" y1="82" x2="62" y2="34" stroke="#0f172a" stroke-width="3.5" stroke-linecap="round"/><circle cx="80" cy="82" r="6" fill="#0f172a"/></svg>
+<div style="font-size:17px;font-weight:800;color:#059669">-18.4°C</div><div style="font-size:10px;font-weight:800;color:#059669;letter-spacing:.5px">CR2 · STABLE ✓</div>
+</div>
+<div style="font-size:10.5px;color:#64748b;border-left:1px solid #f1f5f9;padding-left:12px;line-height:1.8;align-self:center">Target: <b>-18°C</b><br>Alert: >-15°C<br><span style="color:#DC2626;font-weight:800">CR1 → MT-0912-001</span></div>
+</div></div>
+</div>
+
+<div class="g2">
+<div class="card" style="border-left:4px solid #D97706">
+<div class="ch"><h4>⚠ Hold Aging — Action Required</h4><button class="btn btn-g btn-sm">Follow up all QC</button></div>
+<div class="cb" style="padding-top:4px">
+<table>
+<tr><th>Material</th><th>Reason</th><th>Qty</th><th>Since</th><th style="text-align:center">Aging</th><th></th></tr>
+<tr><td><span class="b">LFG00613</span><div class="sm">Myers Everlast · L26I070613</div></td><td>High Temperature</td><td>43 bx</td><td>07 Sep</td><td style="text-align:center"><span class="age a-r">6d 🔴</span></td><td><button class="btn btn-g btn-sm">Nudge</button></td></tr>
+<tr><td><span class="b">LFG00740</span><div class="sm">Everlast 9mm · L26A120740</div></td><td>Thread contamination</td><td>97 bx</td><td>09 Sep</td><td style="text-align:center"><span class="age a-r">4d 🔴</span></td><td><button class="btn btn-g btn-sm">Nudge</button></td></tr>
+<tr><td><span class="b">LFG01058</span><div class="sm">FF 9mm · L26I0801088</div></td><td>Enzyme +ve</td><td>180 bx</td><td>10 Sep</td><td style="text-align:center"><span class="age a-a">2d 🟡</span></td><td><button class="btn btn-g btn-sm">Nudge</button></td></tr>
+</table>
+</div>
+</div>
+<div class="card">
+<div class="ch"><h4>⇗ Today's Dispatch</h4><span class="lnk">Dispatch desk →</span></div>
+<div class="cb" style="padding-top:4px">
+<table>
+<tr><th>Vehicle</th><th>Party</th><th>Qty</th><th>Status</th></tr>
+<tr><td class="b">GJ14AT7260<div class="sm">Export · MNBU9105855</div></td><td>Al Zawid · Dubai</td><td>2,070 bx</td><td><span class="pl-ok">✓ Loaded</span></td></tr>
+<tr><td class="b">GJ27TJ0453</td><td>Hungritos Dist.</td><td>1,600 bx</td><td><span class="pl-qc">Pick in progress</span></td></tr>
+</table>
+<div style="margin-top:12px;display:flex;gap:9px"><button class="btn btn-p btn-sm" style="flex:1;justify-content:center">＋ Loading Sheet</button><button class="btn btn-o btn-sm" style="flex:1;justify-content:center">Gate Passes</button></div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+</div></div>
+</div></div>
+</div>
+
+<!-- SCREEN 2: RECEIVING SHEET -->
+<div class="screen" id="scr2">
+<div class="fit-wrap"><div class="fit-inner">
+<div class="frame"><div class="app">
+<div class="side">
+<div class="brand"><div class="bm">IBF</div><div><div class="t1">FG Warehouse</div><div class="t2">Limbasi Plant</div></div></div>
+<div class="ns">Main</div><div class="ni">◧Dashboard</div>
+<div class="ns">Operations</div>
+<div class="ni on"><span class="ic">⇩</span>Receiving Sheet</div>
+<div class="ni"><span class="ic">▦</span>Rack Map</div>
+<div class="ni"><span class="ic">⚠</span>Hold Tracking</div>
+<div class="ni"><span class="ic">◫</span>Bulk Tracking</div>
+<div class="ni"><span class="ic">⇗</span>Dispatch & Loading</div>
+<div class="ni"><span class="ic">⇄</span>Transfers</div>
+<div class="ns">Support</div>
+<div class="ni"><span class="ic">⚙</span>Maintenance</div>
+<div class="ni"><span class="ic">☰</span>Stock Ledger</div>
+<div class="ni"><span class="ic">◔</span>IN-OUT Report</div>
+<div class="who"><div class="av">RS</div><div><div class="n">Rohan S.</div><div class="r">Warehouse Incharge</div></div></div>
+</div>
+<div class="main">
+<div class="top"><div><div class="crumb">Operations / <b>Receiving Sheet</b> / New</div><div class="h">New FG Receiving Sheet</div></div><div class="rt"><div class="stamp">Fri, 12 Sep 2026 · Shift A</div></div></div>
+<div class="body">
+
+<div class="steps">
+<div class="st dn"><span class="n">✓</span>Sheet Details</div>
+<div class="st on"><span class="n">2</span>Pallet Entry</div>
+<div class="st"><span class="n">3</span>Dual Confirmation</div>
+</div>
+
+<div class="card" style="margin-bottom:16px;background:linear-gradient(90deg,#f0fdfa,#fff);border-color:#99f6e4">
+<div class="cb" style="display:flex;gap:26px;align-items:center;font-size:12.5px;flex-wrap:wrap">
+<div><div class="sm" style="margin:0 0 3px">RECEIVING SHEET</div><b style="font-size:14px;color:#0F766E">RS-2026-0912-001</b></div>
+<div><div class="sm" style="margin:0 0 3px">LINE / SHIFT</div><b>FF · Shift A</b></div>
+<div><div class="sm" style="margin:0 0 3px">MATERIAL</div><b>LFG01105</b> · AL Zawid Premium 10 KG</div>
+<div><div class="sm" style="margin:0 0 3px">BATCH</div><b>2261121052</b></div>
+<div style="margin-left:auto;text-align:right"><div class="sm" style="margin:0 0 3px">RUNNING TOTAL</div><b style="font-size:19px;color:#0F766E">420 boxes</b></div>
+</div>
+</div>
+
+<div class="card">
+<div class="ch"><h4>Pallet-wise Entry <span class="sub">· 7 of 35 · time auto · flags auto</span></h4><span style="display:flex;gap:8px"><button class="btn btn-o btn-sm">Save Draft</button><button class="btn btn-t btn-sm">＋ Add Pallet</button></span></div>
+<div class="cb" style="padding-top:6px">
+<table>
+<tr><th style="width:36px">Sr</th><th>Pallet No</th><th style="width:60px">Qty</th><th style="width:58px">Time</th><th style="width:58px">Total</th><th>Carton Condition</th><th style="width:64px">Temp °C</th><th>Remarks</th></tr>
+<tr class="rf-ok"><td>1</td><td class="b">30673</td><td>60</td><td>09:40</td><td>60</td><td><span class="pl-ok">✓ OK</span></td><td style="color:#0284C7;font-weight:800">-18.2</td><td class="sm" style="margin:0">—</td></tr>
+<tr class="rf-ok"><td>2</td><td class="b">30675</td><td>60</td><td>09:50</td><td>120</td><td><span class="pl-ok">✓ OK</span></td><td style="color:#0284C7;font-weight:800">-18.0</td><td class="sm" style="margin:0">—</td></tr>
+<tr class="rf-wa"><td>3</td><td class="b">30676</td><td>60</td><td>10:10</td><td>180</td><td><span class="pl-hd">⚠ BULGING</span></td><td style="color:#0284C7;font-weight:800">-17.5</td><td><i style="color:#B45309;font-size:11.5px">2 cartons side bulge</i></td></tr>
+<tr class="rf-vi"><td>4</td><td class="b">30698</td><td><b style="color:#6d28d9">58</b></td><td>10:10</td><td>238</td><td><span class="pl-bk">SHORT −2</span></td><td style="color:#0284C7;font-weight:800">-18.1</td><td><i style="color:#6d28d9;font-size:11.5px">2 boxes short vs slip</i></td></tr>
+<tr class="rf-cr"><td>5</td><td class="b">30701</td><td>60</td><td>10:40</td><td>298</td><td><span class="pl-ok">✓ OK</span></td><td style="color:#DC2626;font-weight:800">-14.0 ⚠</td><td><i style="color:#DC2626;font-size:11.5px">Amber: temp > -15°C</i></td></tr>
+<tr class="rf-ok"><td>6</td><td class="b">30702</td><td>60</td><td>10:45</td><td>358</td><td><span class="pl-ok">✓ OK</span></td><td style="color:#0284C7;font-weight:800">-17.8</td><td class="sm" style="margin:0">—</td></tr>
+<tr class="rf-ok"><td>7</td><td class="b">30704</td><td>62</td><td>10:55</td><td><b>420</b></td><td><span class="pl-ok">✓ OK</span></td><td style="color:#0284C7;font-weight:800">-18.3</td><td class="sm" style="margin:0">—</td></tr>
+<tr><td colspan="8" style="text-align:center;color:#cbd5e1;font-size:11px;padding:8px">··· 28 empty rows available ···</td></tr>
+</table>
+<div style="display:flex;justify-content:space-between;margin-top:16px;align-items:center">
+<div class="sm" style="margin:0">Flags: <span class="pl-hd">1 BULGING</span> <span class="pl-bk">1 SHORT</span> <span class="pl-rj">1 TEMP</span></div>
+<button class="btn btn-p btn-lg">Proceed to Confirmation →</button>
+</div>
+</div>
+</div>
+
+<div style="height:18px"></div>
+<div class="card">
+<div class="ch"><h4>Step 3 Preview — Dual Confirmation & Lock</h4><span class="pl-qc"> awaiting warehouse operator</span></div>
+<div class="cb">
+<div class="g2e">
+<div class="cf ok">
+<div style="font-size:12px;font-weight:800;color:#0F766E;letter-spacing:.6px">⇱ PACKING SIDE</div>
+<div class="sigr solid"><div><b>Dilip P.</b> · Packing Supervisor<br><span class="sm" style="margin:0">12 Sep, 10:58</span></div><span class="tick">✓</span></div>
+<div class="sigr solid"><div><b>Manoj K.</b> · Packing Operator<br><span class="sm" style="margin:0">12 Sep, 10:58</span></div><span class="tick">✓</span></div>
+<div style="margin-top:9px;font-size:11px;color:#0F766E;background:#d1fae5;border-radius:8px;padding:7px 11px">✓ Acknowledged: BULGING · SHORT −2 · TEMP flag</div>
+</div>
+<div class="cf wa">
+<div style="font-size:12px;font-weight:800;color:#B45309;letter-spacing:.6px">⇲ WAREHOUSE SIDE</div>
+<div class="sigr solid"><div><b>Rohan S.</b> · Wh. Executive<br><span class="sm" style="margin:0">12 Sep, 11:02</span></div><span class="tick">✓</span></div>
+<div class="sigr" style="border-color:#F59E0B"><div><b style="color:#B45309">Awaiting…</b> · Wh. Operator<br><span class="sm" style="margin:0">tap to confirm</span></div><button class="btn btn-g btn-sm">Confirm</button></div>
+</div>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
+<div class="sm" style="margin:0;line-height:1.7">Dono side lock → <b>Legal record</b> → auto <span class="pl-qc">QC HOLD</span> → QC queue notify → SAP LMFGQ</div>
+<button class="btn btn-p btn-lg">🔒 Lock Receiving Sheet</button>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+</div></div>
+</div></div>
+</div>
+
+<!-- SCREEN 3: RACK MAP -->
+<div class="screen" id="scr3">
+<div class="fit-wrap"><div class="fit-inner">
+<div class="frame"><div class="app">
+<div class="main">
+<div class="top"><div><div class="crumb">Operations / <b>Rack Map</b> / CR1</div><div class="h">Cold Room 1 — Live Rack Map</div></div>
+<div class="rt"><div class="search">Search material / batch / pallet…</div>
+<div style="display:flex;background:#f1f5f9;border-radius:11px;padding:3px"><span class="btn btn-p btn-sm" style="border-radius:8px">CR1</span><span class="btn btn-sm" style="background:transparent;color:#64748b">CR2</span></div></div>
+</div>
+<div class="body">
+
+<div class="leg" style="margin-bottom:14px">
+<div class="i"><div class="s" style="background:#ecfdf5;border-color:#a7f3d0"></div>Empty</div>
+<div class="i"><div class="s" style="background:#fee2e2;border-color:#fca5a5"></div>Full</div>
+<div class="i"><div class="s" style="background:#dbeafe;border-color:#93c5fd"></div>Partial</div>
+<div class="i"><div class="s" style="background:#fef9c3;border-color:#fde047"></div>Mix</div>
+<div class="i"><div class="s" style="background:#ffedd5;border-color:#fdba74"></div>HOLD</div>
+<div class="i"><div class="s" style="background:#e2e8f0;border-color:#cbd5e1"></div>Blocked</div>
+<span style="margin-left:auto" class="pl-ok">CR1: 68% occupied · 127/187 positions</span>
+</div>
+
+<div class="g2">
+<div>
+<div class="card" style="margin-bottom:14px">
+<div class="ch"><h4>Block 01 — LFG00613 · Myers Everlast Shoestring</h4><span class="sub">Positions A–E × Floors 1–4 · 19/20</span></div>
+<div class="cb">
+<div class="rack">
+<div class="rc fl"><span class="l1" style="font-size:9px">FLOOR↓ POS→</span></div>
+<div class="rc fl"><span class="l1">A</span></div><div class="rc fl"><span class="l1">B</span></div><div class="rc fl"><span class="l1">C</span></div><div class="rc fl"><span class="l1">D</span></div><div class="rc fl"><span class="l1">E</span></div>
+<div class="rc fl"><span class="l1">F4</span></div>
+<div class="rc rc-f"><span class="l1">A-4</span><span class="l2">P30083</span></div>
+<div class="rc rc-f"><span class="l1">B-4</span><span class="l2">P30079</span></div>
+<div class="rc rc-e"><span class="l1">C-4</span><span class="l2">empty</span></div>
+<div class="rc rc-m"><span class="l1">D-4</span><span class="l2">2 batches</span></div>
+<div class="rc rc-h"><span class="l1">E-4</span><span class="l2">⚠ HOLD</span></div>
+<div class="rc fl"><span class="l1">F3</span></div>
+<div class="rc rc-f"><span class="l1">A-3</span><span class="l2">P30082</span></div>
+<div class="rc rc-f"><span class="l1">B-3</span><span class="l2">P30077</span></div>
+<div class="rc rc-f"><span class="l1">C-3</span><span class="l2">P30072</span></div>
+<div class="rc rc-p"><span class="l1">D-3</span><span class="l2">48/84</span></div>
+<div class="rc rc-f"><span class="l1">E-3</span><span class="l2">P30067</span></div>
+<div class="rc fl"><span class="l1">F2</span></div>
+<div class="rc rc-f"><span class="l1">A-2</span><span class="l2">P30081</span></div>
+<div class="rc rc-f"><span class="l1">B-2</span><span class="l2">P30078</span></div>
+<div class="rc rc-f"><span class="l1">C-2</span><span class="l2">P30073</span></div>
+<div class="rc rc-f"><span class="l1">D-2</span><span class="l2">P30071</span></div>
+<div class="rc rc-e"><span class="l1">E-2</span><span class="l2">empty</span></div>
+<div class="rc fl"><span class="l1">F1</span></div>
+<div class="rc rc-f"><span class="l1">A-1</span><span class="l2">P30084</span></div>
+<div class="rc rc-f"><span class="l1">B-1</span><span class="l2">P30080</span></div>
+<div class="rc rc-f"><span class="l1">C-1</span><span class="l2">P30074</span></div>
+<div class="rc rc-f"><span class="l1">D-1</span><span class="l2">P30069</span></div>
+<div class="rc rc-x"><span class="l1">E-1</span><span class="l2">rack bent</span></div>
+</div>
+</div>
+</div>
+<div class="card">
+<div class="ch"><h4>Blocks 02–06 <span class="sub">· compact · scroll for 07–36</span></h4></div>
+<div class="cb" style="display:flex;gap:8px;flex-wrap:wrap">
+<div class="rc rc-f" style="width:58px"><span class="l1">02-A1</span><span class="l2">LFG01249</span></div>
+<div class="rc rc-m" style="width:58px"><span class="l1">02-A2</span><span class="l2">2 bat.</span></div>
+<div class="rc rc-e" style="width:58px"><span class="l1">02-A3</span><span class="l2">—</span></div>
+<div class="rc rc-f" style="width:58px"><span class="l1">02-A4</span><span class="l2">30481</span></div>
+<div class="rc rc-h" style="width:58px"><span class="l1">03-B2</span><span class="l2">HOLD</span></div>
+<div class="rc rc-f" style="width:58px"><span class="l1">03-C1</span><span class="l2">SP-2389</span></div>
+<div class="rc rc-p" style="width:58px"><span class="l1">03-C2</span><span class="l2">13/48</span></div>
+<div class="rc rc-f" style="width:58px"><span class="l1">04-D4</span><span class="l2">LFG01494</span></div>
+<div class="rc rc-e" style="width:58px"><span class="l1">04-E2</span><span class="l2">—</span></div>
+<div class="rc rc-x" style="width:58px"><span class="l1">05-A1</span><span class="l2">blocked</span></div>
+<div class="rc rc-f" style="width:58px"><span class="l1">06-B3</span><span class="l2">LFG01250</span></div>
+<span style="align-self:center;color:#94a3b8;font-size:11px">→ blocks 07–36</span>
+</div>
+</div>
+</div>
+
+<div>
+<div style="background:var(--navy);color:#cbd5e1;border-radius:12px;padding:13px 15px;width:236px;font-size:11.5px;line-height:1.75;box-shadow:0 16px 40px -10px rgba(11,31,58,.55)">
+<div style="color:#2DD4BF;font-weight:800;font-size:12.5px;margin-bottom:5px">📍 CR1-01-A-4 · Pallet 30083</div>
+<b style="color:#fff">LFG00613</b> — Myers Everlast<br>
+Batch <b style="color:#fff">L26I070613</b> · 84 bx · 5 days old<br>
+Status: <b style="color:#34D399">OK</b> · SAP <b style="color:#fff">LMFGA</b><br>
+In: 07 Sep, Shift A · <b style="color:#fff">RS-0907-005</b><br>
+Weight: 1,008 kg <span style="color:#fbbf24">(limit check ⚠)</span><br>
+<span style="color:#2DD4BF">History: 2 moves · audit ✓</span>
+</div>
+<div class="card" style="margin-top:14px">
+<div class="ch"><h4>Putaway Suggestions</h4></div>
+<div class="cb" style="font-size:12px">
+<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9"><span><b>CR1-01-C-4</b> · same block, FIFO-friendly</span><button class="btn btn-t btn-sm">Assign</button></div>
+<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9"><span><b>CR2-15-B-3</b> · empty, near dock</span><button class="btn btn-o btn-sm">Assign</button></div>
+<div style="display:flex;justify-content:space-between;padding:8px 0"><span><b>CR1-FLOOR</b> · temp staging</span><button class="btn btn-o btn-sm">Assign</button></div>
+<div class="sm" style="margin-top:8px">Weight limit + pallet type + FIFO accessibility — sab auto-check</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+</div></div>
+</div></div>
+</div>
+
+<!-- SCREEN 4: HOLD TRACKING -->
+<div class="screen" id="scr4">
+<div class="fit-wrap"><div class="fit-inner">
+<div class="frame"><div class="app">
+<div class="main">
+<div class="top"><div><div class="crumb">Operations / <b>Hold Tracking</b></div><div class="h">Hold Tracking · SAP LMFGH</div></div>
+<div class="rt"><select class="inp" style="width:160px;padding:8px 12px;font-size:12px"><option>All Reasons ▾</option></select><select class="inp" style="width:130px;padding:8px 12px;font-size:12px"><option>All Aging ▾</option></select><button class="btn btn-o btn-sm">⇩ Export</button></div></div>
+<div class="body">
+<div class="g3" style="margin-bottom:16px">
+<div class="card" style="border-top:4px solid #DC2626"><div class="cb" style="text-align:center"><div style="font-size:10px;font-weight:800;letter-spacing:1px;color:#DC2626">RED · OVERDUE (>7d)</div><div style="font-size:34px;font-weight:800">2</div><div class="sm" style="margin:0">escalated to QC Head ✓</div></div></div>
+<div class="card" style="border-top:4px solid #D97706"><div class="cb" style="text-align:center"><div style="font-size:10px;font-weight:800;letter-spacing:1px;color:#D97706">AMBER (>3d)</div><div style="font-size:34px;font-weight:800">3</div><div class="sm" style="margin:0">follow-up auto-sent</div></div></div>
+<div class="card" style="border-top:4px solid #059669"><div class="cb" style="text-align:center"><div style="font-size:10px;font-weight:800;letter-spacing:1px;color:#059669">RELEASED THIS WEEK</div><div style="font-size:34px;font-weight:800">11</div><div class="sm" style="margin:0">avg turnaround 2.4 days</div></div></div>
+</div>
+<div class="card">
+<div class="ch"><h4>All Held Materials <span class="sub">· 7 pallets · 320 cartons</span></h4><button class="btn btn-g">⚡ Follow up ALL</button></div>
+<div class="cb" style="padding-top:4px">
+<table>
+<tr><th>Hold ID</th><th>Material</th><th>Pallets / Qty</th><th>Location</th><th>Reason</th><th>Placed By</th><th style="text-align:center">Aging</th><th></th></tr>
+<tr style="background:#fef2f2"><td class="b">HOLD-0907-003</td><td><span class="b">LFG00613</span><div class="sm">L26I070613</div></td><td>P30085 · 5 bx</td><td>CR1-34-E-1</td><td>High Temperature</td><td>Kamlesh · QC</td><td style="text-align:center"><span class="age a-r">6d 🔴</span></td><td><button class="btn btn-g btn-sm">Nudge</button></td></tr>
+<tr style="background:#fef2f2"><td class="b">HOLD-0909-001</td><td><span class="b">LFG00740</span><div class="sm">L26A120740</div></td><td>P605+P613 · 97 bx</td><td>CR2-36-E-1 · CR2-27-D-1</td><td>Thread contamination</td><td>Kamlesh · QC</td><td style="text-align:center"><span class="age a-r">4d 🔴</span></td><td><button class="btn btn-g btn-sm">Nudge</button></td></tr>
+<tr><td class="b">HOLD-0910-004</td><td><span class="b">LFG01058</span><div class="sm">L26I0801088</div></td><td>P812–815 · 180 bx</td><td>CR2-11-A-1…4</td><td>Enzyme test positive</td><td>Rm Lab · QC</td><td style="text-align:center"><span class="age a-a">2d 🟡</span></td><td><button class="btn btn-g btn-sm">Nudge</button></td></tr>
+<tr><td class="b">HOLD-0911-002</td><td><span class="b">LFG00237</span><div class="sm">L26K110237</div></td><td>MG-496 · 62 bx</td><td>CR2-02-A-1</td><td>Misshapes</td><td>Production → QC</td><td style="text-align:center"><span class="age a-a">1d 🟡</span></td><td><button class="btn btn-g btn-sm">Nudge</button></td></tr>
+<tr style="background:#f0fdf9"><td class="b">HOLD-0905-007</td><td><span class="b">LFG00049</span><div class="sm">L26I050049</div></td><td>SP-2389 · 48 bx</td><td>CR2-01-C-1</td><td>Batter bubbles</td><td>Kamlesh · QC</td><td style="text-align:center"><span class="pl-ok">Released ✓ 09:15</span></td><td class="sm" style="margin:0">by QC</td></tr>
+</table>
+</div>
+</div>
+<div class="note">🚫 <b>Hard block:</b> HOLD material party dispatch me select hi nahi hota. 3PL transfer HOLD tag ke saath possible. Release sirf QC role se.</div>
+</div>
+</div>
+</div></div>
+</div></div>
+</div>
+
+<!-- SCREEN 5: BULK TRACKING -->
+<div class="screen" id="scr5">
+<div class="fit-wrap"><div class="fit-inner">
+<div class="frame"><div class="app">
+<div class="main">
+<div class="top"><div><div class="crumb">Operations / <b>Bulk Tracking</b></div><div class="h">Bulk Tracking · SAP LMFGBULK</div></div><div class="rt"><button class="btn btn-t">＋ Register Bulk Inward</button></div></div>
+<div class="body">
+<div class="card"><div class="ch"><h4>Pending Repack — FIFO on bulk age</h4><span class="sub">bulk = bulk cartons me packed (over-production / defective)</span></div>
+<div class="cb" style="padding-top:4px">
+<table>
+<tr><th>Material</th><th>Type</th><th>Qty</th><th>Location</th><th>Age</th><th>Status</th><th>Progress</th><th></th></tr>
+<tr><td><span class="b">LFG00111</span><div class="sm">French Fries 7mm (Bulk) · L26A090111</div></td><td><span class="tagchip tg-b">Over-production</span></td><td>222 bx</td><td>CR1-09-A-1…4</td><td><span class="age a-r">11d</span></td><td><span class="pl-bk">At Packing Dept</span></td><td><div style="background:#f1f5f9;border-radius:6px;height:14px;width:130px"><div style="width:31%;height:100%;border-radius:6px;background:linear-gradient(90deg,#A78BFA,#7C3AED)"></div></div><span class="sm" style="margin:0">69/222</span></td><td><button class="btn btn-o btn-sm">Detail</button></td></tr>
+<tr><td><span class="b">LFG00857</span><div class="sm">Skin On 11mm (Bulk) · L26A110857</div></td><td><span class="tagchip tg-b">Defective</span></td><td>95 bx</td><td>CR1-20-A-3…4</td><td><span class="age a-a">6d</span></td><td><span class="pl-hd">In WH — awaiting pickup</span></td><td class="sm" style="margin:0">—</td><td><button class="btn btn-t btn-sm">Send to Packing</button></td></tr>
+<tr style="background:#f0fdf9"><td><span class="b">LFG00239</span><div class="sm">Herbed Slider (Bulk) · L26K020239</div></td><td><span class="tagchip tg-b">Over-production</span></td><td>40 bx</td><td>CR1-19-B-2</td><td><span class="age a-g">3d</span></td><td><span class="pl-ok">Repacked ✓</span></td><td class="sm" style="margin:0">New RS-0912-004 → QC HOLD</td><td><span class="lnk">Trace →</span></td></tr>
+</table>
+</div>
+</div>
+<div class="note">Lifecycle: WH → Packing Dept → branded cartons me repack → <b>naya Receiving Sheet</b> (new pallet IDs) → QC HOLD → release → dispatchable. Ya <b>Online-Add</b>: agli production run me mix. Full traceability.</div>
+</div>
+</div>
+</div></div>
+</div></div>
+</div>
+
+<!-- SCREEN 6: DISPATCH / LOADING -->
+<div class="screen" id="scr6">
+<div class="fit-wrap"><div class="fit-inner">
+<div class="frame"><div class="app">
+<div class="main">
+<div class="top"><div><div class="crumb">Operations / <b>Dispatch & Loading</b> / New</div><div class="h">New Loading Sheet — LS-2026-0912-001</div></div><div class="rt"><span class="pl-ok">only OK/AVAILABLE selectable</span></div></div>
+<div class="body">
+<div class="g2">
+<div>
+<div class="card" style="margin-bottom:14px">
+<div class="ch"><h4>FIFO Pick List <span class="sub">· LFG01087 · need 2,070 bx</span></h4><button class="btn btn-o btn-sm">Re-plan</button></div>
+<div class="cb" style="padding-top:4px">
+<table>
+<tr><th></th><th>Batch</th><th>Qty</th><th>Location</th><th>Pallets</th></tr>
+<tr><td><input type="radio" checked></td><td><span class="b">L26H271087</span><div class="sm">16 days old · FIFO #1</div></td><td>1,410</td><td>CR1-03-A…E</td><td>17</td></tr>
+<tr><td><input type="radio" checked></td><td><span class="b">L26I010938</span><div class="sm">11 days old · FIFO #2</div></td><td>660</td><td>CR2-07-D-2…4</td><td>8</td></tr>
+<tr style="background:#fffbeb"><td colspan="5" style="font-size:11.5px;color:#92400e;padding:10px 12px">⚠ Newer batch <b>L26I060938</b> bhi available — system ne older pehle chuna (FIFO). <button class="btn btn-o btn-sm">Override w/ reason</button> <span style="color:#94a3b8">(logged)</span></td></tr>
+</table>
+<div style="margin-top:13px"><button class="btn btn-t" style="width:100%;justify-content:center">✓ Confirm Picks · 25 pallets</button></div>
+</div>
+</div>
+<div class="card" style="border:1.5px dashed #fca5a5">
+<div class="cb" style="font-size:12.5px">
+<b style="color:#DC2626;font-size:11px;letter-spacing:.8px">AUTO-BLOCKED — NOT SELECTABLE</b>
+<div style="margin-top:8px;line-height:2">
+<span style="color:#DC2626;font-weight:800">✗</span> L26I070613 — <span class="pl-hd">HOLD</span> (High Temp) · 43 bx<br>
+<span style="color:#DC2626;font-weight:800">✗</span> L26A090111 — <span class="pl-bk">BULK</span> (repack pending) · 222 bx<br>
+<span style="color:#DC2626;font-weight:800">✗</span> L26E071318 — <span class="pl-rj">REJECTED</span> (grade out) · 8 bx
+</div>
+</div>
+</div>
+</div>
+<div class="ls">
+<div class="hd"><div><h3>LOADING SHEET</h3><div style="font-size:11px;color:#64748b;font-weight:700">LS-2026-0912-001 · EXPORT</div></div><div style="text-align:right;font-size:11px;color:#64748b;font-weight:700">12 Sep 2026<br>IBF · Limbasi-01</div></div>
+<table style="font-size:12px;margin-bottom:12px">
+<tr><td class="sm" style="margin:0;padding:4px 8px 4px 0">VEHICLE</td><td class="b">GJ14AT7260</td><td class="sm" style="margin:0;padding:4px 8px 4px 0">DRIVER</td><td class="b">Ramesh V.</td></tr>
+<tr><td class="sm" style="margin:0;padding:4px 8px 4px 0">PARTY</td><td class="b">Al Zawid · Dubai</td><td class="sm" style="margin:0;padding:4px 8px 4px 0">TRANSPORTER</td><td class="b">MSC Logistics</td></tr>
+<tr><td class="sm" style="margin:0;padding:4px 8px 4px 0">CONTAINER</td><td class="b">MNBU9105855</td><td class="sm" style="margin:0;padding:4px 8px 4px 0">SEAL / BOLT</td><td class="b">MLIN3377853 · PACK03760905</td></tr>
+<tr><td class="sm" style="margin:0;padding:4px 8px 4px 0">TEMP REQ</td><td class="b">-18°C</td><td class="sm" style="margin:0;padding:4px 8px 4px 0">AT LOADING</td><td class="b" style="color:#059669">-18.4°C ✓</td></tr>
+</table>
+<table style="font-size:12px">
+<tr><th>MATERIAL</th><th>BATCH</th><th>QTY</th><th>kg</th><th>PALLETS</th></tr>
+<tr><td>LFG01087</td><td>L26H271087</td><td>1,410</td><td>16,920</td><td>17</td></tr>
+<tr><td>LFG01087</td><td>L26I010938</td><td>660</td><td>7,920</td><td>8</td></tr>
+<tr><td colspan="2" style="text-align:right"><b>TOTAL</b></td><td><b>2,070</b></td><td><b>24,840</b></td><td><b>25</b></td></tr>
+</table>
+<div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-top:12px;padding-top:10px;border-top:1px dashed #cbd5e1">
+<div>Loaded: <b style="color:#0f172a">Jaimin</b> · Verified: <b style="color:#0f172a">Rohan S.</b></div>
+<div>QC: <b style="color:#059669">✓ Ok · 10:15</b> · GP: <b style="color:#0f172a">GP-0912-01</b></div>
+</div>
+<div style="margin-top:14px;display:flex;gap:8px"><button class="btn btn-p" style="flex:1;justify-content:center">🖨 Print / PDF</button><button class="btn btn-t" style="flex:1;justify-content:center">Issue Gate Pass →</button></div>
+</div>
+</div>
+</div>
+</div>
+</div></div>
+</div></div>
+</div>
+
+<!-- SCREEN 7: TRANSFERS -->
+<div class="screen" id="scr7">
+<div class="fit-wrap"><div class="fit-inner">
+<div class="frame"><div class="app">
+<div class="main">
+<div class="top"><div><div class="crumb">Operations / <b>Transfers</b></div><div class="h">Inter-Warehouse Transfers</div></div><div class="rt"><button class="btn btn-t">＋ New Transfer Order</button></div></div>
+<div class="body">
+<div class="g3" style="margin-bottom:16px">
+<div class="card" style="border-top:4px solid #2563EB"><div class="cb" style="text-align:center"><div style="font-size:10px;font-weight:800;letter-spacing:1px;color:#2563EB">IN TRANSIT</div><div style="font-size:32px;font-weight:800">2</div><div class="sm" style="margin:0">ETA aaj shaam</div></div></div>
+<div class="card" style="border-top:4px solid #D97706"><div class="cb" style="text-align:center"><div style="font-size:10px;font-weight:800;letter-spacing:1px;color:#D97706">PENDING RECEIPT</div><div style="font-size:32px;font-weight:800">1</div><div class="sm" style="margin:0">at Coldman</div></div></div>
+<div class="card" style="border-top:4px solid #059669"><div class="cb" style="text-align:center"><div style="font-size:10px;font-weight:800;letter-spacing:1px;color:#059669">COMPLETED (SEP)</div><div style="font-size:32px;font-weight:800">14</div><div class="sm" style="margin:0">zero discrepancy</div></div></div>
+</div>
+<div class="card">
+<div class="ch"><h4>Transfer Orders</h4></div>
+<div class="cb" style="padding-top:4px">
+<table>
+<tr><th>TO No</th><th>Destination</th><th>Material / Batch</th><th>Qty</th><th>Type</th><th>Vehicle</th><th>Status</th><th>SAP Path</th></tr>
+<tr><td class="b">TO-0912-001</td><td>Coldman</td><td><span class="b">LFG01418</span><div class="sm">L26I011418</div></td><td>1,640 bx</td><td><span class="tagchip tg-n">Normal</span></td><td>GJ01AB1234</td><td><span class="pl-tr">IN TRANSIT</span></td><td class="sm" style="margin:0">LMFGA → LMFGA-CM</td></tr>
+<tr><td class="b">TO-0910-003</td><td>Coldman</td><td><span class="b">LFG00613</span><div class="sm">L26I070613</div></td><td>4 pallets</td><td><span class="tagchip tg-h">HOLD TAG</span></td><td>GJ05CD5678</td><td><span class="pl-hd">Hold @ Coldman</span></td><td class="sm" style="margin:0">LMFGH → LMFGA-CM</td></tr>
+<tr><td class="b">TO-0911-002</td><td>Himmatnagar</td><td><span class="b">LFG00957</span><div class="sm">L26I090957</div></td><td>310 bx</td><td><span class="tagchip tg-b">BULK TAG</span></td><td>GJ12KL9012</td><td><span class="pl-bk">Delivered · repack there</span></td><td class="sm" style="margin:0">LMFGBULK → SKFGBULK</td></tr>
+<tr><td class="b">TO-0912-002</td><td>RK Cold Store</td><td><span class="b">LFG01377</span><div class="sm">L26H131377</div></td><td>180 bx</td><td><span class="tagchip tg-n">Normal</span></td><td class="sm" style="margin:0">assigning…</td><td><span class="pl-qc">Pick in progress</span></td><td class="sm" style="margin:0">LMFGA → LMFGA-RK</td></tr>
+</table>
+</div>
+</div>
+<div class="note">HOLD TAG → receiving 3PL ko HOLD status me aata hai, unki QC release karegi tab dispatchable. Pallet ID same rehta hai — full traceability. SAP code har step pe track.</div>
+</div>
+</div>
+</div></div>
+</div></div>
+</div>
+
+<!-- SCREEN 8: MAINTENANCE -->
+<div class="screen" id="scr8">
+<div class="fit-wrap"><div class="fit-inner">
+<div class="frame"><div class="app">
+<div class="main">
+<div class="top"><div><div class="crumb">Support / <b>Maintenance</b></div><div class="h">Warehouse Maintenance Tickets</div></div><div class="rt"><button class="btn btn-r">＋ Raise Issue</button></div></div>
+<div class="body">
+
+<div class="card" style="border:1.5px solid #fca5a5;margin-bottom:16px;background:linear-gradient(135deg,#fff5f5,#fff)">
+<div class="cb">
+<div style="display:flex;justify-content:space-between;align-items:flex-start">
+<div>
+<span class="pl-rj">🔴 CRITICAL · MT-2026-0912-001</span>
+<div style="font-size:15px;font-weight:800;margin-top:8px;color:var(--navy)">CR1 temperature rising — -15.2°C (target -18°C)</div>
+<div class="sm" style="margin:4px 0 0">Refrigeration · CR1 · raised by Rohan S. at 09:52 · <b style="color:#DC2626">escalated to Plant Head ✓</b></div>
+</div>
+<div style="text-align:right"><div style="font-size:22px;font-weight:800;color:#DC2626">2h 14m</div><div class="sm" style="margin:0">since raise · ETA 12:30</div></div>
+</div>
+<div class="tl" style="margin-top:16px">
+<div class="nd"><div class="dot" style="background:#fee2e2;border-color:#DC2626;color:#DC2626">!</div><div class="lbl">Open 09:52</div></div>
+<div class="bar fill"></div>
+<div class="nd"><div class="dot" style="background:#fee2e2;border-color:#DC2626;color:#DC2626">✓</div><div class="lbl">Ack 10:05</div></div>
+<div class="bar fill"></div>
+<div class="nd"><div class="dot" style="background:#ffedd5;border-color:#D97706;color:#D97706">◐</div><div class="lbl">In Progress</div></div>
+<div class="bar"></div>
+<div class="nd"><div class="dot" style="background:#f1f5f9;border-color:#cbd5e1;color:#94a3b8">✓</div><div class="lbl">Resolve</div></div>
+<div class="bar"></div>
+<div class="nd"><div class="dot" style="background:#f1f5f9;border-color:#cbd5e1;color:#94a3b8">🔒</div><div class="lbl">Close</div></div>
+</div>
+<div class="sm" style="margin:8px 0 0">Assigned: <b>Jignesh · Refrigeration team</b> — coil defrost in progress</div>
+</div>
+</div>
+
+<div class="card">
+<div class="ch"><h4>All Tickets</h4><span class="sub">avg resolution 4.6h this month</span></div>
+<div class="cb" style="padding-top:4px">
+<table>
+<tr><th>Ticket</th><th>Category</th><th>Location</th><th>Severity</th><th>Raised</th><th>Assigned</th><th>Status</th><th>Age</th></tr>
+<tr><td class="b">MT-0912-001</td><td>Refrigeration</td><td>CR1</td><td><span class="pl-rj">CRITICAL</span></td><td>09:52 · Rohan</td><td>Jignesh</td><td><span class="pl-hd">IN PROGRESS</span></td><td><span class="age a-g">1h live</span></td></tr>
+<tr><td class="b">MT-0910-002</td><td>Forklift</td><td>Dock 2</td><td><span class="pl-hd">HIGH</span></td><td>10 Sep · Manoj</td><td>Maint. Dept</td><td><span class="pl-ok">RESOLVED</span></td><td><span class="age a-g">4h fix</span></td></tr>
+<tr><td class="b">MT-0908-004</td><td>Door belt</td><td>CR1 door</td><td><span class="pl-qc">MEDIUM</span></td><td>08 Sep · Kiran</td><td>Maint. Dept</td><td><span class="pl-ok">CLOSED ✓</span></td><td class="sm" style="margin:0">verified</td></tr>
+<tr><td class="b">MT-0905-001</td><td>Electrical</td><td>PM Store</td><td><span class="pl-qc">MEDIUM</span></td><td>05 Sep · PM Store</td><td>Electrical</td><td><span class="pl-ok">CLOSED ✓</span></td><td class="sm" style="margin:0">—</td></tr>
+</table>
+<div style="margin-top:11px;font-size:11.5px;color:#B45309;background:#fffbeb;border:1px dashed #fde68a;border-radius:8px;padding:8px 12px">📈 <b>Pattern alert:</b> CR1 door belt — quarter me 3rd breakdown → replacement recommend</div>
+</div>
+</div>
+
+</div>
+</div>
+</div></div>
+</div></div>
+</div>
+
+<!-- SCREEN 9: STOCK LEDGER -->
+<div class="screen" id="scr9">
+<div class="fit-wrap"><div class="fit-inner">
+<div class="frame"><div class="app">
+<div class="main">
+<div class="top"><div><div class="crumb">Support / <b>Stock Ledger</b></div><div class="h">Stock Ledger — September 2026</div></div>
+<div class="rt"><div class="search" style="width:200px">Material / batch / pallet…</div><select class="inp" style="width:130px;padding:8px 12px;font-size:12px"><option>All Types ▾</option></select><button class="btn btn-p btn-sm">⇩ Excel · DSR format</button></div></div>
+<div class="body">
+<div class="card">
+<div class="cb" style="padding-top:10px">
+<table style="font-size:12px">
+<tr><th>Date</th><th>Shift</th><th>FG Code</th><th>Product</th><th>Pallet</th><th>Batch</th><th>Qty</th><th>Location</th><th>Remark</th><th>Dispatch</th><th>Bal</th><th>Vehicle</th><th>Ref</th></tr>
+<tr><td>08 Sep</td><td><span class="pl-gn">A</span></td><td class="b">LFG00246</td><td>Aloo Tikki Slider</td><td>MG-519</td><td>L26I080246</td><td>36</td><td>CR2-19-A-3</td><td><span class="pl-ok">OK</span></td><td class="sm" style="margin:0">—</td><td>36</td><td class="sm" style="margin:0">—</td><td class="sm" style="margin:0">RS-0908-011</td></tr>
+<tr><td>08 Sep</td><td><span class="pl-gn">C</span></td><td class="b">LFG00205</td><td>Cheese Corn Nuggets</td><td>SP-2485</td><td>L26I080205</td><td>38</td><td>CR2-FLOOR</td><td><span class="pl-ok">OK</span></td><td class="sm" style="margin:0">—</td><td>38</td><td class="sm" style="margin:0">—</td><td class="sm" style="margin:0">RS-0908-014</td></tr>
+<tr style="background:#fffbeb"><td>09 Sep</td><td><span class="pl-gn">B</span></td><td class="b">LFG00740</td><td>Everlast 9mm</td><td>P605</td><td>L26A120740</td><td>51</td><td>CR2-36-E-1</td><td><span class="pl-hd">HOLD</span></td><td class="sm" style="margin:0">—</td><td>51</td><td class="sm" style="margin:0">—</td><td class="sm" style="margin:0">RS-0909-003</td></tr>
+<tr style="background:#f0fdf9"><td>12 Sep</td><td><span class="pl-gn">B</span></td><td class="b">LFG00049</td><td>Veggie Decker</td><td>SP-2389</td><td>L26I050049</td><td>48</td><td>CR2-01-C-1</td><td><span class="pl-ok">Hold → Released ✓</span></td><td class="sm" style="margin:0">—</td><td>48</td><td class="sm" style="margin:0">—</td><td class="sm" style="margin:0">HOLD-0905-007</td></tr>
+<tr><td>12 Sep</td><td><span class="pl-gn">B</span></td><td class="b">LFG01087</td><td>Everlast Shoestring</td><td>P28310</td><td>L26H271087</td><td>48</td><td>CR2-01-E-4</td><td><span class="pl-tr">DISPATCH</span></td><td>12/09 · 48</td><td>0</td><td class="b">GJ14AT7260</td><td class="sm" style="margin:0">LS-0912-001</td></tr>
+</table>
+<div class="sm" style="margin-top:10px">Har transaction audit-trail: who · when · what · why. Running balance auto. Excel export DSR format me.</div>
+</div>
+</div>
+</div>
+</div>
+</div></div>
+</div></div>
+</div>
+
+<!-- SCREEN 10: IN-OUT REPORT -->
+<div class="screen" id="scr10">
+<div class="fit-wrap"><div class="fit-inner">
+<div class="frame"><div class="app">
+<div class="main">
+<div class="top"><div><div class="crumb">Reports / <b>IN-OUT Summary</b></div><div class="h">Daily IN-OUT — 12 Sep 2026</div></div>
+<div class="rt"><button class="btn btn-o btn-sm">← Prev</button><button class="btn btn-o btn-sm">Next →</button><button class="btn btn-p btn-sm">⇩ Excel</button></div></div>
+<div class="body">
+
+<div class="g3" style="margin-bottom:16px">
+<div class="card">
+<div class="ch"><h4>▥ Shift-wise Inward</h4><span class="sub">cartons</span></div>
+<div class="cb">
+<div style="display:grid;grid-template-columns:56px 1fr 52px;gap:8px;align-items:center;row-gap:12px;font-size:12px">
+<b>Shift A</b><div style="background:#f1f5f9;border-radius:6px;height:20px"><div style="width:62%;height:100%;border-radius:6px;background:linear-gradient(90deg,#2DD4BF,#0D9488)"></div></div><b>1,248</b>
+<b>Shift B</b><div style="background:#f1f5f9;border-radius:6px;height:20px"><div style="width:88%;height:100%;border-radius:6px;background:linear-gradient(90deg,#7DD3FC,#0284C7)"></div></div><b>1,770</b>
+<b>Shift C</b><div style="background:#f1f5f9;border-radius:6px;height:20px"><div style="width:45%;height:100%;border-radius:6px;background:linear-gradient(90deg,#C4B5FD,#7C3AED)"></div></div><span>913</span>
+</div>
+<div style="margin-top:14px;padding-top:11px;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between;font-size:12px"><span style="color:#64748b">Total inward</span><b style="font-size:16px">3,931 bx</b></div>
+</div>
+</div>
+<div class="card">
+<div class="ch"><h4>◕ Stock Status</h4><span class="sub">today snapshot</span></div>
+<div class="cb" style="display:flex;align-items:center;gap:14px">
+<svg width="120" height="120" viewBox="0 0 130 130">
+<circle cx="65" cy="65" r="52" fill="none" stroke="#f1f5f9" stroke-width="17"/>
+<circle cx="65" cy="65" r="52" fill="none" stroke="#059669" stroke-width="17" stroke-dasharray="264 327" transform="rotate(-90 65 65)"/>
+<circle cx="65" cy="65" r="52" fill="none" stroke="#D97706" stroke-width="17" stroke-dasharray="20 327" stroke-dashoffset="-266" transform="rotate(-90 65 65)"/>
+<circle cx="65" cy="65" r="52" fill="none" stroke="#7C3AED" stroke-width="17" stroke-dasharray="19 327" stroke-dashoffset="-288" transform="rotate(-90 65 65)"/>
+<circle cx="65" cy="65" r="52" fill="none" stroke="#DC2626" stroke-width="17" stroke-dasharray="10 327" stroke-dashoffset="-309" transform="rotate(-90 65 65)"/>
+<text x="65" y="62" text-anchor="middle" font-size="17" font-weight="800" fill="#0f172a">3,931</text>
+<text x="65" y="76" text-anchor="middle" font-size="7.5" font-weight="700" fill="#94a3b8" letter-spacing="1">TODAY IN</text>
+</svg>
+<div style="font-size:11.5px;line-height:2">
+<span class="legend-dot" style="background:#059669"></span>OK — 4,260<br>
+<span class="legend-dot" style="background:#D97706"></span>Hold — 320<br>
+<span class="legend-dot" style="background:#7C3AED"></span>Bulk — 312<br>
+<span class="legend-dot" style="background:#DC2626"></span>Rej — 60
+</div>
+</div>
+</div>
+<div class="card">
+<div class="ch"><h4>◈ Dispatch vs Indent</h4><span class="sub">fulfilment</span></div>
+<div class="cb">
+<svg width="100%" height="128" viewBox="0 0 300 128">
+<line x1="10" y1="20" x2="290" y2="20" class="gridline"/><line x1="10" y1="60" x2="290" y2="60" class="gridline"/><line x1="10" y1="100" x2="290" y2="100" class="gridline"/>
+<text x="12" y="16" class="axis">4k</text><text x="12" y="56" class="axis">2k</text><text x="12" y="96" class="axis">0</text>
+<rect x="40" y="34" width="34" height="66" rx="5" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1"/>
+<rect x="82" y="48" width="34" height="52" rx="5" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1"/>
+<rect x="124" y="28" width="34" height="72" rx="5" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1"/>
+<rect x="166" y="42" width="34" height="58" rx="5" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1"/>
+<rect x="208" y="56" width="34" height="44" rx="5" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1"/>
+<rect x="250" y="38" width="34" height="62" rx="5" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1"/>
+<line x1="40" y1="38" x2="284" y2="32" stroke="#0D9488" stroke-width="2.5" stroke-dasharray="6 4"/>
+<text x="57" y="118" class="axis" text-anchor="middle">01418</text><text x="99" y="118" class="axis" text-anchor="middle">00938</text><text x="141" y="118" class="axis" text-anchor="middle">01087</text><text x="183" y="118" class="axis" text-anchor="middle">00047</text><text x="225" y="118" class="axis" text-anchor="middle">00384</text><text x="267" y="118" class="axis" text-anchor="middle">Other</text>
+</svg>
+<div class="sm" style="margin-top:6px">Bars = indent · teal line = dispatched · fulfilment 92%</div>
+</div>
+</div>
+</div>
+
+<div class="card">
+<div class="ch"><h4>Material-wise IN-OUT <span class="sub">· DSR IN-OUT equivalent</span></h4></div>
+<div class="cb" style="padding-top:4px">
+<table>
+<tr><th>Material</th><th>UOM</th><th>In A</th><th>In B</th><th>In C</th><th>Total In</th><th>kgs</th><th>Hold</th><th>Available</th><th>Indent</th><th>Dispatch</th><th>Locations</th></tr>
+<tr><td class="b">LFG00938</td><td>12.5</td><td>1,690</td><td>2,755</td><td>—</td><td class="b">4,445</td><td>55,562</td><td>—</td><td>4,445</td><td>2,300</td><td>1,600</td><td class="sm" style="margin:0">LM · Coldrush</td></tr>
+<tr><td class="b">LFG00047</td><td>12</td><td>139</td><td>610</td><td>515</td><td class="b">1,264</td><td>15,168</td><td>—</td><td>1,264</td><td>177</td><td>177</td><td class="sm" style="margin:0">LM · RK</td></tr>
+<tr><td class="b">LFG01418</td><td>10</td><td>868</td><td>—</td><td>—</td><td class="b">868</td><td>8,680</td><td>—</td><td>868</td><td>6,400</td><td>3,320</td><td class="sm" style="margin:0">LM · Coldman</td></tr>
+<tr><td class="b">LFG01087</td><td>12</td><td>—</td><td>2,220</td><td>—</td><td class="b">2,220</td><td>26,640</td><td>—</td><td>2,220</td><td>2,070</td><td>2,070</td><td class="sm" style="margin:0">LM · export</td></tr>
+</table>
+</div>
+</div>
+
+</div>
+</div>
+</div></div>
+</div></div>
+</div>
+
+<!-- APPROVE / REJECT -->
+<div style="padding:0 16px 40px;max-width:1240px;margin:0 auto">
+<div class="approve">
+<div class="tx">
+<div class="t">Final Decision — Alpesh</div>
+<div class="s">Approved design = FINAL → Claude Code exact yahi build karega</div>
+</div>
+<div style="display:flex;gap:12px;flex-wrap:wrap">
+<button class="btn btn-r btn-lg" onclick="alert('REJECTED — changes batao, v5 banega')">✗ Reject</button>
+<button class="btn btn-t btn-lg" onclick="alert('APPROVED ✓ — Visual design approved!')">✓ Approve · Final</button>
+</div>
+</div>
+</div>
+
+<div class="footer">
+<b>IBF FG Warehouse</b> · Premium Design v5 · Responsive Auto-Fit · 10 screens · 6 chart types<br>
+Flow Document v3 FINAL · Real DSR data · Real SAP codes · Iscon Balaji Foods
+</div>
+
+<script>
+function showScreen(n,btn){
+document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+document.getElementById('scr'+n).classList.add('on');
+document.querySelectorAll('.sg-btn').forEach(b=>b.classList.remove('on'));
+btn.classList.add('on');
+requestAnimationFrame(fitAll);
+window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function fitAll(){
+document.querySelectorAll('.fit-wrap').forEach(function(w){
+var inner=w.querySelector('.fit-inner');
+if(!inner)return;
+var wpx=w.clientWidth;
+var scale=Math.min(1,wpx/1240);
+inner.style.transform='scale('+scale+')';
+inner.style.width='1240px';
+w.style.height=(inner.scrollHeight*scale)+'px';
+});
+}
+
+window.addEventListener('resize',fitAll);
+window.addEventListener('load',function(){setTimeout(fitAll,100);fitAll();});
+window.addEventListener('orientationchange',function(){setTimeout(fitAll,300);});
+fitAll();
+</script>
+</body>
+</html>
