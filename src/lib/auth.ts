@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { ForbiddenError, UnauthorizedError } from "./errors";
+import { hasPermission } from "./permissions";
 
 // The 12 locked roles (R01-R12). Kept in sync with the permissions
 // contract by hand for now - see docs/PENDING_ITEMS.md if this ever
@@ -56,4 +57,25 @@ export async function requireRole(allowedRoles: Role[]) {
     );
   }
   return role;
+}
+
+/**
+ * Fine-grained alternative to requireRole: checks against the
+ * permission matrix (permissions.ts) instead of a hand-written role
+ * list, so a route only has to name the action it performs (e.g.
+ * "holds.release") rather than enumerate every role allowed to do it.
+ * Honors R05's inheritance and R12's "all" wildcard automatically.
+ */
+export async function requirePermission(permission: string) {
+  const { userId } = await auth();
+  if (!userId) {
+    throw new UnauthorizedError();
+  }
+  const { role } = await getCurrentUser();
+  if (!hasPermission(role, permission)) {
+    throw new ForbiddenError(
+      `Role ${role ?? "(none)"} does not have permission "${permission}".`
+    );
+  }
+  return role as Role;
 }

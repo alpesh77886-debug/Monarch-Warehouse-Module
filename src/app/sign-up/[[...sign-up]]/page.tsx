@@ -1,9 +1,8 @@
 import { SignUp } from "@clerk/nextjs";
-
-const hasClerkPublishableKey = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+import { getClerkConfigStatus } from "@/lib/clerk-config";
 
 export default function SignUpPage() {
-  if (!hasClerkPublishableKey) {
+  if (getClerkConfigStatus() !== "configured") {
     return (
       <main className="flex min-h-screen items-center justify-center p-6 text-center text-sm text-muted">
         Sign-up is not configured yet - this app is running in Clerk stub

@@ -110,6 +110,6 @@ describe("generateRackGrid (PEN-008 - deterministic tool, not real warehouse dat
 describe("PEN-008 non-fabrication guarantee", () => {
   it("this test file contains no CR1/CR2 36-block real-grid seed call", () => {
     const src = readFileSync(__filename, "utf8");
-    expect(src).not.toMatch(/blocks:\s*\[\s*"01"\s*,\s*"02".{0,400}"36"/s);
+    expect(src).not.toMatch(/blocks:\s*\[\s*"01"\s*,\s*"02"[\s\S]{0,400}"36"/);
   });
 });

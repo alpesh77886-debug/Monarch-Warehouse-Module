@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import { getClerkConfigStatus } from "@/lib/clerk-config";
 import "./globals.css";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -15,9 +16,10 @@ export const metadata: Metadata = {
   description: "Iscon Balaji Foods — Finished Goods Warehouse Module",
 };
 
-// STUB MODE - see src/middleware.ts. Without a real publishable key,
-// ClerkProvider is skipped so the app still renders and builds.
-const hasClerkPublishableKey = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+// STUB MODE - see src/middleware.ts and src/lib/clerk-config.ts. Without
+// a real, fully-set publishable+secret key pair, ClerkProvider is
+// skipped so the app still renders and builds.
+const clerkConfigured = getClerkConfigStatus() === "configured";
 
 export default function RootLayout({
   children,
@@ -30,5 +32,5 @@ export default function RootLayout({
     </html>
   );
 
-  return hasClerkPublishableKey ? <ClerkProvider>{document}</ClerkProvider> : document;
+  return clerkConfigured ? <ClerkProvider>{document}</ClerkProvider> : document;
 }
