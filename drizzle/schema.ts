@@ -61,6 +61,53 @@ export const warehouses = sqliteTable(
   })
 );
 
+// ENTITY-008 Status Master (architecture-blueprint prose, not yet in the
+// formal entities contract - see PEN-014). The fixed 10-value list itself
+// is already locked (materials/pallets already CHECK against it); this
+// table is the reference data those checks describe.
+export const statuses = sqliteTable(
+  "statuses",
+  {
+    code: text("code").primaryKey(),
+    description: text("description").notNull(),
+    dispatchable: integer("dispatchable").notNull(),
+    transferable: integer("transferable").notNull(),
+    sapLimbasi: text("sap_limbasi").notNull(),
+    sapSabarkantha: text("sap_sabarkantha"),
+  },
+  (table) => ({
+    codeCheck: check(
+      "statuses_code_check",
+      sql`${table.code} IN ('QC_HOLD','OK','HOLD','BULK','DISPATCHED','IN_TRANSIT','CUSTOMER_SAMPLE','SAMPLE','REJECTED','SCRAP')`
+    ),
+  })
+);
+
+// ENTITY-007 SAP Warehouse Master (architecture-blueprint prose, not yet
+// in the formal entities contract - see PEN-014). Reference data only;
+// see drizzle/seed/sap-codes.ts for the seeded rows and PEN-018 for a
+// count discrepancy found in the canonical source while deriving them.
+export const sapCodes = sqliteTable(
+  "sap_codes",
+  {
+    sapCode: text("sap_code").primaryKey(),
+    sapName: text("sap_name").notNull(),
+    plant: text("plant").notNull(),
+    type: text("type").notNull(),
+    moduleStatusMapping: text("module_status_mapping").notNull(),
+    fgRelevant: integer("fg_relevant").notNull(),
+  },
+  (table) => ({
+    typeCheck: check(
+      "sap_codes_type_check",
+      // SALES included because the real Appendix D data contains it
+      // (SKSALES) - the architecture blueprint's own 4-value summary for
+      // this field was incomplete; see PEN-018.
+      sql`${table.type} IN ('STATUS','3PL','CROSS_PLANT','OTHER','SALES')`
+    ),
+  })
+);
+
 export const materials = sqliteTable(
   "materials",
   {
