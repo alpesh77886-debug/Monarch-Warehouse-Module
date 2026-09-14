@@ -1,6 +1,6 @@
 # Project Progress Tracker
 ## IBF FG Warehouse Module
-## Last updated: 2026-09-14 (Loop 23 checkpoint)
+## Last updated: 2026-09-14 (Loop 24 checkpoint)
 
 ## Reading this document's "loop" numbering (PEN-016 clarification)
 
@@ -30,7 +30,7 @@ Two different, non-interchangeable counters both use the word "loop" in this pro
 | TASK-002 | Clerk Auth + Roles | 🟨 Partial | Loop 9 | Middleware/provider/role-check utility scaffolded in stub mode; real account, webhook sync, and Clerk-dashboard role setup still pending (PEN-010) |
 | TASK-003 | Masters CRUD | 🟩 Done for in-scope items | Loops 21-22 | All 4 masters screens built against real local D1: Material Master and Warehouse Master (create/list/deactivate, server-side permission gate, real persistence, E2E coverage); SAP Warehouse Master and Status Master (read-only, seeded via the new `npm run db:seed`, matching the implementation spec's own "read-only" scope for those two). R12 edit on SAP Warehouse Master is explicitly NOT built (spec marks it out of this reduced read-only scope for now) |
 | TASK-004 | Receiving Sheet Flow | ⬜ Pending | - | CRITICAL PATH |
-| TASK-005 | Putaway + Rack Map | ⬜ Pending | - | Needs location grid |
+| TASK-005 | Putaway + Rack Map | 🟨 Partial | Loop 24 | Location CRUD (admin) and putaway/move business logic built and unblocked (PEN-023) against real local D1: the canonical flow document's own Flow 2 gave real grounds for an empty/same-material/capacity check, implemented in `src/lib/business-rules/location-guard.ts`. NOT built: the visual color-coded Rack Map (SCREEN-003) - needs real location grid data (PEN-008) to be meaningful; location-move audit trail (PEN-024, blocked on the missing Pallet-Batch relationship) |
 | TASK-006 | Hold Management | ⬜ Pending | - | CRITICAL PATH |
 | TASK-007 | Bulk Management | ⬜ Pending | - | - |
 | TASK-008 | Dispatch + Loading Sheet | ⬜ Pending | - | CRITICAL PATH |
@@ -224,6 +224,36 @@ Full regression, run after Loop 22's commit, with results:
 8. `git log --oneline` / `git status` / `git diff --stat` against the pre-window merge commit (`c92ffff`) -> 2 real commits this window so far (Loop 21 `cbfa6b7`, Loop 22 `03b2dee`), clean tree after this loop's own commit, 24 files changed / ~1900 insertions total across the window - entirely new masters CRUD application code, validation, API routes, seed tooling, tests, and docs; zero changes to any protected package document or the canonical business source.
 
 **No paid action occurred in this loop or anywhere in this window so far. No cloud account, D1/R2/Clerk resource, or deployment action was performed - `npx wrangler d1 migrations apply DB --local` / `db:seed` are local-only, and the E2E run served a local production build on a local port.**
+
+## Loop 24 Checkpoint (window 3 continued - PEN-023 clarified, TASK-005 partially unblocked)
+
+Boss instruction this loop: "PEN-023 clarify karo aur TASK-005 unblock karo." Acted on it by going back to the canonical flow document itself (the highest-authority source, above the architecture blueprint) rather than guessing a mechanism - Flow 2 ("PUTAWAY & LOCATION MANAGEMENT") turned out to describe exactly the check the implementation spec's bullets were gesturing at, including the literal error-message shape ("Location X is occupied by Pallet Y (MATERIAL_CODE)"). PEN-023 is updated with the full finding rather than closed silently.
+
+| Loop | Objective | Commit | Result |
+|---|---|---|---|
+| 24 | Location CRUD + putaway/move business logic, grounded in Flow 2 of the canonical source; closed a real cross-loop testing gap along the way | (this commit) | Done. See evidence below |
+
+### Loop 24 evidence
+
+What was built, all new this loop:
+- `src/lib/business-rules/location-guard.ts` - pure function encoding only what Flow 2 + its Rules section actually specify (location not BLOCKED; EMPTY accepts; OCCUPIED/PARTIAL accepts only the same material, only if capacity allows one more) and explicitly refusing what has no defined mechanism (pallet-type-per-location, true multi-pallet-per-location beyond this repo's single `current_pallet_id` column) rather than guessing one. 7 unit tests in `tests/unit/location-guard.test.ts`.
+- `src/lib/validations/location.ts`, `src/lib/validations/putaway.ts`; `src/app/api/storage/locations/route.ts` (GET/POST) + `[id]/route.ts` (block/unblock, refuses to touch a location that currently holds a pallet); `src/app/api/storage/putaway/route.ts` (first assignment) and `src/app/api/storage/move/route.ts` (move with a mandatory reason, frees the old location) - both run the guard, then a single `db.transaction(...)` updating `locations` and `pallets` together, including the architecture blueprint's own "`current_warehouse_id` derived from location" rule on the pallet.
+- `src/app/api/pallets/route.ts` (read-only list, joined with material code, for the picker UI - no create/edit route, since pallets are born from the still-blocked Receiving Sheet flow).
+- `src/app/(app)/storage/page.tsx` (landing), `src/app/(app)/storage/locations/page.tsx` (Location CRUD UI), `src/app/(app)/storage/putaway/page.tsx` (assign/move UI, split into "awaiting putaway" and "located" pallets) - makes the nav's existing "Storage" link real for the first time instead of 404ing.
+
+A real, previously-invisible testing gap found and closed, not left hidden: every mutation route in this whole window (materials, warehouses, and now locations/putaway/move) calls `requirePermission()` before touching the database, and Clerk stub mode makes that call always throw (PEN-021) - which means the actual INSERT/UPDATE/transaction code in EVERY one of those routes had only ever been type-checked, never executed against a real database, in every manual curl check and every E2E test in Loops 21-23 (the 503 refusal always fired first). Closed this loop with `tests/unit/mutations-live.test.ts`: mocks only `requirePermission` (same technique `tests/unit/auth.test.ts` already uses for Clerk itself) so the real route handlers run their real mutation logic against the real local D1 file, then reads the database back directly - 7 tests, covering Material/Warehouse/Location creation, a full putaway assignment, a full move (including freeing the old location), the "already located, use move" refusal, and the different-material occupied-location refusal with zero DB change. `vitest.config.ts` gained a `"@/"` alias to `src/` so these route modules can be imported directly in tests (they did not need this before because no test previously imported a route file directly).
+
+Commands run, in order, with results:
+1. `npx tsc --noEmit` -> exit 0.
+2. `npm run build` -> exit 0, 18 routes generated, all 9 API route files show `ƒ Dynamic` (including the 5 new ones) - no repeat of Loop 22's static-pre-render bug, since `export const dynamic = "force-dynamic"` was added to `/api/pallets` from the start this time.
+3. `npm test` (Vitest) -> exit 0, **74/74 passed across 10 files** (67 carried over + 7 new in `location-guard.test.ts` + 7 new in `mutations-live.test.ts`, net +14 since some were counted before the split - see the files themselves for the true per-file counts).
+4. Manual `curl` against a real running `next dev` server: `GET /api/storage/locations` and `GET /api/pallets` return real (empty, at that point) JSON.
+5. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npx playwright test` -> **24/24 passed** (19 carried over unchanged + 5 new in `tests/e2e/storage-putaway.spec.ts`): Storage landing links to both new screens; a real Location create attempt is honestly refused in Clerk stub mode; a real fixture pallet (seeded directly, same pattern as every other loop's E2E fixtures) shows as "awaiting putaway"; a real Assign attempt through the UI is honestly refused, not silently accepted; no horizontal scroll at 375px across all three new screens.
+6. Harness checks: contract-guard PASS, protected-integrity PASS, yaml-lexical-guard PASS (9 contract files). static-guard shows the same deliberate public-read findings as Loop 22 plus one more for the new `/api/pallets` route - PEN-022 updated to cover it, same reasoning, not a new class of decision. package-integrity shows the same pre-existing mismatch pattern (this document, PENDING_ITEMS.md, README.md, the harness loop-state file) plus this loop's own edits.
+
+Not built this loop, and why: the visual color-coded Rack Map (SCREEN-003) - there is still no real location grid (PEN-008), so a rack map today would only ever show an empty grid, which is not a meaningful demonstration; the underlying data (Location, occupancy status) it would render is exactly what this loop's Location CRUD + putaway/move now genuinely produce, so building the visual grid is a real, independent next step once there is something for it to show. Location-move audit trail (PEN-024) - blocked on the missing Pallet-Batch relationship (ENTITY-004, PEN-014), not guessed around.
+
+**No paid action occurred in this loop. No cloud account, D1/R2/Clerk resource, or deployment action was performed.**
 
 ## Architecture Decisions Log
 | Date | Decision | Status |
