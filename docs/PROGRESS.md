@@ -78,6 +78,46 @@ Two different, non-interchangeable counters both use the word "loop" in this pro
 | PEN-014 | 10 of 16 domain entities lack a formal machine-readable contract | Will block TASK-004/006/007/008/009/010 when they start | Needs formal contract entries before those tasks begin |
 | PEN-015 | Harness scripts cannot be aliased as package.json npm scripts | Cosmetic only — scripts still run directly | Protected-file hook false positive; not fixed or routed around per instruction |
 
+## Loops 11-20 Checkpoint (window 2, Boss-approved batch "APPROVE LOOPS 11-20")
+
+Loop numbers below are the human-facing, task-oriented count (per the PEN-016 note above), matching commit-message titles. Several loops carry a "(resequenced from N)" label because an earlier loop in this window hit a genuine structural blocker (not missing evidence) and the batch moved to the next independent objective rather than halting - each resequencing is called out inline in that loop's own commit and PENDING_ITEMS entry, never silently.
+
+| Loop | Objective | Commit | Result |
+|---|---|---|---|
+| 11 | Dependency/CVE forensic review + security baseline | `0c01e03` | Done. Full CVE inventory by runtime surface in docs/SECURITY_BASELINE.md; re-confirmed PEN-013's `next@14.2.35` residual risk (Boss Option A) still current, no safe in-line fix exists |
+| 12 | Contract completion for highest-priority PEN-014 entities | `cfb9d8b` | **Blocked, resequenced.** A new file inside the contract folder was denied by the protected-file governance hook - working as designed, not a false positive. Recorded as PEN-017; ready-to-apply YAML staged instead in docs/PROPOSED_CONTRACTS_PEN014.md, pending a Boss decision on how to apply it |
+| 13 | Harness loop-state semantics investigation (resequenced from 14, since 13 itself was blocked by PEN-017) | `a65b59d` | Done. Read the loop-gate script directly; added tests/unit/harness-loop-gate.test.ts (4 tests) proving the raw `completed_loops` counter's real semantics; closed as PEN-016 VERIFIED |
+| 14 | Material master + Status/SAP-code seed-data architecture (resequenced from 15) | `13d3b12` | Done. Statuses (10 rows) and SAP codes (45 rows) seeded from verified canonical Appendix D source data (tests/unit/seed-data.test.ts, 9 tests); Material Master itself stays a validated loader interface only - no source file exists yet (PEN-007 still IN PROGRESS). Found and recorded PEN-018 (Appendix D.6 24-vs-25 count mismatch; missing SALES sap_code type) |
+| 15 | Warehouse location-grid architecture (resequenced from 16) | `26d5e3e` | Done. Deterministic rack/floor-staging grid generator (drizzle/seed/location-grid.ts) using deliberately fake identifiers, never the real 36-block shape, since the flow document itself says the real grid has unenumerated exceptions; found and fixed a genuine missing unique constraint on `locations.full_code` along the way (migration 0003, tested against a real duplicate-rejection case) |
+| 16 | Auth/RBAC hardening in stub/local mode (resequenced from 17) | `b7ec850` | Done. src/lib/permissions.ts (full R01-R12 matrix, R05 inheritance, R12 wildcard), requirePermission() in src/lib/auth.ts, src/lib/clerk-config.ts (fails loudly on a half-configured Clerk env instead of guessing). 21 new tests, all Clerk calls mocked - zero live Clerk session used or possible |
+| 17 | Core pallet-status workflow, contract-bounded (resequenced from 18) | `2a96f26` | Done. src/lib/workflows/pallet-status.ts implements only the already-fully-contracted `pallet_status` state machine (workflows.yaml) over the already-contracted Pallet/Stock Ledger entities - the one slice of "core workflow" not blocked by PEN-014. 12 tests proving INV-001/003/004/005 by name plus role-gating on every transition. Receiving Sheet/Hold Record/Transfer Order/Loading Sheet/Maintenance Ticket remain blocked by PEN-014 |
+| 18 | Browser/E2E verification of implemented scope (resequenced from 19) | (this commit) | Done. Added Playwright (`@playwright/test@^1.63.0`, devDependency only) plus tests/e2e/app-shell.spec.ts (9 tests) run against a real `next build && next start` on the pre-installed Chromium - see the Loop 18 evidence section below for the full command/output record |
+
+**No paid action occurred in any of loops 11-18. No cloud account, D1/R2/Clerk resource, or deployment action was performed - everything above is local-only, npm-registry installs, or a local production build served on a local port for the E2E run.**
+
+### Loop 18 evidence (Browser/E2E verification)
+
+Implemented scope actually exercised (nothing beyond it was tested, since nothing beyond it exists yet): homepage (`/`), the mobile-first App Shell demo page (`/dashboard`), the stub-mode `/sign-in` and `/sign-up` pages, and Next.js's own 404 handling. Nav items pointing at not-yet-built screens (`/inward`, `/storage`, `/holds`, `/bulk`, `/outward`, `/transfers`, `/maintenance`, `/stock`, `/masters`, `/reports`) were intentionally not navigated to - at this scaffold stage they are placeholder links only (src/lib/nav-items.ts), and following them would 404 for "not built yet," which is not the same fact as the dedicated error-state test below.
+
+Commands run, in order, with results:
+
+1. `npm run typecheck` -> exit 0.
+2. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm run test:e2e` -> **9/9 passed** (chromium, via `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`, against a real `next build && next start -p 3100`):
+   - homepage loads, shows the scaffold-stage heading
+   - dashboard shell page loads, shows the page header
+   - mobile (375x667): bottom nav visible, sidebar hidden, no horizontal scroll (`document.documentElement.scrollWidth <= window.innerWidth`)
+   - mobile: all 5 bottom-nav links are >=48px-tall touch targets
+   - mobile: exactly the 5 `primary: true` nav items appear in the bottom nav
+   - desktop (1280x800, at the `lg` breakpoint): full sidebar with labels visible, bottom nav hidden, no horizontal scroll
+   - `/sign-in` shows the Clerk-stub-mode message, not a live widget (auth boundary - no real Clerk keys exist)
+   - `/sign-up` shows the Clerk-stub-mode message, not a live widget
+   - an unknown route (`/this-route-does-not-exist-e2e-check`) returns HTTP 404 and renders Next.js's "This page could not be found" (error state)
+3. `npm run build` -> exit 0, `next build` production build succeeds, 5 routes generated.
+4. `npm test` (Vitest, unit suite) -> exit 0, **57/57 passed across 8 files** (unchanged from Loop 17 - Loop 18 added no unit-level code, only the E2E harness).
+5. Harness checks: contract-guard PASS, static-guard PASS, protected-integrity PASS, yaml-lexical-guard PASS (9 contract files). The package-integrity check reports the same 4 pre-existing mismatches already recorded under PEN-015 (the harness loop-state file, README.md, this document, and docs/PENDING_ITEMS.md - all legitimate content that has evolved since the original file-manifest snapshot; a plain repository status check confirms those three docs carried no *new* uncommitted change from this loop beyond what this loop itself is now adding) - not a new regression.
+
+Not tested (does not exist yet, so cannot be exercised): forms, data validation, real database interaction from the browser (no CRUD screens are built yet - PEN-014 still blocks Receiving Sheet/Hold Record/Transfer Order/Loading Sheet/Maintenance Ticket), and real Clerk authentication (still stub-only, per PEN-010).
+
 ## Architecture Decisions Log
 | Date | Decision | Status |
 |------|----------|--------|

@@ -145,3 +145,9 @@ vite.config.ts.timestamp-*
 # Wrangler local state (local D1/KV/R2 emulation, logs) - never commit
 .wrangler/
 .dev.vars
+
+# Playwright E2E run artifacts (traces, screenshots) - regenerated per run
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/

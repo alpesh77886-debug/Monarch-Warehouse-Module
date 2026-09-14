@@ -1,6 +1,6 @@
 # Pending Items
 ## IBF FG Warehouse Module
-## Last updated: 2026-09-13
+## Last updated: 2026-09-14 (Loop 18)
 
 ## CRITICAL (blocks implementation)
 | ID | Item | Status | Blocking | Notes |
@@ -21,6 +21,7 @@
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
 | - | Technology stack | RESOLVED | Cloudflare D1 + Clerk approved 2026-09-13 |
+| - | Browser/E2E verification of implemented scope (Loop 18) | RESOLVED for current scope | Playwright added as a devDependency only; tests/e2e/app-shell.spec.ts (9 tests, all passing) verifies mobile-first behavior, desktop sidebar behavior, the Clerk stub-mode auth boundary on /sign-in and /sign-up, and Next.js's 404 error state, against a real local production build. Full detail in docs/PROGRESS.md's Loop 18 evidence section. Cannot yet cover forms, validation, or real database interaction from the browser, since no CRUD screen exists - that remains blocked by PEN-014, not by anything in this loop. |
 
 ## DEFERRED
 | ID | Item | Notes |
