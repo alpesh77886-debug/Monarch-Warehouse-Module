@@ -1,0 +1,16 @@
+name = "monarch-warehouse-module"
+compatibility_date = "2024-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# LOCAL-ONLY placeholder binding (Loop 7). database_id is a placeholder
+# UUID, not a real Cloudflare resource - no cloud D1 database has been
+# created for this project. All commands in this loop use --local,
+# which runs entirely against a local SQLite file under .wrangler/state
+# and never contacts Cloudflare's API. Creating the real remote D1
+# database requires a separate, explicit approval before any --remote
+# command is ever run against this binding.
+[[d1_databases]]
+binding = "DB"
+database_name = "monarch-warehouse-module-local"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "drizzle/migrations"

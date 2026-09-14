@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1789357109774,
+      "tag": "0000_parallel_smasher",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789357133094,
+      "tag": "0001_stock_ledger_append_only",
+      "breakpoints": true
+    }
+  ]
+}
