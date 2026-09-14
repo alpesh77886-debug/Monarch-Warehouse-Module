@@ -1,13 +1,11 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
 
-// Storage section landing (Loop 24 / TASK-005, partial - see
-// docs/PENDING_ITEMS.md PEN-023 for what is and is not built here).
-// The visual color-coded Rack Map (SCREEN-003) is NOT built this
-// loop - it needs real location grid data (PEN-008, still pending)
-// to be a meaningful demonstration, not an empty grid; what IS built
-// is the underlying Location CRUD and the putaway/move business logic
-// SCREEN-003 would eventually sit on top of.
+// Storage section landing (Loop 24-25 / TASK-005 - see
+// docs/PENDING_ITEMS.md PEN-023/PEN-024 for what is and is not built
+// here). The Rack Map (SCREEN-003, Loop 25) reads real Location/
+// Pallet data - it will show an empty grid until real locations exist
+// (PEN-008), which is the honest state, not a placeholder.
 const STORAGE_SCREENS = [
   {
     href: "/storage/locations",
@@ -18,6 +16,11 @@ const STORAGE_SCREENS = [
     href: "/storage/putaway",
     title: "Putaway & Move",
     description: "Assign a pallet to a location, or move it to a new one.",
+  },
+  {
+    href: "/storage/rack-map",
+    title: "Rack Map",
+    description: "Color-coded grid view of location occupancy, with search.",
   },
 ];
 
@@ -39,12 +42,6 @@ export default function StorageLandingPage() {
             <span className="text-teal">&rarr;</span>
           </Link>
         ))}
-        <div className="flex min-h-[64px] items-center justify-between rounded-xl border border-dashed border-line bg-white/60 p-4 text-muted">
-          <div>
-            <div className="text-sm font-bold">Rack Map (visual grid)</div>
-            <div className="text-xs">Not built yet - needs a real location grid to show.</div>
-          </div>
-        </div>
       </div>
     </>
   );
