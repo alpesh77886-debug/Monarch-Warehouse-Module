@@ -1,6 +1,15 @@
 # Project Progress Tracker
 ## IBF FG Warehouse Module
-## Last updated: 2026-09-14 (Loop 10 checkpoint)
+## Last updated: 2026-09-14 (Loop 13 checkpoint)
+
+## Reading this document's "loop" numbering (PEN-016 clarification)
+
+Two different, non-interchangeable counters both use the word "loop" in this project - do not conflate them:
+
+- **`.harness/loop-state.json`'s `completed_loops`** is a raw, mechanical counter incremented once per Claude Code turn that reaches the Stop hook - by the harness engineering documentation's own stated definition ("a loop is one Claude Code work turn reaching Stop"). It increments on every turn, including pure report/clarification turns with zero engineering work, and it is not, and cannot be, aware of what work (if any) happened in that turn. Verified behavior, unmodified: tests/unit/harness-loop-gate.test.ts.
+- **The "Loop N" numbering used in this document's checkpoint tables and in commit messages** (Loop 1, Loop 2, ... ) is a human-facing, task-oriented count of bounded engineering units, each with its own objective/commit/evidence. This is the number that answers "how much of the approved batch is done."
+
+**These two numbers will not match**, because a single approved engineering "Loop N" can span multiple Claude Code turns (a paused loop awaiting a decision, a forensic-review turn, an evidence-supplement turn, etc. all increment the raw counter without being their own engineering loop). Treat the checkpoint tables below - not the raw `completed_loops` value - as authoritative for "how many approved loops have been completed."
 
 ## Architecture Status: ✅ v1.1 (Cloudflare D1 + Clerk stack approved by Alpesh)
 ## Harness Package: ✅ v1.3 — executable loop/payment/integrity controls added; implementation remains pending
