@@ -183,7 +183,13 @@ export const locations = sqliteTable(
     block: text("block"),
     position: text("position"),
     floor: integer("floor"),
-    fullCode: text("full_code").notNull(),
+    // Unique because a full_code identifies one physical location - two
+    // rows for the same physical spot would be a data-integrity bug.
+    // (Schema-correctness fix found and applied in the location-grid
+    // loop - entities.yaml does not explicitly say "unique" for this
+    // field, but the architecture blueprint's own description of the
+    // location hierarchy makes this an obvious, non-invented rule.)
+    fullCode: text("full_code").notNull().unique(),
     capacityPallets: integer("capacity_pallets").notNull().default(1),
     currentPalletId: text("current_pallet_id"),
     status: text("status").notNull().default("EMPTY"),
