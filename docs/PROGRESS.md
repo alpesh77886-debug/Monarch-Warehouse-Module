@@ -1,6 +1,6 @@
 # Project Progress Tracker
 ## IBF FG Warehouse Module
-## Last updated: 2026-09-14 (Loop 22 checkpoint)
+## Last updated: 2026-09-14 (Loop 23 checkpoint)
 
 ## Reading this document's "loop" numbering (PEN-016 clarification)
 
@@ -202,6 +202,28 @@ Commands run, in order, with results:
 Not tested (does not exist yet, so cannot be exercised): SAP Warehouse Master's R12 edit path (out of this loop's reduced scope), and - same as every loop since PEN-010/PEN-021 were recorded - any screen requiring a real authenticated mutation to actually succeed end-to-end through a real browser session.
 
 **No paid action occurred in this loop. No cloud account, D1/R2/Clerk resource, or deployment action was performed.**
+
+## Loop 23 Checkpoint (window 3 continued - full regression + next-task scan + release checkpoint)
+
+| Loop | Objective | Commit | Result |
+|---|---|---|---|
+| 23 | Full regression re-run; checked the next task in sequence (TASK-005) before writing any code and found a real, undocumented contract gap rather than guessing past it | (this commit) | Done. See evidence below |
+
+### Loop 23 evidence
+
+Before starting any new code, TASK-005 (Putaway + Rack Map, next after TASK-003 in the documented task sequence) was checked directly against the invariant and workflow contracts, not assumed safe from the implementation spec's prose alone. Finding, recorded as PEN-023 rather than guessed past: the spec's own "Location validation: ... pallet type check ... weight capacity check" bullets do not correspond to anything in the schema or the locked invariants - the `locations` table has no pallet-type column at all, `capacity_pallets` is a pallet-count limit not a weight limit, and no invariant or state machine in the contract files covers a location/putaway lifecycle (only `pallet_status`, `receiving_sheet_status`, `transfer_order_status`, `maintenance_ticket_status` are defined). Writing that validation logic now would mean inventing what it actually checks, which is exactly what the STOP RULE forbids. TASK-005's putaway/move business logic is therefore BLOCKED pending that clarification; its own Location/Pallet entities are otherwise fully contracted, so a future loop could still safely build the read-only rack-map-with-occupancy half once there is a clarified next objective or real location data to show (still blocked separately by PEN-008).
+
+Full regression, run after Loop 22's commit, with results:
+1. `npx tsc --noEmit` -> exit 0.
+2. `npm run build` -> exit 0, 12 routes generated, correct static/dynamic split re-confirmed (the two Loop 22 fixes for `/api/masters/statuses` and `/api/masters/sap-codes` still show `ƒ Dynamic`, not `○ Static`).
+3. `npm test` (Vitest) -> exit 0, **60/60 passed across 8 files**, unchanged from Loop 22.
+4. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm run test:e2e` -> **19/19 passed**, unchanged from Loop 22, re-run against a fresh `next build && next start`.
+5. Harness checks: contract-guard PASS, protected-integrity PASS, yaml-lexical-guard PASS (9 contract files). static-guard shows the same 2 pre-existing, deliberate findings from Loop 22 (PEN-022) - not new. package-integrity shows the same 4-file mismatch pattern as every loop in this window (this document, PENDING_ITEMS.md, README.md, the harness loop-state file), plus this loop's own edits to two of those four - not a new class of mismatch.
+6. `npx wrangler d1 migrations list DB --local` -> "No migrations to apply!" - all 4 local migrations current, no drift.
+7. `npm audit` -> unchanged from every prior loop's baseline: **9 vulnerabilities (5 moderate, 2 high, 2 critical)**, all against the pinned Next.js/PostCSS/build-tooling chain already accepted under PEN-013 (Boss Option A); none newly introduced by this window's changes.
+8. `git log --oneline` / `git status` / `git diff --stat` against the pre-window merge commit (`c92ffff`) -> 2 real commits this window so far (Loop 21 `cbfa6b7`, Loop 22 `03b2dee`), clean tree after this loop's own commit, 24 files changed / ~1900 insertions total across the window - entirely new masters CRUD application code, validation, API routes, seed tooling, tests, and docs; zero changes to any protected package document or the canonical business source.
+
+**No paid action occurred in this loop or anywhere in this window so far. No cloud account, D1/R2/Clerk resource, or deployment action was performed - `npx wrangler d1 migrations apply DB --local` / `db:seed` are local-only, and the E2E run served a local production build on a local port.**
 
 ## Architecture Decisions Log
 | Date | Decision | Status |
