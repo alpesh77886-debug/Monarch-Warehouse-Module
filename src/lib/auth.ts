@@ -1,6 +1,31 @@
 import { auth } from "@clerk/nextjs/server";
-import { ForbiddenError, UnauthorizedError } from "./errors";
+import { AuthNotConfiguredError, ForbiddenError, UnauthorizedError } from "./errors";
 import { hasPermission } from "./permissions";
+import { getClerkConfigStatus, PartialClerkConfigError } from "./clerk-config";
+
+/**
+ * Loop 21 finding: calling Clerk's `auth()` when `clerkMiddleware()`
+ * never ran (stub mode - see src/middleware.ts) throws Clerk's own
+ * internal "auth() was called but Clerk can't detect usage of
+ * clerkMiddleware()" error, which surfaced as an opaque 500 on every
+ * permission-gated route the moment a real mutating endpoint was
+ * built and actually run (not just unit-tested with Clerk mocked out).
+ * requireRole/requirePermission now check the same config-status
+ * signal the middleware already uses and fail with a specific, honest
+ * error instead - not because the security decision changes (there is
+ * still no way to authorize a mutation in stub mode), but because
+ * "why" it failed must be legible to the caller and to tests, and
+ * must never depend on Clerk's own wording.
+ */
+function assertAuthBackendIsUsable() {
+  const status = getClerkConfigStatus();
+  if (status === "partial") {
+    throw new PartialClerkConfigError();
+  }
+  if (status === "stub") {
+    throw new AuthNotConfiguredError();
+  }
+}
 
 // The 12 locked roles (R01-R12). Kept in sync with the permissions
 // contract by hand for now - see docs/PENDING_ITEMS.md if this ever
@@ -46,6 +71,7 @@ export async function getCurrentUser() {
  * never sufficient authorization on its own.
  */
 export async function requireRole(allowedRoles: Role[]) {
+  assertAuthBackendIsUsable();
   const { userId } = await auth();
   if (!userId) {
     throw new UnauthorizedError();
@@ -67,6 +93,7 @@ export async function requireRole(allowedRoles: Role[]) {
  * Honors R05's inheritance and R12's "all" wildcard automatically.
  */
 export async function requirePermission(permission: string) {
+  assertAuthBackendIsUsable();
   const { userId } = await auth();
   if (!userId) {
     throw new UnauthorizedError();

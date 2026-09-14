@@ -33,3 +33,19 @@ export class NotFoundError extends Error {
     this.name = "NotFoundError";
   }
 }
+
+// Loop 21 finding: distinct from UnauthorizedError (401, "no session
+// presented") - this means the auth backend itself cannot verify any
+// session at all yet (Clerk stub mode has no real login, so nobody -
+// not even an admin - can be authenticated). Callers must not treat
+// this as "not logged in, please log in"; there is no login to
+// perform until a real Clerk application is configured.
+export class AuthNotConfiguredError extends Error {
+  status = 503 as const;
+  constructor(
+    message = "Authentication is not configured yet (Clerk stub mode). No action requiring a role check can be authorized until a real Clerk application is connected."
+  ) {
+    super(message);
+    this.name = "AuthNotConfiguredError";
+  }
+}

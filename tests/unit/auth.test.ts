@@ -10,11 +10,27 @@ vi.mock("@clerk/nextjs/server", () => ({
   auth: () => authMock(),
 }));
 
+// Loop 21: requireRole/requirePermission now check the Clerk config
+// status before ever calling auth() (see src/lib/auth.ts). Most tests
+// in this file are about the role/permission decision itself, which
+// only matters once a real Clerk app exists, so they mock the status
+// as "configured" - the stub/partial behavior gets its own describe
+// block below instead of being spread across every existing case.
+const clerkConfigStatusMock = vi.fn<[], "configured" | "stub" | "partial">(() => "configured");
+vi.mock("../../src/lib/clerk-config", () => ({
+  getClerkConfigStatus: () => clerkConfigStatusMock(),
+  PartialClerkConfigError: class PartialClerkConfigError extends Error {},
+}));
+
 const { getCurrentUser, requireRole, requirePermission } = await import("../../src/lib/auth");
-const { UnauthorizedError, ForbiddenError } = await import("../../src/lib/errors");
+const { UnauthorizedError, ForbiddenError, AuthNotConfiguredError } = await import(
+  "../../src/lib/errors"
+);
 
 beforeEach(() => {
   authMock.mockReset();
+  clerkConfigStatusMock.mockReset();
+  clerkConfigStatusMock.mockReturnValue("configured");
 });
 
 describe("getCurrentUser", () => {
@@ -85,5 +101,35 @@ describe("requirePermission (fine-grained RBAC gate)", () => {
       sessionClaims: { metadata: { role: "R12" } },
     });
     await expect(requirePermission("holds.release")).resolves.toBe("R12");
+  });
+});
+
+describe("auth backend availability (Loop 21 finding)", () => {
+  // Calling Clerk's real auth() with no clerkMiddleware() wrapping it
+  // (stub mode) throws Clerk's own internal error, which surfaced as
+  // an opaque 500 the first time a real mutating API route was
+  // actually run rather than only unit-tested with auth() mocked out.
+  // requireRole/requirePermission must fail predictably before ever
+  // reaching auth() when the config status says the backend can't be
+  // used - proven here by never letting authMock resolve.
+
+  it("requireRole throws AuthNotConfiguredError in stub mode without calling auth()", async () => {
+    clerkConfigStatusMock.mockReturnValue("stub");
+    await expect(requireRole(["R04"])).rejects.toBeInstanceOf(AuthNotConfiguredError);
+    expect(authMock).not.toHaveBeenCalled();
+  });
+
+  it("requirePermission throws AuthNotConfiguredError in stub mode without calling auth()", async () => {
+    clerkConfigStatusMock.mockReturnValue("stub");
+    await expect(requirePermission("masters.edit")).rejects.toBeInstanceOf(
+      AuthNotConfiguredError
+    );
+    expect(authMock).not.toHaveBeenCalled();
+  });
+
+  it("requireRole throws on a half-configured Clerk environment without calling auth()", async () => {
+    clerkConfigStatusMock.mockReturnValue("partial");
+    await expect(requireRole(["R04"])).rejects.toThrow();
+    expect(authMock).not.toHaveBeenCalled();
   });
 });

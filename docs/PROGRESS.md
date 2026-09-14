@@ -1,6 +1,6 @@
 # Project Progress Tracker
 ## IBF FG Warehouse Module
-## Last updated: 2026-09-14 (Loop 13 checkpoint)
+## Last updated: 2026-09-14 (Loop 21 checkpoint)
 
 ## Reading this document's "loop" numbering (PEN-016 clarification)
 
@@ -28,7 +28,7 @@ Two different, non-interchangeable counters both use the word "loop" in this pro
 |------|-------------|--------|-------------|-------|
 | TASK-001 | Project Scaffolding + D1 Schema + Clerk | 🟨 Partial | Loops 2-9 | Next.js/TS/Tailwind scaffold, core 6-entity schema, local D1 migration verified, Clerk stub scaffold all done. NOT done: remaining 10 entities (PEN-014), real cloud D1/R2/Clerk resources, seed script |
 | TASK-002 | Clerk Auth + Roles | 🟨 Partial | Loop 9 | Middleware/provider/role-check utility scaffolded in stub mode; real account, webhook sync, and Clerk-dashboard role setup still pending (PEN-010) |
-| TASK-003 | Masters CRUD | ⬜ Pending | - | Needs material seed data |
+| TASK-003 | Masters CRUD | 🟨 Partial | Loop 21 | Material Master CRUD (create/list/deactivate) built end-to-end against real local D1: UI, Zod validation mirroring the locked entity contract, server-side permission gate, real persistence, browser E2E coverage. Warehouse Master / SAP Warehouse Master / Status Master CRUD screens NOT built yet (read-only reference data only so far) |
 | TASK-004 | Receiving Sheet Flow | ⬜ Pending | - | CRITICAL PATH |
 | TASK-005 | Putaway + Rack Map | ⬜ Pending | - | Needs location grid |
 | TASK-006 | Hold Management | ⬜ Pending | - | CRITICAL PATH |
@@ -136,6 +136,41 @@ Commands run, in order, with results:
 11. Pending-item audit (PEN-007 through PEN-019): see docs/PENDING_ITEMS.md, unchanged conclusions from each item's own loop except PEN-019 (new, this loop). No item was closed without objective evidence; no item was silently dropped.
 
 **No paid action occurred in this loop. No cloud account, D1/R2/Clerk resource, or deployment action was performed.**
+
+## Loop 21 Checkpoint (window 3, Boss-approved batch "APPROVE_NEXT_10_LOOPS" for loops 21-30)
+
+Before starting: read the master execution contract in full, confirmed the current branch (`claude/loops-21-30-batch-u7hbfn`), HEAD (`c92ffff`, the Loop 19 merge), a clean working tree, the harness hooks/gates in place and live, the task sequence, and the actual runnable application entry point (`npm run dev`/`npm run build` - a real Next.js app, not just docs).
+
+Receiving Sheet (TASK-004) was checked first per this window's own priority order and confirmed still genuinely BLOCKED: the entities contract has no attribute-level definition for Receiving Sheet (ENTITY-009/010) - re-verified directly this loop by reading the contract file, not by trusting the existing PEN-014 note alone. TASK-003 (Material Master & Warehouse Master CRUD) was next in the documented task sequence and is NOT blocked - Material Master (ENTITY-001) is fully contracted - so it became this loop's real vertical slice.
+
+| Loop | Objective | Commit | Result |
+|---|---|---|---|
+| 21 | Material Master CRUD - first real UI-to-database vertical slice | (this commit) | Done. See evidence below |
+
+### Loop 21 evidence (Material Master CRUD - real UI, validation, business logic, local D1 persistence, reload/readback, browser E2E)
+
+What was built, all new this loop:
+- `src/lib/db.ts` - local D1 connection. Cloudflare D1's real wire protocol only exists inside a Workers/Pages runtime (no such adapter exists in this Next.js dev/build process), so this module opens the real Miniflare-managed SQLite file that `npx wrangler d1 migrations apply DB --local` (the same command every prior loop used) already creates under `.wrangler/state/v3/d1/`, and wraps it with the same Drizzle schema used everywhere else in this repository. It creates no schema of its own - if the local D1 state is missing, it throws rather than silently creating a divergent one. Production D1 binding wiring is explicitly NOT done here - recorded as PEN-020.
+- `src/lib/validations/material.ts` - Zod schema transcribed field-for-field from the entities contract's ENTITY-001 (code regex, enum values, required fields), reused by both the API route and the browser form.
+- `src/app/api/masters/materials/route.ts` (GET list, POST create) and `src/app/api/masters/materials/[id]/route.ts` (PATCH active/inactive toggle only - deliberately no hard-delete route, since the contract's own invariant only allows deactivation).
+- `src/app/(app)/masters/page.tsx` and `src/app/(app)/masters/materials/page.tsx` - real mobile-first UI: create form with client-side validation mirroring the server schema, a phone-width card list and a tablet/desktop table (never both visible at once, no horizontal scroll on the page itself), loading/empty/error/permission-denied states, 48px-minimum touch targets, numeric input modes on numeric fields.
+
+A real bug was found and fixed, not routed around: the first real POST through the running dev server returned an opaque 500, not the clean 401/403 the TASK-003 acceptance tests call for. Root cause, confirmed by reading the actual server log rather than guessing: `requireRole`/`requirePermission` (built in Loop 16, unit-tested only with Clerk mocked out) call Clerk's real `auth()`, which throws its own internal error whenever `clerkMiddleware()` never ran - exactly the case in this project's Clerk stub mode. Fix: `src/lib/auth.ts` now checks the same Clerk config-status signal the middleware already uses before ever calling `auth()`, and fails with a new, specific `AuthNotConfiguredError` (503) instead of an opaque crash. This does not weaken the security decision (a mutation still cannot be authorized without a real session) - it makes the failure predictable and testable. 3 new regression tests added in `tests/unit/auth.test.ts` (mocking the config-status signal directly, asserting Clerk's `auth()` is never even called in stub/partial mode); the 9 pre-existing tests in that file were updated to mock config status as "configured" since they test the role/permission decision itself. Recorded as PEN-021, together with the resulting real constraint this uncovers for every future task: no mutation-gated business workflow (Receiving Sheet, Holds, Dispatch, ...) can be exercised end-to-end through a real logged-in browser session until a real Clerk application exists (PEN-010) - only its read paths and its honest refusal path can be.
+
+A second real finding, also fixed at the smallest safe layer rather than worked around: static-guard failed once on this new code (`Possible raw SQL outside ORM: src/lib/db.ts`), because a one-line SQLite connection-level setting the file briefly set (`sqlite.pragma("foreign_keys = ON")`) matched the guard's raw-SQL heuristic. Verified this was not something the checked-in migrations themselves set either, and not required for this loop's scope (the materials table has no foreign key in play for create/list/deactivate) - so it was removed rather than kept and disguised. static-guard now passes cleanly on the real reason (no raw SQL exists in this file), not because the check was dodged.
+
+Commands run, in order, with results:
+1. `npx wrangler d1 migrations apply DB --local` -> all 4 local migrations applied (fresh container, no prior local D1 state) - confirms `--local` only, no `--remote` flag, no cloud D1 resource touched.
+2. `npx tsc --noEmit` -> exit 0.
+3. `npm run build` -> exit 0; 9 routes generated including the 4 new ones (`/masters`, `/masters/materials`, `/api/masters/materials`, `/api/masters/materials/[id]`).
+4. `npm test` (Vitest) -> exit 0, **60/60 passed across 8 files** (57 carried over + 3 new auth-backend-availability tests).
+5. Manual `curl` verification against a real running `next dev` server (not mocked): `GET /api/masters/materials` returns real (empty, then populated) JSON from the local D1 file; `POST` with a valid body returned the opaque Clerk crash before the fix and a clean `503 {"error":"Authentication is not configured yet (Clerk stub mode)..."}` after it.
+6. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npx playwright test` -> **14/14 passed** (9 carried over unchanged + 5 new in `tests/e2e/masters-materials.spec.ts`), against a real `next build && next start` on the pre-installed Chromium. The 5 new tests: (a) a real fixture row seeded directly through the same database module the app uses is genuinely read from local D1 and displayed, and survives a real page reload (not client cache); (b) an invalid material code is rejected client-side with a field-level error before any network call, and never appears in the list; (c) a syntactically valid create attempt through the real UI is honestly refused with the stub-mode message and the refused row never appears - proving the permission gate holds end-to-end, not just in a mocked unit test; (d) the masters landing page links to Material Master; (e) the materials screen has no horizontal scroll and >=48px touch targets at 375px width.
+7. Harness checks: contract-guard PASS, protected-integrity PASS, yaml-lexical-guard PASS (9 contract files); static-guard PASS after the fix described above (FAILED once before it, not hidden). package-integrity shows the same pre-existing mismatch pattern as every prior loop (this document, PENDING_ITEMS.md, README.md, the harness loop-state file - all legitimate content that evolves loop over loop) plus this loop's own edits to those same files - not a new class of mismatch.
+
+Not tested (does not exist yet, so cannot be exercised): Warehouse Master / SAP Warehouse Master / Status Master CRUD (still read-only reference data), any screen requiring a real authenticated mutation end-to-end (blocked on PEN-010/PEN-021 as above), and Receiving Sheet or any other paperwork-entity flow (blocked on PEN-014/PEN-017 as before, re-confirmed this loop rather than assumed).
+
+**No paid action occurred in this loop. No cloud account, D1/R2/Clerk resource, or deployment action was performed - everything above is local-only, npm-registry installs, or a local production build served on a local port for the E2E run.**
 
 ## Architecture Decisions Log
 | Date | Decision | Status |
