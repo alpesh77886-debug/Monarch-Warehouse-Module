@@ -5,7 +5,7 @@
 ## CRITICAL (blocks implementation)
 | ID | Item | Status | Blocking | Notes |
 |----|------|--------|----------|-------|
-| PEN-013 | Next.js version / known-CVE risk decision | PENDING BOSS DECISION | Loop 2 completion | Latest available 14.2.x line (14.2.35) still carries 2 critical + 2 high advisories per `npm audit`; the only fix path npm offers is a major-version jump (next 16.x), which is a bigger change than a scaffold task and has unverified Cloudflare-adapter/hosting-decision implications. Scaffold files below are committed as-is only to keep the working tree clean; the version choice is NOT yet accepted or approved. |
+| PEN-013 | Next.js version / known-CVE risk decision | ACCEPTED RISK (Boss: Option A, 2026-09-14) | None — unblocked | Latest available 14.2.x line (14.2.35) still carries 2 critical + 2 high advisories per `npm audit`; the only fix path npm offers is a major-version jump (next 16.x). Boss explicitly accepted staying on `next@14.2.35` for the pre-deployment/local-dev stage. **This must be re-checked and re-resolved (patch or major upgrade) before any real Cloudflare deployment or internet exposure** — do not carry this acceptance forward silently into a production-readiness claim. |
 | PEN-007 | Material master seed data | PENDING | TASK-003 | Need DSR Excel FG CODE sheet |
 | PEN-008 | Warehouse location grid config | PENDING | TASK-005 | Need exact CR1/CR2 block/position/floor grid |
 | PEN-009 | Cloudflare account creation | PENDING | TASK-001 | Alpesh needs to create Cloudflare account + D1 + R2 |
