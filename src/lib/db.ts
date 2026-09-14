@@ -47,6 +47,26 @@ export class LocalD1NotProvisionedError extends Error {
   }
 }
 
+// Loop 27 finding: Miniflare names this file deterministically from
+// the binding name + database_id in wrangler.toml, so changing
+// database_id (e.g. switching a placeholder to a real one, as this
+// loop did) leaves the OLD file behind alongside a freshly created
+// one - two real candidates in the same directory at once. Silently
+// picking "whichever readdirSync happens to return first" could
+// connect the app to stale, orphaned local data without anyone
+// noticing. Failing loudly here is safer than guessing.
+export class AmbiguousLocalD1StateError extends Error {
+  constructor(dir: string, candidates: string[]) {
+    super(
+      `Found ${candidates.length} candidate local D1 SQLite files in "${dir}": ` +
+        `${candidates.join(", ")}. This usually means wrangler.toml's database_id ` +
+        `changed and an old file was left behind - delete the stale one(s) and keep ` +
+        `only the file matching the current database_id, rather than guessing which to use.`
+    );
+    this.name = "AmbiguousLocalD1StateError";
+  }
+}
+
 function resolveLocalD1SqliteFile(): string {
   let entries: string[];
   try {
@@ -54,11 +74,14 @@ function resolveLocalD1SqliteFile(): string {
   } catch {
     throw new LocalD1NotProvisionedError(STATE_DIR);
   }
-  const dbFile = entries.find((f) => f.endsWith(".sqlite") && f !== "metadata.sqlite");
-  if (!dbFile) {
+  const dbFiles = entries.filter((f) => f.endsWith(".sqlite") && f !== "metadata.sqlite");
+  if (dbFiles.length === 0) {
     throw new LocalD1NotProvisionedError(STATE_DIR);
   }
-  return join(STATE_DIR, dbFile);
+  if (dbFiles.length > 1) {
+    throw new AmbiguousLocalD1StateError(STATE_DIR, dbFiles);
+  }
+  return join(STATE_DIR, dbFiles[0]);
 }
 
 let sqlite: InstanceType<typeof Database> | undefined;

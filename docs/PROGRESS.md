@@ -1,6 +1,6 @@
 # Project Progress Tracker
 ## IBF FG Warehouse Module
-## Last updated: 2026-09-14 (Loop 26 checkpoint)
+## Last updated: 2026-09-14 (Loop 27 checkpoint)
 
 ## Reading this document's "loop" numbering (PEN-016 clarification)
 
@@ -26,7 +26,7 @@ Two different, non-interchangeable counters both use the word "loop" in this pro
 
 | Task | Description | Status | Completed On | Notes |
 |------|-------------|--------|-------------|-------|
-| TASK-001 | Project Scaffolding + D1 Schema + Clerk | 🟨 Partial | Loops 2-9 | Next.js/TS/Tailwind scaffold, core 6-entity schema, local D1 migration verified, Clerk stub scaffold all done. NOT done: remaining 10 entities (PEN-014), real cloud D1/R2/Clerk resources, seed script |
+| TASK-001 | Project Scaffolding + D1 Schema + Clerk | 🟨 Partial | Loops 2-9, 27 | Next.js/TS/Tailwind scaffold, core 6-entity schema, local D1 migration verified, Clerk stub scaffold, seed script (Loop 22) all done. Loop 27: real Cloudflare D1 database created and migrated (PEN-009 mostly resolved). NOT done: remaining 10 entities (PEN-014), real R2 (blocked on an Alpesh-only dashboard step), real Clerk resources (PEN-010 - the Clerk connector cannot create these either, confirmed Loop 27), production D1 binding wiring (PEN-020) |
 | TASK-002 | Clerk Auth + Roles | 🟨 Partial | Loop 9 | Middleware/provider/role-check utility scaffolded in stub mode; real account, webhook sync, and Clerk-dashboard role setup still pending (PEN-010) |
 | TASK-003 | Masters CRUD | 🟩 Done for in-scope items | Loops 21-22 | All 4 masters screens built against real local D1: Material Master and Warehouse Master (create/list/deactivate, server-side permission gate, real persistence, E2E coverage); SAP Warehouse Master and Status Master (read-only, seeded via the new `npm run db:seed`, matching the implementation spec's own "read-only" scope for those two). R12 edit on SAP Warehouse Master is explicitly NOT built (spec marks it out of this reduced read-only scope for now) |
 | TASK-004 | Receiving Sheet Flow | ⬜ Pending | - | CRITICAL PATH |
@@ -307,6 +307,45 @@ Commands run, in order, with results:
 Not built this loop: In-Out Summary, Excel export (the real DSR column layout has never been provided - same class of gap as PEN-007's missing material master source file, not guessed at), FIFO Aging Report.
 
 **No paid action occurred in this loop. No cloud account, D1/R2/Clerk resource, or deployment action was performed.**
+
+## Loop 27 Checkpoint (window 4 continued - real Cloudflare D1 created)
+
+Boss's own words this loop, both worth answering directly rather than deferred to a pending item:
+1. "Iska answer do kyu PEN-007 jaisa gap" (about the DSR Excel export) - answered in-chat: this app has never been given the actual DSR SEPT-2026 Excel file. The flow document only describes it in prose (column names, a "44 FG-relevant" summary count that Loop 14 already found doesn't match the source table's real 45 rows - PEN-018). Building an Excel exporter that claims to "match DSR format" without the real file would mean guessing the exact column order/headers/number formatting, which is exactly what the STOP RULE forbids - the same category of gap as PEN-007 (Material Master has no real seed rows because the DSR "FG CODE" sheet was never provided either). Not blocked forever - just needs the real file.
+2. "maine tumhe Cloudflare aur Clerk ke connectors diye hai to vaha kaam kyu nahi ho sakta" - checked directly rather than assuming either connector was inert. Cloudflare's genuinely has account-mutating tools (create/list D1 databases, R2 buckets, Workers) - it was simply never used before because the master contract's own gate says D1 stays local-only "until a remote connection is verified," which nothing had done yet. Clerk's connector, by contrast, only has two SDK-snippet reference tools - no application/account management capability exists there at all, so that specific gap could not be closed from here regardless.
+
+| Loop | Objective | Commit | Result |
+|---|---|---|---|
+| 27 | Real Cloudflare D1 database created and migrated via the Cloudflare connector; confirmed the Clerk connector's real limits; local D1 file-resolution hardened against the ambiguity this caused | (this commit) | Done. See evidence below |
+
+### Loop 27 evidence
+
+Discovery first, before any mutation: `d1_databases_list` -> 0 databases (fresh account for this project). `r2_buckets_list` -> a real 403 ("Please enable R2 through the Cloudflare Dashboard") - R2 needs a one-time dashboard step only Alpesh can do; not a connector gap being routed around. `workers_list` -> one pre-existing Worker, `monarch-license-gate` (created 2026-08-03, a month before this project's own Loop 1 governance commit) - not touched, flagged as PEN-027 for Alpesh's awareness since it predates and is unrelated to this repository's own history.
+
+Then, real action: `d1_database_create` -> a genuine Cloudflare D1 database (`monarch-warehouse-module`, id `3947a2dd-a29d-4dd2-9af0-49895548f0e2`) - a free action, no billing prompt. All 4 checked-in migrations applied directly via `d1_database_query`, one statement at a time in the same order every `--local` run has always used, plus a `d1_migrations` bookkeeping table (wrangler's own convention) so a real `wrangler ... --remote` run would recognize the database as already current. Re-verified against the real remote database the same two checks Loop 7 first proved locally: a SKFG-prefixed material code is rejected by the CHECK constraint, and the stock_ledger append-only triggers block both UPDATE and DELETE - all against `served_by: v3-prod`, not a simulator. `wrangler.toml`'s `database_id` now points at this real database (previously a placeholder UUID) - see the updated comment in that file for exactly what this does and does not mean (still NOT a production binding - PEN-020 is unrelated and still open; still NOT DEPLOYED).
+
+A real, disclosed side effect: verifying the remote database meant inserting small, obviously-labeled test rows (`verify-*` ids). Because of the same append-only-ledger-plus-foreign-keys finding as PEN-026 (confirmed here to be equally true on the real remote D1, not just the local one - `DELETE FROM pallets` failed with a real `FOREIGN KEY constraint failed` once a stock_ledger row referenced it), one verification ledger row and the handful of rows it references are now permanently on the real database. Harmless, clearly test data, not fabricated business data - recorded in PEN-009's update, not hidden.
+
+A second real finding, from changing `database_id`: Miniflare names the local `--local` SQLite file deterministically from the binding + database_id, so the old placeholder-id file was left behind next to a freshly created one - two real candidate files in the same directory. `src/lib/db.ts`'s file-resolution logic previously just took "whichever `readdirSync` returns first," which could have silently connected the app to stale local data without anyone noticing. Hardened it to throw a new, specific `AmbiguousLocalD1StateError` if more than one candidate file ever exists again, rather than guessing; the actual stale file from this loop was deleted, `npm run db:seed` was re-run against the fresh one, and the full regression suite (below) was re-run afterward to prove nothing broke from the swap.
+
+Commands/tool calls run, in order, with results:
+1. `d1_databases_list`, `r2_buckets_list`, `workers_list` (Cloudflare connector, read-only) -> results above.
+2. `d1_database_create` -> real database created.
+3. 17 individual `d1_database_query` calls (DDL from all 4 migration files, in original file order) -> all succeeded against the real remote database.
+4. `d1_database_query` (create + populate `d1_migrations`) -> succeeded.
+5. `d1_database_query` (SKFG rejection check) -> correctly failed with the real `materials_code_prefix_check` CHECK-constraint error.
+6. `d1_database_query` (insert a full valid fixture chain: material/warehouse/user/batch/pallet/stock_ledger) -> succeeded.
+7. `d1_database_query` (UPDATE then DELETE that stock_ledger row) -> both correctly failed with the real append-only trigger errors.
+8. `d1_database_query` (DELETE the fixture pallet) -> correctly failed with a real foreign-key error, confirming the permanence finding above.
+9. `npx wrangler d1 migrations apply DB --local` (after updating `wrangler.toml`) -> ran cleanly, created a fresh local file under the new database_id's hash.
+10. `npm run db:seed` -> "Seeded 10 statuses and 45 SAP codes into local D1" against the fresh file.
+11. `npx tsc --noEmit` -> exit 0.
+12. `npm run build` -> exit 0, no route-table changes (no application code changed, only `wrangler.toml` and `src/lib/db.ts`'s file-resolution logic).
+13. `npm test` (Vitest) -> exit 0, **84/84 passed across 12 files**, re-confirming every test-file fixture that self-seeds via `getDb()` still works correctly against a completely fresh local database file.
+14. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npx playwright test` -> **32/32 passed**, unchanged, against the fresh local file.
+15. Harness checks: contract-guard PASS, protected-integrity PASS, yaml-lexical-guard PASS (9 contract files), static-guard shows the same 3 pre-existing, deliberate public-read findings (PEN-022) - not new (`wrangler.toml`/`src/lib/db.ts` changes did not touch any API route file).
+
+**Free-only confirmation:** every Cloudflare connector action taken this loop (`d1_databases_list`, `d1_database_create`, 20 `d1_database_query` calls, `r2_buckets_list`, `workers_list`, `workers_get_worker`) is a database/read operation, not a billing action - D1 database creation and queries are free-tier operations with no payment prompt at any point. R2 was explicitly NOT enabled (that 403 was left as-is, not worked around) since doing so is a dashboard-only step outside this session's tools and outside this loop's authority to decide on Alpesh's behalf. No Clerk account or resource was created (the connector cannot do this). Vercel: still NOT DEPLOYED, untouched this loop.
 
 ## Architecture Decisions Log
 | Date | Decision | Status |

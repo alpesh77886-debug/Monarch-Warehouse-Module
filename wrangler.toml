@@ -2,15 +2,19 @@ name = "monarch-warehouse-module"
 compatibility_date = "2024-09-01"
 compatibility_flags = ["nodejs_compat"]
 
-# LOCAL-ONLY placeholder binding (Loop 7). database_id is a placeholder
-# UUID, not a real Cloudflare resource - no cloud D1 database has been
-# created for this project. All commands in this loop use --local,
-# which runs entirely against a local SQLite file under .wrangler/state
-# and never contacts Cloudflare's API. Creating the real remote D1
-# database requires a separate, explicit approval before any --remote
-# command is ever run against this binding.
+# Real Cloudflare D1 database (Loop 27) - created via the Cloudflare
+# connector after Alpesh explicitly pointed out it was connected and
+# asked why it was unused; the 4 migrations were applied directly
+# against it and re-verified (SKFG rejection, stock_ledger append-only
+# triggers) with the same checks Loop 7 first ran locally. Local dev
+# still uses `--local` / the app's own local-D1 connection
+# (src/lib/db.ts) by default - this binding only makes the id real so
+# a genuine `--remote` command targets the right database; it does not
+# by itself mean the deployed app is wired to it (PEN-020 - no
+# @cloudflare/next-on-pages-style adapter exists yet) or that anything
+# has been deployed (still NOT DEPLOYED per the free-only gate).
 [[d1_databases]]
 binding = "DB"
-database_name = "monarch-warehouse-module-local"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_name = "monarch-warehouse-module"
+database_id = "3947a2dd-a29d-4dd2-9af0-49895548f0e2"
 migrations_dir = "drizzle/migrations"
