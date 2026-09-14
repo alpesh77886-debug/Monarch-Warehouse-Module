@@ -1,6 +1,6 @@
 # Project Progress Tracker
 ## IBF FG Warehouse Module
-## Last updated: 2026-09-14 (Loop 27 checkpoint)
+## Last updated: 2026-09-14 (Loop 28 checkpoint)
 
 ## Reading this document's "loop" numbering (PEN-016 clarification)
 
@@ -30,13 +30,13 @@ Two different, non-interchangeable counters both use the word "loop" in this pro
 | TASK-002 | Clerk Auth + Roles | 🟨 Partial | Loop 9 | Middleware/provider/role-check utility scaffolded in stub mode; real account, webhook sync, and Clerk-dashboard role setup still pending (PEN-010) |
 | TASK-003 | Masters CRUD | 🟩 Done for in-scope items | Loops 21-22 | All 4 masters screens built against real local D1: Material Master and Warehouse Master (create/list/deactivate, server-side permission gate, real persistence, E2E coverage); SAP Warehouse Master and Status Master (read-only, seeded via the new `npm run db:seed`, matching the implementation spec's own "read-only" scope for those two). R12 edit on SAP Warehouse Master is explicitly NOT built (spec marks it out of this reduced read-only scope for now) |
 | TASK-004 | Receiving Sheet Flow | ⬜ Pending | - | CRITICAL PATH |
-| TASK-005 | Putaway + Rack Map | 🟩 Done for in-scope items | Loops 24-25 | Location CRUD (admin), putaway/move business logic (unblocked via PEN-023), and the visual color-coded Rack Map (SCREEN-003) are all built against real local D1, verified with a real browser and screenshots (5/6 legend colors + click-to-detail popup + search highlighting). NOT built: location-move audit trail (PEN-024) and the "mix of batches" legend color (PEN-025) - both blocked on the same missing Pallet-Batch relationship (PEN-014) |
+| TASK-005 | Putaway + Rack Map | 🟩 Done for in-scope items | Loops 24-25, 28 | Location CRUD (admin), putaway/move business logic (unblocked via PEN-023), and the visual color-coded Rack Map (SCREEN-003) are all built against real local D1, verified with a real browser and screenshots (5/6 legend colors + click-to-detail popup + search highlighting). Loop 28: PEN-008 resolved - the real Limbasi CR1/CR2 grid (1442 locations) is now seeded from the real DSR Excel file. NOT built: location-move audit trail (PEN-024) and the "mix of batches" legend color (PEN-025) - both blocked on the same missing Pallet-Batch relationship (PEN-014) |
 | TASK-006 | Hold Management | ⬜ Pending | - | CRITICAL PATH |
 | TASK-007 | Bulk Management | ⬜ Pending | - | - |
 | TASK-008 | Dispatch + Loading Sheet | ⬜ Pending | - | CRITICAL PATH |
 | TASK-009 | Inter-Warehouse Transfers | ⬜ Pending | - | - |
 | TASK-010 | Maintenance Module | ⬜ Pending | - | - |
-| TASK-011 | Stock Ledger + Reports + R2 Export | 🟨 Partial | Loop 26 | Stock Ledger list built (paginated, filterable by transaction_type) against real local D1, role-gated per the architecture blueprint's own Action Permission Matrix (unlike the masters/pallets reads - see PEN-022). NOT built: In-Out Summary, Excel export (real DSR column layout not available, same class of gap as PEN-007), FIFO Aging Report |
+| TASK-011 | Stock Ledger + Reports + R2 Export | 🟨 Partial | Loops 26, 28 | Stock Ledger list built (paginated, filterable by transaction_type) against real local D1, role-gated per the architecture blueprint's own Action Permission Matrix (unlike the masters/pallets reads - see PEN-022). Loop 28: real DSR-format Excel export built (`/api/stock/ledger/export`, `stock.export`-gated per the same matrix), using the real column headers from the DSR file Alpesh provided - see PEN-028 for the dependency-CVE tradeoff this required. NOT built: In-Out Summary, FIFO Aging Report |
 | TASK-012 | Dashboard | ⬜ Pending | - | - |
 | TASK-013 | FIFO Stock Maintenance | ⬜ Pending | - | - |
 | TASK-014 | Integration Tests + E2E | ⬜ Pending | - | After all features |
@@ -346,6 +346,40 @@ Commands/tool calls run, in order, with results:
 15. Harness checks: contract-guard PASS, protected-integrity PASS, yaml-lexical-guard PASS (9 contract files), static-guard shows the same 3 pre-existing, deliberate public-read findings (PEN-022) - not new (`wrangler.toml`/`src/lib/db.ts` changes did not touch any API route file).
 
 **Free-only confirmation:** every Cloudflare connector action taken this loop (`d1_databases_list`, `d1_database_create`, 20 `d1_database_query` calls, `r2_buckets_list`, `workers_list`, `workers_get_worker`) is a database/read operation, not a billing action - D1 database creation and queries are free-tier operations with no payment prompt at any point. R2 was explicitly NOT enabled (that 403 was left as-is, not worked around) since doing so is a dashboard-only step outside this session's tools and outside this loop's authority to decide on Alpesh's behalf. No Clerk account or resource was created (the connector cannot do this). Vercel: still NOT DEPLOYED, untouched this loop.
+
+## Loop 28 Checkpoint (window 4 continued - real DSR Excel file, real location grid, real DSR export, Clerk CLI attempted)
+
+Boss provided the real DSR SEPT-2026 Excel file and said a real Clerk application was created, with the official Clerk CLI setup skill's instructions pasted in full.
+
+| Loop | Objective | Commit | Result |
+|---|---|---|---|
+| 28 | Parsed the real DSR file (skipping the SAP PASSWORD sheet entirely - never read); seeded the real Limbasi CR1/CR2 location grid (PEN-008 resolved) and a real warehouse; built a real DSR-format Stock Ledger Excel export; attempted the Clerk CLI setup and found it cannot complete headlessly in this environment | (this commit) | Done. See evidence below |
+
+### Loop 28 evidence
+
+**DSR Excel file** (`SAP PASSWORD` sheet deliberately never opened or read - credentials, out of scope regardless of what it contains): 11 sheets total. `FG CODE` (1013 real FG material rows after excluding 9 duplicates, 18 rows that are actually RM/raw-material codes, and 36 junk/subtotal rows) is the real material master source PEN-007 was waiting on. `CR-1`/`CR-2` (a real pallet-occupancy snapshot, every row carrying its own full location code) confirm the architecture blueprint's general 36-block/5-position/4-floor pattern exactly for both cold rooms. `SEPT-2026` gives the real DSR ledger column headers/order. `CONTAINER DETAILS` names the physical warehouse "LIMBASI-01". `IN-OUT`, `REPORT`, `DSR-3PL INWARD`, `Sheet1`, `Sheet2` were also inspected for completeness; none contain a pallet-weight-limit or pallet-type field for materials.
+
+**Real location grid + warehouse (PEN-008 resolved):** `drizzle/seed/warehouses.ts` (one real warehouse, `LIMBASI-FG`) and `drizzle/seed/limbasi-grid.ts` (1442 real locations: 36 blocks x 5 positions x 4 floors x 2 rooms + 2 floor-staging codes), built on the Loop 15 generator exactly as designed, wired into `npm run db:seed` (idempotent - re-running never overwrites an existing location's occupancy fields, only inserts genuinely missing rows), tested in `tests/unit/limbasi-grid.test.ts` (5 tests) against the real schema. Ran `npm run db:seed` twice in a row to confirm idempotency (1442 both times, not doubled).
+
+**Real DSR-format Excel export (TASK-011):** `src/app/api/stock/ledger/export/route.ts`, gated by `stock.export` (R03/R09/R12 per the architecture blueprint's Action Permission Matrix - a different, narrower gate than the ledger list's `stock.view_ledger`). Column headers/order (DATE, SHIFT, FG CODE, Product, PALLET NO., BATCH NO, QTY, LOCATION, REMARK) are transcribed exactly from the real SEPT-2026 sheet's own header row. Explicitly NOT included: DISPATCH DATE, DISPATCH QTY, BALANCE, VEHICLE NO, WMS IN, WMS IN PERSON - the real DSR sheet is one mutable row per pallet updated later with dispatch info, while this system's append-only ledger (INV-009) deliberately replaces that with one immutable row per transaction, and the schema does not track vehicle/WMS fields at all yet (PEN-014 territory) - exporting fabricated blank columns for these would look complete without being complete. A dependency choice was needed and is disclosed as PEN-028: the npm-registry `xlsx` package has 2 unfixed high-severity advisories directly in its read/write code path; `exceljs` was used instead, which adds 2 new moderate advisories of its own but only through a low-likelihood transitive `uuid` misuse pattern - a smaller risk, not a zero one. `tests/unit/stock-ledger-export.test.ts` proves the export is a real, loadable `.xlsx` file with the exact real headers, using the same requirePermission-bypass technique as every other gated-route test in this repository.
+
+**Clerk CLI (PEN-029):** installed (`npm install -g clerk`, version 3.3.0) and ran `clerk auth login` exactly as the provided setup skill specifies. It correctly started a local OAuth callback server and printed a real sign-in URL - this is the CLI working as designed, not a bug - but the callback server binds to `127.0.0.1` inside this remote sandboxed session, which Alpesh's own browser cannot reach to complete the redirect. Confirmed directly by running the command and reading its own output, not assumed from documentation. The process was not left hanging - it was cleanly interrupted once this was confirmed. Asked Alpesh directly for the two real API keys instead (this repository's own Clerk integration from Loops 9/16/21+ already auto-detects them the moment both env vars are set - the CLI's own scaffolding step is not needed here since it was already done by hand).
+
+Commands run, in order, with results:
+1. `npm install -g clerk` -> installed, `clerk --version` -> 3.3.0.
+2. `clerk auth login` (20s timeout wrapper) -> printed a real OAuth URL and started waiting for a callback that cannot reach this session; interrupted cleanly, no lingering process (`ps aux | grep clerk` -> empty afterward).
+3. Real DSR file inspected with `openpyxl`/`pandas` (installed via pip, not previously present) - read-only throughout, `SAP PASSWORD` sheet never opened.
+4. `npx tsc --noEmit` -> exit 0 (checked after each new file: db.ts hardening, warehouse/grid seed files, and the export route).
+5. `npm run db:seed` (twice) -> "Seeded 10 statuses, 45 SAP codes, 1 warehouse(s), and up to 1442 real Limbasi CR1/CR2 locations into local D1." both times, confirming idempotency.
+6. `npm run build` -> exit 0, 20 routes generated, `/api/stock/ledger/export` shows `ƒ Dynamic` correctly.
+7. `npm test` (Vitest) -> exit 0, **90/90 passed across 14 files** (84 carried over + 5 new in `limbasi-grid.test.ts` + 1 new in `stock-ledger-export.test.ts`).
+8. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npx playwright test` -> **32/32 passed**, unchanged - this loop added no new UI screen beyond the export button already covered by existing Stock Ledger E2E coverage.
+9. Harness checks: contract-guard PASS, protected-integrity PASS, yaml-lexical-guard PASS (9 contract files), static-guard shows the same 3 pre-existing, deliberate public-read findings (PEN-022) - not new (no new unguarded API route this loop; the export route correctly calls `requirePermission` and is not flagged).
+10. `npm audit` -> **11 vulnerabilities (7 moderate, 2 high, 2 critical)**, up from 9 - the 2 new moderate findings are `exceljs`'s transitive `uuid` dependency (PEN-028), a deliberate, disclosed, smaller-risk choice over the alternative, not an accident.
+
+Not resolved this loop, and why: Material Master's full seed (PEN-007) - the one field genuinely missing from every sheet in the real file (`pallet_weight_limit_kg`) is asked about directly rather than guessed for ~1013 real materials. Real Clerk keys - Alpesh needs to paste them directly since the CLI's interactive login cannot complete here (PEN-029).
+
+**Free-only confirmation:** `npm install -g clerk` and `pip install openpyxl pandas` are free package-registry installs. No Cloudflare/Clerk billing action was taken. Vercel: still NOT DEPLOYED.
 
 ## Architecture Decisions Log
 | Date | Decision | Status |

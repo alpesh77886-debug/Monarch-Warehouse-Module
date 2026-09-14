@@ -78,7 +78,22 @@ export default function StockLedgerPage() {
 
   return (
     <>
-      <PageHeader breadcrumb="Home / Stock / Ledger" title="Stock Ledger" />
+      <PageHeader
+        breadcrumb="Home / Stock / Ledger"
+        title="Stock Ledger"
+        actions={
+          <a
+            href={
+              transactionType
+                ? `/api/stock/ledger/export?transactionType=${transactionType}`
+                : "/api/stock/ledger/export"
+            }
+            className="flex min-h-[48px] items-center rounded-lg bg-teal px-4 text-sm font-bold text-white"
+          >
+            Export (DSR format)
+          </a>
+        }
+      />
       <div className="flex flex-col gap-4 p-4 sm:p-6">
         <select
           className="min-h-[48px] w-full rounded-lg border border-line bg-white px-3 text-sm text-ink2 outline-none focus:border-teal sm:w-64"
