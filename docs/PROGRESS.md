@@ -1,6 +1,6 @@
 # Project Progress Tracker
 ## IBF FG Warehouse Module
-## Last updated: 2026-09-14 (Loop 21 checkpoint)
+## Last updated: 2026-09-14 (Loop 22 checkpoint)
 
 ## Reading this document's "loop" numbering (PEN-016 clarification)
 
@@ -28,7 +28,7 @@ Two different, non-interchangeable counters both use the word "loop" in this pro
 |------|-------------|--------|-------------|-------|
 | TASK-001 | Project Scaffolding + D1 Schema + Clerk | 🟨 Partial | Loops 2-9 | Next.js/TS/Tailwind scaffold, core 6-entity schema, local D1 migration verified, Clerk stub scaffold all done. NOT done: remaining 10 entities (PEN-014), real cloud D1/R2/Clerk resources, seed script |
 | TASK-002 | Clerk Auth + Roles | 🟨 Partial | Loop 9 | Middleware/provider/role-check utility scaffolded in stub mode; real account, webhook sync, and Clerk-dashboard role setup still pending (PEN-010) |
-| TASK-003 | Masters CRUD | 🟨 Partial | Loop 21 | Material Master CRUD (create/list/deactivate) built end-to-end against real local D1: UI, Zod validation mirroring the locked entity contract, server-side permission gate, real persistence, browser E2E coverage. Warehouse Master / SAP Warehouse Master / Status Master CRUD screens NOT built yet (read-only reference data only so far) |
+| TASK-003 | Masters CRUD | 🟩 Done for in-scope items | Loops 21-22 | All 4 masters screens built against real local D1: Material Master and Warehouse Master (create/list/deactivate, server-side permission gate, real persistence, E2E coverage); SAP Warehouse Master and Status Master (read-only, seeded via the new `npm run db:seed`, matching the implementation spec's own "read-only" scope for those two). R12 edit on SAP Warehouse Master is explicitly NOT built (spec marks it out of this reduced read-only scope for now) |
 | TASK-004 | Receiving Sheet Flow | ⬜ Pending | - | CRITICAL PATH |
 | TASK-005 | Putaway + Rack Map | ⬜ Pending | - | Needs location grid |
 | TASK-006 | Hold Management | ⬜ Pending | - | CRITICAL PATH |
@@ -171,6 +171,37 @@ Commands run, in order, with results:
 Not tested (does not exist yet, so cannot be exercised): Warehouse Master / SAP Warehouse Master / Status Master CRUD (still read-only reference data), any screen requiring a real authenticated mutation end-to-end (blocked on PEN-010/PEN-021 as above), and Receiving Sheet or any other paperwork-entity flow (blocked on PEN-014/PEN-017 as before, re-confirmed this loop rather than assumed).
 
 **No paid action occurred in this loop. No cloud account, D1/R2/Clerk resource, or deployment action was performed - everything above is local-only, npm-registry installs, or a local production build served on a local port for the E2E run.**
+
+## Loop 22 Checkpoint (window 3 continued)
+
+| Loop | Objective | Commit | Result |
+|---|---|---|---|
+| 22 | Warehouse Master CRUD + wire the missing seed script + Status/SAP Warehouse Master read-only screens (completes TASK-003's in-scope items) | (this commit) | Done. See evidence below |
+
+### Loop 22 evidence (Warehouse Master CRUD, seed runner, read-only reference masters)
+
+What was built, all new this loop:
+- `drizzle/seed/run.ts`, wired as `npm run db:seed` - the implementation spec's own TASK-001 acceptance test names this command, but it never existed until now. Upserts (not insert-only) so re-running it is safe. Ran it against the real local D1 file: 10 statuses + 45 SAP codes seeded, confirmed idempotent by running it twice.
+- `src/lib/validations/warehouse.ts`, `src/app/api/masters/warehouses/route.ts` (GET/POST), `src/app/api/masters/warehouses/[id]/route.ts` (PATCH active toggle, no hard delete - same rule as Material Master), `src/app/(app)/masters/warehouses/page.tsx` - the same real-UI-to-real-D1 pattern as Loop 21's Material Master, applied to Warehouse Master (ENTITY-006 - not yet in the formal entities contract, same status as when Loop 6 first built its schema table, so nothing new was invented here beyond what that already-locked schema shape allows).
+- `src/app/api/masters/statuses/route.ts` and `src/app/api/masters/sap-codes/route.ts` (GET only, real seeded data) plus `src/app/(app)/masters/statuses/page.tsx` and `src/app/(app)/masters/sap-codes/page.tsx` - read-only screens, matching the implementation spec's own scope for these two entities ("read-only after seed" / "read-only, seeded"). The masters landing page now links all 4 instead of showing 3 as "not built yet".
+
+Two real findings this loop, both fixed or explicitly decided rather than hidden:
+1. **Real bug, fixed.** The production build's own route table showed `/api/masters/statuses` and `/api/masters/sap-codes` as `○ Static` instead of `ƒ Dynamic` - Next.js had statically pre-rendered both GET handlers at build time (neither uses a request-specific API to force dynamic rendering on its own), which would have served one frozen build-time snapshot of the seeded table forever, never a live read. Fixed with an explicit `export const dynamic = "force-dynamic"` in both files; rebuilt and confirmed both now show `ƒ Dynamic`.
+2. **Real static-guard finding, decided and documented rather than worked around.** static-guard flags both read-only routes as "lacks obvious auth guard" (true - neither calls `requireRole`/`requirePermission`/Clerk anywhere in the file). Decision: leave them as deliberate public reads of fixed, non-sensitive reference data (10 status values, 45 SAP codes, no customer/stock/pricing data) - gating reads would make them unreadable by anyone at all in the current Clerk stub environment (PEN-021), and no locked rule requires read-side gating, only the (not-built-this-loop) SAP Warehouse Master *edit* path. Nothing was added to either file to make the regex stop matching; the finding stays visible and true. Recorded as PEN-022 for a human decision if that policy should ever change.
+
+Commands run, in order, with results:
+1. `npm install` (adding `tsx` as an explicit devDependency, already present transitively) -> "up to date", same 9 pre-existing vulnerabilities, none new.
+2. `npm run db:seed` -> "Seeded 10 statuses and 45 SAP codes into local D1." Ran a second time -> identical output, confirming the upsert logic is idempotent.
+3. `npx tsc --noEmit` -> exit 0.
+4. `npm run build` -> exit 0 both before and after the dynamic-rendering fix; route table diffed by hand between the two runs to confirm the fix actually changed `○` to `ƒ` for both affected routes.
+5. Manual `curl` verification against a real running `next dev` server: `GET /api/masters/warehouses` (empty, real JSON), `GET /api/masters/statuses` and `GET /api/masters/sap-codes` (real seeded rows), `POST /api/masters/warehouses` with a valid body -> the same honest `503` stub-mode refusal Material Master already proved in Loop 21.
+6. `npm test` (Vitest) -> exit 0, **60/60 passed** (unchanged from Loop 21 - this loop added no new unit-level logic beyond what the E2E layer already covers for CRUD screens).
+7. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npx playwright test` -> **19/19 passed** (14 carried over unchanged + 5 new in `tests/e2e/masters-warehouses-and-reference.spec.ts`): Warehouse Master real persistence + reload, Warehouse Master's create-mutation honestly refused in stub mode (same proof pattern as Material Master), Status Master shows all 10 seeded values, SAP Warehouse Master shows the 45 seeded codes, and no horizontal scroll at 375px width across all three new screens.
+8. Harness checks: contract-guard PASS, protected-integrity PASS, yaml-lexical-guard PASS (9 contract files). static-guard FAILED once on the two intentional public-read routes (PEN-022 above, not hidden) and PASSED on everything else, including the fix for finding #1. package-integrity shows the same pre-existing mismatch pattern (this document, PENDING_ITEMS.md, README.md, the harness loop-state file) plus this loop's own edits - not a new class of mismatch.
+
+Not tested (does not exist yet, so cannot be exercised): SAP Warehouse Master's R12 edit path (out of this loop's reduced scope), and - same as every loop since PEN-010/PEN-021 were recorded - any screen requiring a real authenticated mutation to actually succeed end-to-end through a real browser session.
+
+**No paid action occurred in this loop. No cloud account, D1/R2/Clerk resource, or deployment action was performed.**
 
 ## Architecture Decisions Log
 | Date | Decision | Status |
