@@ -405,7 +405,7 @@ Commands run, in order, with results:
 3. `npm run db:seed` (twice) -> "...and 972 of 972 real FG materials..." then "...and 0 of 972 real FG materials (already-existing codes left untouched)..." - confirming idempotency.
 4. `npm run build` -> exit 0, same 21-route table as before (no new route added, `/api/masters/materials/[id]` already existed).
 5. `npm test` (Vitest) -> exit 0, **99/99 passed across 14 files** (90 carried over + 5 new real-seed-data tests in `seed-data.test.ts` + 4 new PATCH tests in `mutations-live.test.ts`).
-6. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npx playwright test` (with `.env.local` moved aside, per the diagnosed PEN-030 constraint) -> **32/32 passed**, unchanged - proving this loop's changes did not regress any existing screen; `.env.local` restored immediately after.
+6. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npx playwright test` (with `.env.local` moved aside, per the diagnosed PEN-030 constraint) -> **34/34 passed** (32 carried over + 2 new for the `PalletWeightEditor` UI in `masters-materials.spec.ts`: click-to-edit surfaces the same honest Clerk-stub-mode 503 refusal as every other mutation in this app, and Cancel discards the edit without calling the API) - proving this loop's changes did not regress any existing screen; `.env.local` restored immediately after each run.
 7. Harness checks: contract-guard PASS, protected-integrity PASS, yaml-lexical-guard PASS (9 contract files), static-guard shows the same 3 pre-existing, deliberate public-read findings (PEN-022) - not new (no new unguarded API route this loop).
 8. `npm audit` -> unchanged, **11 vulnerabilities (7 moderate, 2 high, 2 critical)** - same accepted baseline as Loop 28 (PEN-013, PEN-028), no new dependency added this loop.
 

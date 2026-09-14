@@ -118,6 +118,38 @@ test.describe("Material Master - server-side permission gate (Clerk stub mode)",
   });
 });
 
+test.describe("Material Master - pallet weight limit inline edit (Loop 29, PEN-007)", () => {
+  test("click-to-edit surfaces the same honest Clerk-stub-mode refusal as every other mutation", async ({
+    page,
+  }) => {
+    await page.goto("/masters/materials");
+    const row = page.getByRole("row", { name: new RegExp(FIXTURE_CODE) });
+    const editButton = row.getByRole("button", { name: "1000 kg" });
+    await expect(editButton).toBeVisible();
+    await editButton.click();
+
+    const input = row.locator('input[type="number"]');
+    await input.fill("750");
+    await row.getByRole("button", { name: "Save" }).click();
+
+    await expect(row.getByText(/Clerk stub mode/i)).toBeVisible();
+    // Refused, not silently applied - the button still shows the
+    // original real value once the notice is visible.
+    await expect(row.getByRole("button", { name: "1000 kg" })).toHaveCount(0);
+    await expect(input).toBeVisible();
+  });
+
+  test("Cancel discards the edit without calling the API", async ({ page }) => {
+    await page.goto("/masters/materials");
+    const row = page.getByRole("row", { name: new RegExp(FIXTURE_CODE) });
+    await row.getByRole("button", { name: "1000 kg" }).click();
+    await row.locator('input[type="number"]').fill("1");
+    await row.getByRole("button", { name: "Cancel" }).click();
+
+    await expect(row.getByRole("button", { name: "1000 kg" })).toBeVisible();
+  });
+});
+
 test.describe("Masters landing page", () => {
   test("links to Material Master", async ({ page }) => {
     await page.goto("/masters");
