@@ -1,0 +1,15 @@
+# IBF FG Warehouse — Evaluation Rubric Contract
+# Status: PROPOSED | Authority: TECHNICAL
+
+version: 1.0
+status: PROPOSED
+
+dimensions:
+  - {dimension: functional_correctness, weight: 25, description: "All 10 flows work end-to-end"}
+  - {dimension: authorization_correctness, weight: 20, description: "Clerk role checks enforced on every endpoint"}
+  - {dimension: data_integrity, weight: 15, description: "Invariants hold, D1 triggers block mutations"}
+  - {dimension: business_rules, weight: 15, description: "Hard blocks prevent violations"}
+  - {dimension: ux_journey, weight: 10, description: "Key journeys complete without dead-ends"}
+  - {dimension: visual_fidelity, weight: 5, description: "Screens match wireframes"}
+  - {dimension: performance, weight: 5, description: "Dashboard < 2s, API P95 < 500ms"}
+  - {dimension: accessibility, weight: 5, description: "Touch targets, contrast, keyboard nav"}

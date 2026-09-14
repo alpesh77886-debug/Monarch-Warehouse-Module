@@ -1,0 +1,202 @@
+# IBF FG Warehouse — Domain Entities Contract
+# Source: IBF_FG_Warehouse_Flow_Document_v3_FINAL_Complete.md
+# Status: LOCKED (business-critical entities)
+# Authority: BUSINESS
+# ORM: Drizzle ORM (drizzle-orm/d1) for Cloudflare D1
+
+version: 1.0
+source: IBF_FG_Warehouse_Flow_Document_v3_FINAL_Complete.md
+status: LOCKED
+authority: BUSINESS
+database: Cloudflare D1 (SQLite)
+orm: Drizzle ORM
+
+entities:
+
+  material_master:
+    id: ENTITY-001
+    table: materials
+    purpose: FG material definition (LFG/SFG codes)
+    authority: BUSINESS
+    attributes:
+      - name: code
+        type: text
+        unique: true
+        required: true
+        validation: "^(?:LFG|SFG)[0-9]+$"
+        editable_by: [R12]
+      - name: description
+        type: text
+        required: true
+        editable_by: [R12]
+      - name: uom_kg_per_carton
+        type: real
+        required: true
+        editable_by: [R12]
+      - name: category
+        type: text
+        required: true
+        editable_by: [R12]
+      - name: pallet_weight_limit_kg
+        type: real
+        required: true
+        editable_by: [R12]
+        invariant: INV-007
+      - name: pallet_type
+        type: text
+        check_constraint: "pallet_type IN ('CARTON', 'ROLL', 'POUCH')"
+        required: true
+        editable_by: [R12]
+      - name: shelf_life_days
+        type: integer
+        required: false
+        editable_by: [R12]
+      - name: plant_origin
+        type: text
+        check_constraint: "plant_origin IN ('LIMBASI', 'SABARKANTHA')"
+        required: true
+        editable_by: [R12]
+      - name: active
+        type: integer
+        default: 1
+        editable_by: [R12]
+    invariants:
+      - "Cannot delete material with active stock — must deactivate"
+      - "Code must start with LFG (Limbasi) or SFG (Sabarkantha)"
+
+  batch:
+    id: ENTITY-002
+    table: batches
+    purpose: Production batch of a material
+    attributes:
+      - name: batch_number
+        type: text
+        unique: true
+        required: true
+        validation: "^L[0-9]{2}[A-L][0-9]{2}[0-9]{3,4}$"
+      - name: material_id
+        type: text
+        references: materials
+        required: true
+      - name: production_date
+        type: text
+        required: true
+      - name: production_line
+        type: text
+        check_constraint: "production_line IN ('FF', 'SPECIALITY')"
+      - name: shift
+        type: text
+        check_constraint: "shift IN ('A', 'B', 'C')"
+
+  pallet:
+    id: ENTITY-003
+    table: pallets
+    purpose: Physical pallet in warehouse
+    attributes:
+      - name: pallet_number
+        type: text
+        required: true
+      - name: pallet_type
+        type: text
+        check_constraint: "pallet_type IN ('PLASTIC', 'WOODEN')"
+      - name: material_id
+        type: text
+        references: materials
+        required: true
+        invariant: INV-006
+      - name: current_location_id
+        type: text
+        references: locations
+        required: false
+      - name: status_code
+        type: text
+        check_constraint: "status_code IN ('QC_HOLD','OK','HOLD','BULK','DISPATCHED','IN_TRANSIT','CUSTOMER_SAMPLE','SAMPLE','REJECTED','SCRAP')"
+        required: true
+        default: QC_HOLD
+        invariant: INV-014
+      - name: total_weight_kg
+        type: real
+        required: true
+        invariant: INV-007
+      - name: total_cartons
+        type: integer
+        required: true
+      - name: current_warehouse_id
+        type: text
+        references: warehouses
+        required: true
+
+  location:
+    id: ENTITY-005
+    table: locations
+    attributes:
+      - name: warehouse_id
+        type: text
+        references: warehouses
+        required: true
+      - name: cold_room
+        type: text
+        check_constraint: "cold_room IN ('CR1', 'CR2', 'FLOOR', 'NA')"
+      - name: block
+        type: text
+      - name: position
+        type: text
+      - name: floor
+        type: integer
+      - name: full_code
+        type: text
+        required: true
+      - name: capacity_pallets
+        type: integer
+        default: 1
+      - name: current_pallet_id
+        type: text
+        references: pallets
+        required: false
+      - name: status
+        type: text
+        check_constraint: "status IN ('EMPTY', 'OCCUPIED', 'PARTIAL', 'BLOCKED')"
+        default: EMPTY
+
+  stock_ledger:
+    id: ENTITY-015
+    table: stock_ledger
+    purpose: "Append-only transaction log — replaces DSR Excel"
+    locked: true
+    append_only: true
+    db_triggers:
+      - "BEFORE UPDATE: RAISE(ABORT, 'stock_ledger is append-only')"
+      - "BEFORE DELETE: RAISE(ABORT, 'stock_ledger is append-only')"
+    invariants:
+      - INV-009: "NEVER UPDATE or DELETE — append only"
+
+  user:
+    id: ENTITY-016
+    table: users
+    purpose: "System user — synced from Clerk"
+    attributes:
+      - name: clerk_user_id
+        type: text
+        unique: true
+        required: true
+        description: "Clerk's user ID — primary link to Clerk auth"
+      - name: name
+        type: text
+        required: true
+      - name: email
+        type: text
+        unique: true
+        required: true
+      - name: role_id
+        type: text
+        required: true
+        description: "R01-R12 — also stored in Clerk metadata"
+      - name: department
+        type: text
+        required: true
+      - name: plant
+        type: text
+        required: true
+      - name: active
+        type: integer
+        default: 1

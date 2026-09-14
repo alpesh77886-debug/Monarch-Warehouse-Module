@@ -1,0 +1,30 @@
+# IBF FG Warehouse — Invariant Register Contract
+# Status: LOCKED | Authority: SAFETY
+# Database: Cloudflare D1 (SQLite)
+# Auth: Clerk (role-based)
+
+version: 1.0
+status: LOCKED
+authority: SAFETY
+
+invariants:
+  - {id: INV-001, rule: "HOLD material CANNOT be dispatched to party", severity: CRITICAL, enforcement: "H4_RUNTIME + H2_TEST", mechanism: "API guard: check pallet.status_code = OK before loading sheet creation"}
+  - {id: INV-002, rule: "REJECTED material CANNOT be dispatched", severity: CRITICAL, enforcement: "H4_RUNTIME + H2_TEST", mechanism: "Same API guard"}
+  - {id: INV-003, rule: "QC HOLD (new inward) CANNOT be dispatched", severity: CRITICAL, enforcement: "H4_RUNTIME + H2_TEST", mechanism: "Same API guard"}
+  - {id: INV-004, rule: "BULK material CANNOT be dispatched", severity: CRITICAL, enforcement: "H4_RUNTIME + H2_TEST", mechanism: "Same API guard"}
+  - {id: INV-005, rule: "Only QC role can release a hold", severity: CRITICAL, enforcement: "H4_RUNTIME + H2_TEST", mechanism: "Clerk role check: auth().sessionClaims.metadata.role must be R04 or R05"}
+  - {id: INV-006, rule: "One pallet = one material (no mixing)", severity: CRITICAL, enforcement: "H4_RUNTIME + H2_TEST", mechanism: "API validation: batch.material_id must match pallet.material_id"}
+  - {id: INV-007, rule: "Pallet weight must not exceed limit", severity: HIGH, enforcement: "H4_RUNTIME + H2_TEST", mechanism: "API calculation: sum of batch weights > material.pallet_weight_limit_kg → reject"}
+  - {id: INV-008, rule: "Receiving Sheet once LOCKED is immutable", severity: CRITICAL, enforcement: "H4_RUNTIME + H3_DB_TRIGGER + H2_TEST", mechanism: "D1 SQLite trigger: BEFORE UPDATE WHEN OLD.status='LOCKED' → RAISE(ABORT)"}
+  - {id: INV-009, rule: "Stock Ledger is append-only (no UPDATE/DELETE)", severity: CRITICAL, enforcement: "H3_DB_TRIGGER + H4_RUNTIME + H2_TEST", mechanism: "D1 SQLite triggers: BEFORE UPDATE → RAISE(ABORT), BEFORE DELETE → RAISE(ABORT)"}
+  - {id: INV-010, rule: "FIFO violation requires logged override with reason", severity: HIGH, enforcement: "H4_RUNTIME + H2_TEST", mechanism: "API: if older OK batch exists and pick is newer → override_reason required"}
+  - {id: INV-011, rule: "Gate pass required for every vehicle exit", severity: HIGH, enforcement: "H4_RUNTIME + H2_TEST", mechanism: "Dispatch finalization checks gate_pass_number exists"}
+  - {id: INV-012, rule: "Loading sheet required for every vehicle loading", severity: HIGH, enforcement: "H4_RUNTIME + H2_TEST", mechanism: "Gate pass requires linked loading_sheet_id"}
+  - {id: INV-013, rule: "Receiving Sheet requires dual confirmation", severity: HIGH, enforcement: "H4_RUNTIME + H2_TEST", mechanism: "Lock action checks both packing_confirmed AND warehouse_confirmed"}
+  - {id: INV-014, rule: "Status values are FIXED enum (no free text)", severity: HIGH, enforcement: "H3_CHECK_CONSTRAINT + H4_RUNTIME + H2_TEST", mechanism: "D1 CHECK constraint + Drizzle type + Zod validation"}
+  - {id: INV-015, rule: "Hold reason from fixed dropdown (no free text)", severity: HIGH, enforcement: "H3_CHECK_CONSTRAINT + H4_RUNTIME + H2_TEST", mechanism: "D1 CHECK constraint + Drizzle type + Zod validation"}
+  - {id: INV-016, rule: "Batch traceability across warehouse transfers", severity: HIGH, enforcement: "H4_RUNTIME + H2_TEST", mechanism: "Stock ledger records all movements with batch_id"}
+  - {id: INV-017, rule: "Hold materials CAN transfer with hold tag", severity: MEDIUM, enforcement: "H4_RUNTIME + H2_TEST", mechanism: "Transfer allows HOLD if transfer_type = HOLD_TAG"}
+  - {id: INV-018, rule: "Export containers need QC approval before loading", severity: HIGH, enforcement: "H4_RUNTIME + H2_TEST", mechanism: "Export loading sheet finalization checks qc_approval_by_id"}
+  - {id: INV-019, rule: "Temperature at loading must be recorded", severity: MEDIUM, enforcement: "H4_RUNTIME + H2_TEST", mechanism: "Loading sheet requires temperature_c field"}
+  - {id: INV-020, rule: "SAP code != physical location — both maintained separately", severity: MEDIUM, enforcement: "H1_AGENT + H2_TEST", mechanism: "Architecture review + data model test"}

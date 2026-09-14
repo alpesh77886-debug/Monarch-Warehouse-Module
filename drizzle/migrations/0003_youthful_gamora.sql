@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `locations_full_code_unique` ON `locations` (`full_code`);

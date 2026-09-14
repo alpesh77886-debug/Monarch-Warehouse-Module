@@ -1,0 +1,30 @@
+# IBF FG Warehouse — Screen Contract
+# Status: LOCKED | Authority: ARCHITECTURE
+# Behavioral proof must come from real application tests; this file is a scope contract.
+version: 1.0
+status: LOCKED
+authority: ARCHITECTURE
+screens:
+  - {id: SCREEN-001, name: Main Dashboard, purpose: Warehouse overview, html_reference: 01}
+  - {id: SCREEN-002, name: New Receiving Sheet, purpose: Create and dual-confirm receiving sheet, html_reference: 02}
+  - {id: SCREEN-003, name: Rack Map, purpose: Digital warehouse location map, html_reference: 03}
+  - {id: SCREEN-004, name: Hold Management, purpose: Hold/release/reject tracking, html_reference: 04}
+  - {id: SCREEN-005, name: Loading Sheet and Dispatch, purpose: Pick/load/gate/dispatch workflow, html_reference: 06}
+  - {id: SCREEN-006, name: Putaway Queue, purpose: Assign pallet locations after receiving, html_reference: null}
+  - {id: SCREEN-007, name: Transfer Order, purpose: Inter-warehouse transfer workflow, html_reference: 07}
+  - {id: SCREEN-008, name: Bulk Management, purpose: Track bulk and repacking queue, html_reference: 05}
+  - {id: SCREEN-009, name: Maintenance Ticket, purpose: Raise/track/resolve equipment issues, html_reference: 08}
+  - {id: SCREEN-010, name: Stock Ledger DSR, purpose: Transaction log and export, html_reference: 09}
+  - {id: SCREEN-011, name: In-Out Summary, purpose: Daily DSR IN-OUT summary, html_reference: 10}
+  - {id: SCREEN-012, name: Masters Management, purpose: Material/warehouse/SAP/user/status masters, html_reference: null}
+  - {id: SCREEN-013, name: FIFO Aging Report, purpose: Aging and FIFO compliance, html_reference: null}
+  - {id: SCREEN-014, name: Export Container Details, purpose: Container/seal/bolt/QC approval details, html_reference: 06}
+mobile_contract:
+  target: mobile-first web application
+  required_widths_px: [320, 360, 390, 430, 768]
+  touch_target_min_px: 48
+  no_horizontal_scroll_primary_flows: true
+  phone_layout: single_column
+  tablet_layout: two_column
+  desktop_layout: multi_column
+  reference_html_is_behavioral_proof: false

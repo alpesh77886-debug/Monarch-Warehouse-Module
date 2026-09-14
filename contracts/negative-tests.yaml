@@ -1,0 +1,27 @@
+# IBF FG Warehouse — Negative Tests Contract
+# Status: LOCKED | Authority: SAFETY
+
+version: 1.0
+status: LOCKED
+
+negative_tests:
+  - {id: NS-001, name: "Dispatch HOLD material", expected: "422 — Cannot include HOLD material"}
+  - {id: NS-002, name: "Dispatch REJECTED material", expected: "422 — Cannot include REJECTED material"}
+  - {id: NS-003, name: "Non-QC user attempts to release hold", expected: "403 — Only QC role can release holds"}
+  - {id: NS-004, name: "Mix materials on one pallet", expected: "422 — Pallet cannot have mixed materials"}
+  - {id: NS-005, name: "Pallet weight exceeds limit", expected: "422 — Pallet booked — Xkg already loaded"}
+  - {id: NS-006, name: "Attempt to unlock LOCKED receiving sheet", expected: "403 — Locked sheets are immutable"}
+  - {id: NS-007, name: "Attempt to DELETE stock ledger entry", expected: "D1 trigger ABORT — stock_ledger is append-only"}
+  - {id: NS-008, name: "FIFO violation without override reason", expected: "422 — FIFO violation — override requires reason"}
+  - {id: NS-009, name: "Gate pass without loading sheet", expected: "422 — Gate pass requires linked loading sheet"}
+  - {id: NS-010, name: "Loading sheet with non-OK status material", expected: "422 — same as NS-001 to NS-004"}
+  - {id: NS-011, name: "Concurrent dual-confirmation race condition", expected: "409 Conflict — one succeeds"}
+  - {id: NS-012, name: "Duplicate receiving sheet (same material+batch+shift)", expected: "409 — Sheet already exists"}
+  - {id: NS-013, name: "Export container loading without QC approval", expected: "422 — Export requires QC approval"}
+  - {id: NS-014, name: "Free-text status entry", expected: "422 — CHECK constraint violation"}
+  - {id: NS-015, name: "Free-text hold reason", expected: "422 — CHECK constraint violation"}
+  - {id: NS-016, name: "Unauthenticated API access", expected: "401 — Clerk session required"}
+  - {id: NS-017, name: "Unauthorized role access to masters", expected: "403 — Only R12 can edit masters"}
+  - {id: NS-018, name: "Invalid batch number format", expected: "422 — Invalid batch format"}
+  - {id: NS-019, name: "More than 35 pallets on receiving sheet", expected: "422 — Maximum 35 pallets"}
+  - {id: NS-020, name: "Edit DISPATCHED loading sheet", expected: "403 — DISPATCHED sheets are immutable"}

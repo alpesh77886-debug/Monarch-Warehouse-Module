@@ -1,0 +1,85 @@
+name: MONARCH Warehouse CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: monarch-warehouse-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  harness-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Package self-integrity
+        run: node scripts/harness/package-integrity.mjs
+      - name: YAML contract lexical guard
+        run: node scripts/harness/yaml-lexical-guard.mjs
+      - name: Contract guard
+        run: node scripts/harness/contract-guard.mjs
+      - name: Protected integrity
+        run: node scripts/harness/protected-integrity.mjs
+      - name: Static guard
+        run: node scripts/harness/static-guard.mjs
+
+  application-quality:
+    if: ${{ hashFiles('package.json') != '' }}
+    needs: harness-preflight
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Contract re-check after install
+        run: node scripts/harness/contract-guard.mjs
+      - name: Unit tests
+        run: npm run test
+      - name: Invariant tests
+        run: npm run test:invariants
+      - name: Negative tests
+        run: npm run test:negative
+      - name: Build
+        run: npm run build
+
+  browser-e2e:
+    if: ${{ hashFiles('package.json') != '' }}
+    needs: application-quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Start test app
+        run: npm run dev:test > /tmp/monarch-warehouse.log 2>&1 &
+      - name: Wait for app
+        shell: bash
+        run: |
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:3000 >/dev/null 2>&1; then exit 0; fi
+            sleep 1
+          done
+          echo 'Application did not become ready within 60 seconds.'
+          tail -n 200 /tmp/monarch-warehouse.log || true
+          exit 1
+      - name: Golden E2E scenarios
+        run: npm run test:e2e
+      - name: Negative E2E scenarios
+        run: npm run test:e2e:negative

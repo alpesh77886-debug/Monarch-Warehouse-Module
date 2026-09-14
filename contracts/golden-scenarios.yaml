@@ -1,0 +1,17 @@
+# IBF FG Warehouse — Golden Scenarios Contract
+# Status: LOCKED | Authority: BUSINESS
+
+version: 1.0
+status: LOCKED
+
+scenarios:
+  - {id: GS-001, name: "Normal FG Inward & Dispatch", verifies: [INV-001, INV-013, "FIFO", "dual confirmation", "full lifecycle"]}
+  - {id: GS-002, name: "Hold & Release", verifies: [INV-005, "hold lifecycle", "aging timer"]}
+  - {id: GS-003, name: "Inter-Warehouse Transfer of Hold Material", verifies: [INV-016, INV-017, "3PL transfer"]}
+  - {id: GS-004, name: "Bulk Material Flow (over-production to repack to dispatch)", verifies: ["bulk lifecycle", "traceability"]}
+  - {id: GS-005, name: "Export Container Dispatch", verifies: [INV-018, INV-019, "export flow"]}
+  - {id: GS-006, name: "Maintenance Critical Issue", verifies: ["maintenance lifecycle", "CRITICAL escalation"]}
+  - {id: GS-007, name: "FIFO Override", verifies: [INV-010, "FIFO override", "audit logging"]}
+  - {id: GS-008, name: "Receiving Dispute Prevention", verifies: [INV-013, "dispute prevention", "carton condition tracking"]}
+  - {id: GS-009, name: "Multiple Batches on Same Pallet", verifies: [INV-006, INV-007, "multi-batch pallet"]}
+  - {id: GS-010, name: "3PL Inward from Other Plant", verifies: ["3PL inward", "cross-plant stock"]}

@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1789357109774,
+      "tag": "0000_parallel_smasher",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789357133094,
+      "tag": "0001_stock_ledger_append_only",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789359982927,
+      "tag": "0002_concerned_invisible_woman",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789360205507,
+      "tag": "0003_youthful_gamora",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+# IBF FG Warehouse — Workflow / State Machine Contract
+# Status: LOCKED | Authority: BUSINESS
+
+version: 1.0
+status: LOCKED
+
+state_machines:
+  pallet_status:
+    states: [QC_HOLD, OK, HOLD, BULK, DISPATCHED, IN_TRANSIT, CUSTOMER_SAMPLE, SAMPLE, REJECTED, SCRAP]
+    transitions:
+      - {from: QC_HOLD, to: OK, action: qc_release, actor: [R04, R05]}
+      - {from: QC_HOLD, to: HOLD, action: qc_place_hold, actor: [R04]}
+      - {from: HOLD, to: OK, action: qc_release_hold, actor: [R04, R05]}
+      - {from: HOLD, to: REJECTED, action: qc_reject, actor: [R04]}
+      - {from: BULK, to: QC_HOLD, action: bulk_repacked, actor: [R01, R06]}
+      - {from: OK, to: IN_TRANSIT, action: transfer_dispatch, actor: [R03, R09]}
+      - {from: IN_TRANSIT, to: OK, action: transfer_receive, actor: [R01, R03]}
+      - {from: OK, to: DISPATCHED, action: dispatch, actor: [R03, R09, R10]}
+    invalid_transitions:
+      - "QC_HOLD → DISPATCHED (must release first)"
+      - "HOLD → DISPATCHED (must release first)"
+      - "BULK → DISPATCHED (must repack first)"
+      - "HOLD → OK by non-QC role (INV-005)"
+
+  receiving_sheet_status:
+    states: [DRAFT, PENDING_PACKING, PENDING_WAREHOUSE, LOCKED, CANCELLED]
+    transitions:
+      - {from: DRAFT, to: PENDING_PACKING, action: warehouse_confirm}
+      - {from: DRAFT, to: PENDING_WAREHOUSE, action: packing_confirm}
+      - {from: PENDING_PACKING, to: LOCKED, action: packing_confirm}
+      - {from: PENDING_WAREHOUSE, to: LOCKED, action: warehouse_confirm}
+      - {from: DRAFT, to: CANCELLED, action: cancel}
+    invalid_transitions:
+      - "LOCKED → DRAFT"
+      - "LOCKED → any"
+      - "DRAFT → LOCKED (must go through pending states)"
+
+  transfer_order_status:
+    states: [DRAFT, PICKED, LOADED, IN_TRANSIT, RECEIVED, COMPLETED, CANCELLED]
+    transitions:
+      - {from: DRAFT, to: PICKED, action: pick}
+      - {from: PICKED, to: LOADED, action: load}
+      - {from: LOADED, to: IN_TRANSIT, action: dispatch}
+      - {from: IN_TRANSIT, to: RECEIVED, action: receive}
+      - {from: RECEIVED, to: COMPLETED, action: complete}
+    invalid_transitions:
+      - "COMPLETED → any"
+      - "IN_TRANSIT → DRAFT"
+
+  maintenance_ticket_status:
+    states: [OPEN, ACKNOWLEDGED, IN_PROGRESS, RESOLVED, CLOSED, REOPENED]
+    transitions:
+      - {from: OPEN, to: ACKNOWLEDGED, action: acknowledge}
+      - {from: ACKNOWLEDGED, to: IN_PROGRESS, action: start_work}
+      - {from: IN_PROGRESS, to: RESOLVED, action: resolve}
+      - {from: RESOLVED, to: CLOSED, action: close}
+      - {from: RESOLVED, to: REOPENED, action: reopen}
+      - {from: REOPENED, to: IN_PROGRESS, action: start_work}
+    invalid_transitions:
+      - "CLOSED → any"
+      - "OPEN → RESOLVED"
