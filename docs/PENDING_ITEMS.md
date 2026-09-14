@@ -11,7 +11,7 @@
 | PEN-007 | Material master seed data | PENDING | TASK-003 | Need DSR Excel FG CODE sheet |
 | PEN-008 | Warehouse location grid config | PENDING | TASK-005 | Need exact CR1/CR2 block/position/floor grid |
 | PEN-009 | Cloudflare account creation | PENDING | TASK-001 | Alpesh needs to create Cloudflare account + D1 + R2 |
-| PEN-010 | Clerk account creation | PENDING | TASK-001 | Alpesh needs to create Clerk app + get API keys |
+| PEN-010 | Clerk account creation | PENDING | TASK-001/002 | Alpesh needs to create Clerk app + get API keys. Code scaffold (middleware, provider, sign-in/up pages, role-check utility) is committed in stub mode: with no keys set it no-ops instead of crashing the build. Pinned to `@clerk/nextjs@6.39.6` specifically because the current latest major (7.x) requires Next.js 15/16 and would conflict with the accepted Next 14.2.35 decision (PEN-013) - re-check this pin if that Next decision ever changes. |
 | PEN-011 | Offline/PWA scope conflict | PENDING | TASK-001 | Source flow requests offline resilience; v1 architecture defers offline sync. Mobile-friendly online UX is mandatory. Explicit human decision required before offline mutation/sync is implemented. |
 
 ## IMPORTANT
