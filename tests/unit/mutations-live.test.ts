@@ -25,6 +25,7 @@ vi.mock("@/lib/auth", () => ({
 const { getDb } = await import("@/lib/db");
 const { materials, warehouses, locations, pallets } = await import("../../drizzle/schema");
 const { POST: createMaterial } = await import("@/app/api/masters/materials/route");
+const { PATCH: patchMaterial } = await import("@/app/api/masters/materials/[id]/route");
 const { POST: createWarehouse } = await import("@/app/api/masters/warehouses/route");
 const { POST: createLocation } = await import("@/app/api/storage/locations/route");
 const { POST: assignPallet } = await import("@/app/api/storage/putaway/route");
@@ -33,6 +34,14 @@ const { POST: movePallet } = await import("@/app/api/storage/move/route");
 function jsonRequest(url: string, body: unknown) {
   return new NextRequest(new URL(url, "http://localhost"), {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+function patchRequest(url: string, body: unknown) {
+  return new NextRequest(new URL(url, "http://localhost"), {
+    method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -86,6 +95,46 @@ describe("Material Master POST really inserts into local D1 (not just 503s)", ()
     expect(row).toBeDefined();
     expect(row.description).toBe("Loop 24 live-mutation fixture");
     materialId = row.id;
+  });
+});
+
+describe("Material Master PATCH really updates local D1 (Loop 29, PEN-007 pallet-weight editability)", () => {
+  it("updates only the field sent - partial update, not a full replace", async () => {
+    const res = await patchMaterial(patchRequest(`/api/masters/materials/${materialId}`, { palletWeightLimitKg: 750 }), {
+      params: { id: materialId },
+    });
+    const body = await res.json();
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.material.palletWeightLimitKg).toBe(750);
+    // Untouched fields survive the partial update.
+    expect(body.material.description).toBe("Loop 24 live-mutation fixture");
+
+    const [row] = await db.select().from(materials).where(eq(materials.id, materialId));
+    expect(row.palletWeightLimitKg).toBe(750);
+  });
+
+  it("rejects a non-positive pallet weight limit (422 - matches ValidationError.status)", async () => {
+    const res = await patchMaterial(patchRequest(`/api/masters/materials/${materialId}`, { palletWeightLimitKg: 0 }), {
+      params: { id: materialId },
+    });
+    expect(res.status).toBe(422);
+    const [row] = await db.select().from(materials).where(eq(materials.id, materialId));
+    expect(row.palletWeightLimitKg).toBe(750); // unchanged
+  });
+
+  it("rejects an empty patch body (422 - matches ValidationError.status)", async () => {
+    const res = await patchMaterial(patchRequest(`/api/masters/materials/${materialId}`, {}), {
+      params: { id: materialId },
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it("404s for a material id that does not exist", async () => {
+    const res = await patchMaterial(
+      patchRequest(`/api/masters/materials/does-not-exist`, { palletWeightLimitKg: 500 }),
+      { params: { id: "does-not-exist" } }
+    );
+    expect(res.status).toBe(404);
   });
 });
 

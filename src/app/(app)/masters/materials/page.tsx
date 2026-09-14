@@ -245,7 +245,7 @@ export default function MaterialMasterPage() {
               No materials yet. Add one above.
             </div>
           ) : (
-            <MaterialList materials={materials} />
+            <MaterialList materials={materials} onUpdated={loadMaterials} />
           )}
         </section>
       </div>
@@ -253,7 +253,7 @@ export default function MaterialMasterPage() {
   );
 }
 
-function MaterialList({ materials }: { materials: Material[] }) {
+function MaterialList({ materials, onUpdated }: { materials: Material[]; onUpdated: () => void }) {
   return (
     <>
       {/* Phone: stacked cards, never a wide table - avoids horizontal scroll. */}
@@ -269,9 +269,11 @@ function MaterialList({ materials }: { materials: Material[] }) {
               <span>{m.category}</span>
               <span>{m.palletType}</span>
               <span>{m.uomKgPerCarton} kg/carton</span>
-              <span>{m.palletWeightLimitKg} kg/pallet limit</span>
               <span>{m.plantOrigin}</span>
               <span>{m.shelfLifeDays ? `${m.shelfLifeDays}d shelf life` : "no shelf life"}</span>
+            </div>
+            <div className="mt-2">
+              <PalletWeightEditor material={m} onUpdated={onUpdated} />
             </div>
           </li>
         ))}
@@ -302,7 +304,9 @@ function MaterialList({ materials }: { materials: Material[] }) {
                 <td className="px-4 py-3">{m.category}</td>
                 <td className="px-4 py-3">{m.palletType}</td>
                 <td className="px-4 py-3">{m.uomKgPerCarton}</td>
-                <td className="px-4 py-3">{m.palletWeightLimitKg}</td>
+                <td className="px-4 py-3">
+                  <PalletWeightEditor material={m} onUpdated={onUpdated} />
+                </td>
                 <td className="px-4 py-3">{m.plantOrigin}</td>
                 <td className="px-4 py-3">
                   <StatusPill active={m.active === 1} />
@@ -313,6 +317,105 @@ function MaterialList({ materials }: { materials: Material[] }) {
         </table>
       </div>
     </>
+  );
+}
+
+/**
+ * Per-material pallet weight limit editor (Loop 29 - Alpesh asked
+ * that admins be able to set this per material, since the real DSR
+ * source has no such field to seed a real value from). Same
+ * stub-mode-honest pattern as every other mutation in this app: a
+ * 503 in Clerk stub mode is shown plainly, not hidden.
+ */
+function PalletWeightEditor({ material, onUpdated }: { material: Material; onUpdated: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(String(material.palletWeightLimitKg));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          setValue(String(material.palletWeightLimitKg));
+          setError(null);
+          setNotice(null);
+          setEditing(true);
+        }}
+        className="min-h-[32px] text-left underline decoration-dotted"
+        title="Edit pallet weight limit"
+      >
+        {material.palletWeightLimitKg} kg
+      </button>
+    );
+  }
+
+  async function save() {
+    const num = Number(value);
+    if (!Number.isFinite(num) || num <= 0) {
+      setError("Must be a positive number.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/masters/materials/${material.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ palletWeightLimitKg: num }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        if (res.status === 503) {
+          setNotice(body.error);
+        } else {
+          setError(body.error ?? `Request failed (${res.status}).`);
+        }
+        return;
+      }
+      setEditing(false);
+      onUpdated();
+    } catch {
+      setError("Network error - could not reach the server.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-1">
+        <input
+          type="number"
+          inputMode="decimal"
+          min="0"
+          step="1"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="min-h-[36px] w-20 rounded-lg border border-line bg-white px-2 text-sm text-ink2 outline-none focus:border-teal"
+        />
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving}
+          className="min-h-[36px] rounded-lg bg-teal px-2 text-xs font-bold text-white disabled:opacity-60"
+        >
+          {saving ? "..." : "Save"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setEditing(false)}
+          className="min-h-[36px] rounded-lg border border-line px-2 text-xs font-bold text-ink2"
+        >
+          Cancel
+        </button>
+      </div>
+      {error ? <span className="text-xs font-semibold text-danger">{error}</span> : null}
+      {notice ? <span className="text-xs font-semibold text-warning">{notice}</span> : null}
+    </div>
   );
 }
 

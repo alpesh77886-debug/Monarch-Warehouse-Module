@@ -1,6 +1,6 @@
 # Project Progress Tracker
 ## IBF FG Warehouse Module
-## Last updated: 2026-09-14 (Loop 28 checkpoint)
+## Last updated: 2026-09-14 (Loop 29 checkpoint)
 
 ## Reading this document's "loop" numbering (PEN-016 clarification)
 
@@ -380,6 +380,38 @@ Commands run, in order, with results:
 Not resolved this loop, and why: Material Master's full seed (PEN-007) - the one field genuinely missing from every sheet in the real file (`pallet_weight_limit_kg`) is asked about directly rather than guessed for ~1013 real materials. Real Clerk keys - Alpesh needs to paste them directly since the CLI's interactive login cannot complete here (PEN-029).
 
 **Free-only confirmation:** `npm install -g clerk` and `pip install openpyxl pandas` are free package-registry installs. No Cloudflare/Clerk billing action was taken. Vercel: still NOT DEPLOYED.
+
+## Loop 29 Checkpoint (window 4 continued - real Clerk keys wired, network-egress limitation diagnosed, Material Master fully seeded and pallet-weight-limit made admin-editable)
+
+Boss pasted the two real Clerk API keys directly (CLI login could not complete headlessly - PEN-029), and answered the one open Material Master question directly: "Pallet limit - 1000kg rakho ya fir pallet limit user khud set kar sake aisa rakho" (default to 1000kg **and** make it admin-editable).
+
+| Loop | Objective | Commit | Result |
+|---|---|---|---|
+| 29 | Wired and verified real Clerk keys; diagnosed why real Clerk cannot be browser/E2E-verified from this sandbox (network-egress policy, not a config defect); resolved PEN-007 fully - real 972-row Material Master seed, plus a PATCH endpoint and inline UI making pallet_weight_limit_kg (and every other R12-editable field) admin-editable | (this commit) | Done. See evidence below |
+
+### Loop 29 evidence
+
+**Real Clerk keys wired (PEN-029):** the two keys Alpesh pasted were written only to the gitignored `.env.local` (`git check-ignore -v .env.local` -> `.gitignore:70:.env.*` confirmed), never committed, and not echoed again in any tool output or doc after that one message. Verified real Clerk is genuinely active, not just present in the file: an HTTP check against `/sign-in` returns real `x-clerk-auth-status: signed-out` and `x-clerk-auth-reason: dev-browser-missing` response headers, and the SSR'd HTML embeds a real `clerk.browser.js` script tag carrying the real publishable key - stub mode produces neither.
+
+**Network-egress limitation diagnosed (new finding, PEN-030 - not silently worked around):** running Playwright against the app with real keys active hit `ERR_TUNNEL_CONNECTION_FAILED` on every single route (not just `/sign-in`), because `clerkMiddleware()`'s matcher covers nearly all pages and every page load now attempts a one-time "dev browser" handshake redirect to Clerk's own `.accounts.dev` domain. Checked this sandbox's own egress proxy status endpoint directly (`curl -sS "$HTTPS_PROXY/__agentproxy/status"`) and confirmed a policy 403 for that Clerk domain - and, as a control, for an unrelated arbitrary domain (`www.google.com`) too, proving this is a general sandbox-level egress allowlist gap, not anything specific to this project's Clerk setup. Per this session's own documented guidance ("Do not retry or route around it - report the blocked host"), this was reported and worked around only for testing purposes (see below), not bypassed as if it were fixed. Confirmed the diagnosis both directions: moved `.env.local` aside (forcing stub mode) and reran the full E2E suite - 32/32 passed instantly with zero tunnel errors - then restored the real keys.
+
+**Material Master fully seeded (PEN-007 resolved):** re-parsed the real DSR "FG CODE" sheet from scratch with a precise, disclosed cleaning pass (see PEN-007's own updated entry for the full accounting) - of 1022 raw rows: 18 excluded as not a valid LFG/SFG code (13 RM-prefixed raw materials + 5 sheet junk labels: TOTAL/EMPTY/RS/ES/SAMPLE, discovered in a second unlabeled appendix block after the sheet's own "TOTAL" row), 9 excluded as duplicate codes (kept first occurrence), 23 excluded for missing/zero UOM with nothing reliable to derive it from - tried and rejected a description-text weight backfill after finding it disagreed with the real UOM column on 9 of 920 cross-checked rows (~1% silent-corruption rate). **972 real rows** (not the "1013" Loop 28 estimated before this actual cleaning pass ran - corrected honestly, not left standing) written to `drizzle/seed/data/materials.json`, `plantOrigin` derived from the locked LFG/SFG prefix rule, `palletType` defaulted to CARTON (re-confirmed zero "roll"/"pouch" hits across all 972 real descriptions), `category` defaulted to the visible placeholder `"UNSPECIFIED"` for 52 rows whose source cell was blank, `palletWeightLimitKg` defaulted to 1000 for all 972 (matching the canonical flow document's own worked example). Wired into `npm run db:seed` via `drizzle/seed/run.ts` (insert-only - never overwrites an existing/admin-edited material on re-seed) using the already-existing `loadMaterialSeedRows` loader/validator from `drizzle/seed/materials.ts` (built in an earlier loop, never previously wired to a real file). Ran the seed twice: 972/972 inserted the first time, 0/972 the second - confirmed idempotent.
+
+**Pallet weight limit made admin-editable (the other half of Boss's answer):** `materialUpdateSchema` in `src/lib/validations/material.ts` extended from `{ active }`-only to also accept `description`, `uomKgPerCarton`, `category`, `palletWeightLimitKg`, `palletType`, `shelfLifeDays`, `plantOrigin` - every field the entities contract marks `editable_by: [R12]` except `code` (deliberately excluded; see the file's own comment for why renaming a material's business identifier after it has ledger history is a bigger, unrequested change than this loop's scope). `PATCH /api/masters/materials/[id]` (`src/app/api/masters/materials/[id]/route.ts`) applies any subset of those fields, still gated by `requirePermission("masters.edit")`, still 404s on an unknown id, still 422s on an empty or invalid body. The Material Master screen (`src/app/(app)/masters/materials/page.tsx`) got a new `PalletWeightEditor` component (click-to-edit -> number input -> Save/Cancel -> PATCH), in both the mobile card and desktop table views, following the same honest-503-stub-mode-notice UX pattern used everywhere else in this app for permission-gated mutations.
+
+Commands run, in order, with results:
+1. Real DSR file re-parsed with `openpyxl` (read-only, `SAP PASSWORD` sheet never opened) - exact row-by-row exclusion counts computed and cross-checked (the 9-of-920 description-vs-UOM mismatch check that ruled out backfilling).
+2. `npx tsc --noEmit` -> exit 0 (checked after each file: validation schema, PATCH route, seed script, UI component).
+3. `npm run db:seed` (twice) -> "...and 972 of 972 real FG materials..." then "...and 0 of 972 real FG materials (already-existing codes left untouched)..." - confirming idempotency.
+4. `npm run build` -> exit 0, same 21-route table as before (no new route added, `/api/masters/materials/[id]` already existed).
+5. `npm test` (Vitest) -> exit 0, **99/99 passed across 14 files** (90 carried over + 5 new real-seed-data tests in `seed-data.test.ts` + 4 new PATCH tests in `mutations-live.test.ts`).
+6. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npx playwright test` (with `.env.local` moved aside, per the diagnosed PEN-030 constraint) -> **32/32 passed**, unchanged - proving this loop's changes did not regress any existing screen; `.env.local` restored immediately after.
+7. Harness checks: contract-guard PASS, protected-integrity PASS, yaml-lexical-guard PASS (9 contract files), static-guard shows the same 3 pre-existing, deliberate public-read findings (PEN-022) - not new (no new unguarded API route this loop).
+8. `npm audit` -> unchanged, **11 vulnerabilities (7 moderate, 2 high, 2 critical)** - same accepted baseline as Loop 28 (PEN-013, PEN-028), no new dependency added this loop.
+
+Not resolved this loop, and why: R2 (PEN-009, needs a one-time Alpesh dashboard step), the 10 uncontracted entities (PEN-014/017, needs a human decision on the contract-folder protection), real-Clerk browser/E2E verification (PEN-030, this-sandbox network-policy gap, not fixable from here).
+
+**Free-only confirmation:** no Cloudflare/Clerk billing action was taken this loop - the two Clerk keys pasted are the free dev-instance keys for the app Alpesh already created on the Clerk dashboard, not a purchase. No new npm package installed. Vercel: still NOT DEPLOYED.
 
 ## Architecture Decisions Log
 | Date | Decision | Status |

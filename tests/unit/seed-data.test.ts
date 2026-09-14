@@ -98,7 +98,7 @@ describe("SAP Warehouse Master seed (PEN-007 architecture, PEN-018 finding)", ()
   });
 });
 
-describe("Material Master seed interface (PEN-007, no fabricated data)", () => {
+describe("Material Master seed interface (PEN-007 architecture, no fabricated data)", () => {
   it("rejects a SKFG-prefixed code", () => {
     expect(() =>
       validateMaterialRow(
@@ -137,5 +137,65 @@ describe("Material Master seed interface (PEN-007, no fabricated data)", () => {
     expect(() => loadMaterialSeedRows("/tmp/this-file-does-not-exist-monarch-test.json")).toThrow(
       MissingMaterialSourceError
     );
+  });
+});
+
+describe("Material Master real seed data (Loop 29, PEN-007 resolved)", () => {
+  const materialSourcePath = join(__dirname, "..", "..", "drizzle", "seed", "data", "materials.json");
+
+  it("loads exactly 972 real, cleaned FG codes from the DSR 'FG CODE' sheet", () => {
+    const rows = loadMaterialSeedRows(materialSourcePath);
+    expect(rows).toHaveLength(972);
+  });
+
+  it("has no duplicate codes and no RM-prefixed or junk-label rows", () => {
+    const rows = loadMaterialSeedRows(materialSourcePath);
+    const codes = rows.map((r) => r.code);
+    expect(new Set(codes).size).toBe(codes.length);
+    for (const code of codes) {
+      expect(code).toMatch(/^(LFG|SFG)[0-9]+$/);
+    }
+  });
+
+  it("derives plantOrigin from the code prefix (LFG->LIMBASI, SFG->SABARKANTHA)", () => {
+    const rows = loadMaterialSeedRows(materialSourcePath);
+    for (const row of rows) {
+      if (row.code.startsWith("LFG")) {
+        expect(row.plantOrigin).toBe("LIMBASI");
+      } else {
+        expect(row.plantOrigin).toBe("SABARKANTHA");
+      }
+    }
+  });
+
+  it("defaults every row to palletWeightLimitKg=1000 (Alpesh's explicit instruction) and palletType=CARTON, both admin-editable afterwards", () => {
+    const rows = loadMaterialSeedRows(materialSourcePath);
+    expect(rows.every((r) => r.palletWeightLimitKg === 1000)).toBe(true);
+    expect(rows.every((r) => r.palletType === "CARTON")).toBe(true);
+  });
+
+  it("every row inserts cleanly against the real materials table CHECK constraints", () => {
+    const rows = loadMaterialSeedRows(materialSourcePath);
+    const stmt = db.prepare(
+      `INSERT INTO materials (id, code, description, uom_kg_per_carton, category, pallet_weight_limit_kg, pallet_type, shelf_life_days, plant_origin, active, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    );
+    for (const row of rows) {
+      expect(() =>
+        stmt.run(
+          crypto.randomUUID(),
+          row.code,
+          row.description,
+          row.uomKgPerCarton,
+          row.category,
+          row.palletWeightLimitKg,
+          row.palletType,
+          row.shelfLifeDays,
+          row.plantOrigin
+        )
+      ).not.toThrow();
+    }
+    const count = db.prepare("SELECT COUNT(*) as n FROM materials").get() as { n: number };
+    expect(count.n).toBe(972);
   });
 });
