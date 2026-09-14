@@ -111,8 +111,15 @@ test.describe("Locations - server-side permission gate (Clerk stub mode)", () =>
 test.describe("Putaway - real pallet read from local D1", () => {
   test("shows the fixture pallet as awaiting putaway", async ({ page }) => {
     await page.goto("/storage/putaway");
-    await expect(page.getByText(`Pallet ${FIXTURE_PALLET_NUMBER} · ${FIXTURE_MATERIAL_CODE}`)).toBeVisible();
-    await expect(page.getByText("Awaiting putaway (1)")).toBeVisible();
+    // Scoped to the "Awaiting putaway" section rather than asserting
+    // an exact global count: /api/pallets lists every pallet in the
+    // shared local D1 file, so other test suites' own permanent
+    // fixture pallets (e.g. tests/unit/stock-ledger-read.test.ts's)
+    // legitimately add to that list too.
+    const section = page.locator("section", { hasText: "Awaiting putaway" });
+    await expect(
+      section.getByText(`Pallet ${FIXTURE_PALLET_NUMBER} · ${FIXTURE_MATERIAL_CODE}`)
+    ).toBeVisible();
   });
 
   test("an assign attempt is honestly refused in Clerk stub mode, not silently accepted", async ({
@@ -138,7 +145,10 @@ test.describe("Putaway - real pallet read from local D1", () => {
 
     await expect(row.getByText(/Clerk stub mode/i)).toBeVisible();
     // Still awaiting putaway - the refusal is real, not cosmetic.
-    await expect(page.getByText("Awaiting putaway (1)")).toBeVisible();
+    const section = page.locator("section", { hasText: "Awaiting putaway" });
+    await expect(
+      section.getByText(`Pallet ${FIXTURE_PALLET_NUMBER} · ${FIXTURE_MATERIAL_CODE}`)
+    ).toBeVisible();
   });
 });
 

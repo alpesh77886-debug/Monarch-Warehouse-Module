@@ -1,6 +1,6 @@
 # Project Progress Tracker
 ## IBF FG Warehouse Module
-## Last updated: 2026-09-14 (Loop 25 checkpoint)
+## Last updated: 2026-09-14 (Loop 26 checkpoint)
 
 ## Reading this document's "loop" numbering (PEN-016 clarification)
 
@@ -36,7 +36,7 @@ Two different, non-interchangeable counters both use the word "loop" in this pro
 | TASK-008 | Dispatch + Loading Sheet | ⬜ Pending | - | CRITICAL PATH |
 | TASK-009 | Inter-Warehouse Transfers | ⬜ Pending | - | - |
 | TASK-010 | Maintenance Module | ⬜ Pending | - | - |
-| TASK-011 | Stock Ledger + Reports + R2 Export | ⬜ Pending | - | - |
+| TASK-011 | Stock Ledger + Reports + R2 Export | 🟨 Partial | Loop 26 | Stock Ledger list built (paginated, filterable by transaction_type) against real local D1, role-gated per the architecture blueprint's own Action Permission Matrix (unlike the masters/pallets reads - see PEN-022). NOT built: In-Out Summary, Excel export (real DSR column layout not available, same class of gap as PEN-007), FIFO Aging Report |
 | TASK-012 | Dashboard | ⬜ Pending | - | - |
 | TASK-013 | FIFO Stock Maintenance | ⬜ Pending | - | - |
 | TASK-014 | Integration Tests + E2E | ⬜ Pending | - | After all features |
@@ -279,6 +279,32 @@ Commands run, in order, with results:
 7. `npm audit` -> unchanged: **9 vulnerabilities (5 moderate, 2 high, 2 critical)**, same accepted baseline (PEN-013), none new.
 
 Not built this loop: the location-move audit trail (PEN-024) and the "mix of batches" rack-map color (PEN-025) - both genuinely blocked on the same missing Pallet-Batch relationship, not attempted with a guessed substitute.
+
+**No paid action occurred in this loop. No cloud account, D1/R2/Clerk resource, or deployment action was performed.**
+
+## Loop 26 Checkpoint (window 4 continued)
+
+| Loop | Objective | Commit | Result |
+|---|---|---|---|
+| 26 | Stock Ledger list (TASK-011's "list, paginated, filterable" scope) | (this commit) | Done. See evidence below |
+
+### Loop 26 evidence
+
+Before building, checked the architecture blueprint's own Action Permission Matrix rather than assuming this read route should be public like the masters/pallets ones: it explicitly lists "View Stock Ledger" as restricted to R01/R03/R04/R09/R12 - a real, locked rule the other read routes never had. `src/app/api/stock/ledger/route.ts` is gated with the already-existing `stock.view_ledger` permission (from Loop 16's permission matrix) accordingly, unlike PEN-022's routes.
+
+What was built: the GET route (join to materials for a readable code, `transactionType` filter against the schema's own 10-value enum, fixed-size pagination via `count()`/`limit()`/`offset()`), `src/app/(app)/stock/page.tsx` (landing, with In-Out Summary / Excel export / FIFO Aging Report listed as not-built), and `src/app/(app)/stock/ledger/page.tsx` (filter dropdown, phone-card/desktop-table split, pagination controls, and - genuinely exercised for the first time in this repository - the "permission-denied" state the master contract's mobile-first checklist has always required, since this is the first read route where Clerk stub mode means that state is what every visitor sees today).
+
+A real, non-obvious finding, verified directly rather than assumed: this local D1 connection has real SQLite foreign-key enforcement ON by default, and stock_ledger's append-only triggers (INV-009) already forbid deleting a ledger row - so once any fixture stock_ledger row references a material/batch/pallet/warehouse/user, none of those rows can ever be deleted again. `tests/unit/stock-ledger-read.test.ts` hit this directly (a first version's cleanup failed with "stock_ledger is append-only... DELETE is not allowed", then with a foreign-key error), and had to switch to an idempotent find-or-create fixture pattern instead of every other test file's delete-then-recreate one. Recorded as PEN-026. This had a real side effect on an unrelated file: the new permanent fixture pallet, left without a location, started appearing in the Storage/Putaway screen's "awaiting putaway" list and broke `tests/e2e/storage-putaway.spec.ts`'s exact-count assertion - fixed two ways, not one: gave the ledger test's fixture pallet a real location so it no longer counts as unassigned, and hardened the putaway test to check its own fixture inside the "Awaiting putaway" section instead of asserting an exact global count (the local D1 file is genuinely shared state across every test suite, so an exact global count was always a latent fragility).
+
+Commands run, in order, with results:
+1. `npx tsc --noEmit` -> exit 0.
+2. `npm run build` -> exit 0, `/api/stock/ledger` shows `ƒ Dynamic` correctly (no repeat of Loop 22's static-pre-render bug).
+3. `npm test` (Vitest) -> exit 0, **84/84 passed across 12 files** (81 carried over + 3 new in `stock-ledger-read.test.ts`), confirmed idempotent by running that file twice in a row with no growth or duplicate-key errors.
+4. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npx playwright test` -> **32/32 passed** (28 carried over, including the 2 hardened `storage-putaway.spec.ts` cases, + 4 new in `stock-ledger.spec.ts`): Stock landing links to the ledger; the ledger screen shows the real stub-mode permission-denied message (not a silently empty table); the filter control is present even while access is denied; no horizontal scroll at 375px.
+5. Harness checks: contract-guard PASS, protected-integrity PASS, yaml-lexical-guard PASS (9 contract files). static-guard shows the same 3 pre-existing, deliberate public-read findings (PEN-022) - not new (the ledger route correctly does NOT get flagged, since it genuinely calls `requirePermission`). package-integrity shows the same pre-existing mismatch pattern plus this loop's own doc edits.
+6. `npm audit` -> unchanged: **9 vulnerabilities**, same accepted baseline (PEN-013), none new.
+
+Not built this loop: In-Out Summary, Excel export (the real DSR column layout has never been provided - same class of gap as PEN-007's missing material master source file, not guessed at), FIFO Aging Report.
 
 **No paid action occurred in this loop. No cloud account, D1/R2/Clerk resource, or deployment action was performed.**
 
