@@ -1,6 +1,6 @@
 # Pending Items
 ## IBF FG Warehouse Module
-## Last updated: 2026-09-14 (Loop 18)
+## Last updated: 2026-09-14 (Loop 19)
 
 ## CRITICAL (blocks implementation)
 | ID | Item | Status | Blocking | Notes |
@@ -16,6 +16,7 @@
 | PEN-009 | Cloudflare account creation | PENDING | TASK-001 | Alpesh needs to create Cloudflare account + D1 + R2 |
 | PEN-010 | Clerk account creation | **IN PROGRESS** (Loop 16 hardening; real account still PENDING) | TASK-001/002 | Alpesh still needs to create the real Clerk app + get API keys - real authentication remains NOT VERIFIED. What Loop 16 added, all local/stub-only, zero real credentials: src/lib/permissions.ts (typed permission matrix transcribed from the locked contract, including R05's inheritance and R12's wildcard), requirePermission() in src/lib/auth.ts as a fine-grained alternative to requireRole(), src/lib/clerk-config.ts (fails loudly on a half-configured environment - one key set, one missing - instead of silently misbehaving), and a mock/stub test harness (tests/unit/{auth,permissions,clerk-config}.test.ts, 21 new tests, @clerk/nextjs/server mocked via vitest - no live Clerk session needed or possible). Pinned to `@clerk/nextjs@6.39.6` specifically because the current latest major (7.x) requires Next.js 15/16 and would conflict with the accepted Next 14.2.35 decision (PEN-013) - re-check this pin if that Next decision ever changes. |
 | PEN-011 | Offline/PWA scope conflict | PENDING | TASK-001 | Source flow requests offline resilience; v1 architecture defers offline sync. Mobile-friendly online UX is mandatory. Explicit human decision required before offline mutation/sync is implemented. |
+| PEN-019 | `npm run lint` has never actually completed a run since it was added in Loop 2 | RECORDED, non-blocking | None found yet — surfaced, not fixed | Discovered in Loop 19 (the first loop to actually invoke this script as part of a full-regression pass): `next lint` requires answering a one-time interactive ESLint setup prompt ("Strict" / "Base" / "Cancel") that this non-interactive environment cannot answer, so the command exits 1 without linting anything. Not a regression from any change in this window. Not resolved: picking an ESLint preset is a tooling decision outside a regression-checkpoint loop's scope, so it is recorded per the STOP RULE rather than guessed. Needs either a human-run interactive `next lint` once (to write the config), or an explicit instruction on which preset to pre-seed non-interactively. |
 
 ## IMPORTANT
 | ID | Item | Status | Notes |

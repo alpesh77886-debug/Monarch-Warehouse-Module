@@ -91,9 +91,10 @@ Loop numbers below are the human-facing, task-oriented count (per the PEN-016 no
 | 15 | Warehouse location-grid architecture (resequenced from 16) | `26d5e3e` | Done. Deterministic rack/floor-staging grid generator (drizzle/seed/location-grid.ts) using deliberately fake identifiers, never the real 36-block shape, since the flow document itself says the real grid has unenumerated exceptions; found and fixed a genuine missing unique constraint on `locations.full_code` along the way (migration 0003, tested against a real duplicate-rejection case) |
 | 16 | Auth/RBAC hardening in stub/local mode (resequenced from 17) | `b7ec850` | Done. src/lib/permissions.ts (full R01-R12 matrix, R05 inheritance, R12 wildcard), requirePermission() in src/lib/auth.ts, src/lib/clerk-config.ts (fails loudly on a half-configured Clerk env instead of guessing). 21 new tests, all Clerk calls mocked - zero live Clerk session used or possible |
 | 17 | Core pallet-status workflow, contract-bounded (resequenced from 18) | `2a96f26` | Done. src/lib/workflows/pallet-status.ts implements only the already-fully-contracted `pallet_status` state machine (workflows.yaml) over the already-contracted Pallet/Stock Ledger entities - the one slice of "core workflow" not blocked by PEN-014. 12 tests proving INV-001/003/004/005 by name plus role-gating on every transition. Receiving Sheet/Hold Record/Transfer Order/Loading Sheet/Maintenance Ticket remain blocked by PEN-014 |
-| 18 | Browser/E2E verification of implemented scope (resequenced from 19) | (this commit) | Done. Added Playwright (`@playwright/test@^1.63.0`, devDependency only) plus tests/e2e/app-shell.spec.ts (9 tests) run against a real `next build && next start` on the pre-installed Chromium - see the Loop 18 evidence section below for the full command/output record |
+| 18 | Browser/E2E verification of implemented scope (resequenced from 19) | `a5bdfbb` | Done. Added Playwright (`@playwright/test@^1.63.0`, devDependency only) plus tests/e2e/app-shell.spec.ts (9 tests) run against a real `next build && next start` on the pre-installed Chromium - see the Loop 18 evidence section below for the full command/output record |
+| 19 | Full regression + traceability + release checkpoint (resequenced from 20 - the last loop of this window) | (this commit) | Done. Full command/output record in the Loop 19 evidence section below. **No Loop 21 will follow - this window stops completely per Boss's instruction.** |
 
-**No paid action occurred in any of loops 11-18. No cloud account, D1/R2/Clerk resource, or deployment action was performed - everything above is local-only, npm-registry installs, or a local production build served on a local port for the E2E run.**
+**No paid action occurred in any of loops 11-19. No cloud account, D1/R2/Clerk resource, or deployment action was performed - everything above is local-only, npm-registry installs, or a local production build served on a local port for the E2E run.**
 
 ### Loop 18 evidence (Browser/E2E verification)
 
@@ -117,6 +118,24 @@ Commands run, in order, with results:
 5. Harness checks: contract-guard PASS, static-guard PASS, protected-integrity PASS, yaml-lexical-guard PASS (9 contract files). The package-integrity check reports the same 4 pre-existing mismatches already recorded under PEN-015 (the harness loop-state file, README.md, this document, and docs/PENDING_ITEMS.md - all legitimate content that has evolved since the original file-manifest snapshot; a plain repository status check confirms those three docs carried no *new* uncommitted change from this loop beyond what this loop itself is now adding) - not a new regression.
 
 Not tested (does not exist yet, so cannot be exercised): forms, data validation, real database interaction from the browser (no CRUD screens are built yet - PEN-014 still blocks Receiving Sheet/Hold Record/Transfer Order/Loading Sheet/Maintenance Ticket), and real Clerk authentication (still stub-only, per PEN-010).
+
+### Loop 19 evidence (full regression + traceability + release checkpoint - final loop of this window)
+
+Commands run, in order, with results:
+
+1. `npm run typecheck` -> exit 0.
+2. `npm run build` -> exit 0, 5 routes generated (`/`, `/_not-found`, `/dashboard`, `/sign-in/[[...sign-in]]`, `/sign-up/[[...sign-up]]`).
+3. `npm test` (Vitest) -> exit 0, **57/57 passed across 8 files**.
+4. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm run test:e2e` -> **9/9 passed** (re-confirmed unchanged from Loop 19's own commit).
+5. `npm run lint` (`next lint`) -> **new finding, not silently resolved.** This script has existed in package.json since Loop 2 but no loop before this one had actually completed a run: `next lint` requires an interactive first-run ESLint setup prompt ("Strict" / "Base" / "Cancel") that has never been answered in this non-interactive environment, so the command exits 1 without linting anything. This is not a regression from this loop - it is a pre-existing gap surfacing for the first time because this is the first loop to actually invoke `npm run lint` as part of a full-regression pass. Not resolved here: choosing an ESLint preset is a tooling decision outside this loop's "run the existing checks and report" scope, and the STOP RULE calls for recording an ambiguous gap rather than guessing a config on Alpesh's behalf. Recorded as PEN-019.
+6. Harness checks: all 4 guard scripts pass with the same result pattern as every prior loop in this window (contract, static, protected-file, and yaml-lexical checks all PASS; the package-integrity check shows the same 4 pre-existing mismatches already recorded under PEN-015, no new ones).
+7. `npx wrangler d1 migrations list DB --local` -> "No migrations to apply!" - all 4 local migrations (0000-0003) are applied and the local D1 schema is current; no migration drift.
+8. `npm audit` -> unchanged from Loop 11's security baseline: **9 vulnerabilities (5 moderate, 2 high, 2 critical)**, all against the pinned Next.js release and its build-tooling dependency chain (PEN-013, Boss-approved Option A), none newly introduced by any change in this window including the Playwright devDependency addition.
+9. `git status` -> clean tree after this loop's own commit; `git log` shows 9 commits in this window.
+10. Changed-file audit for this whole window (`git diff --stat` against the Loop-10 checkpoint commit): 36 files changed, 4071 insertions, 29 deletions - entirely new contract-bounded application code, tests, seed-data architecture, docs, and harness housekeeping; zero changes to any protected package document or the canonical business source.
+11. Pending-item audit (PEN-007 through PEN-019): see docs/PENDING_ITEMS.md, unchanged conclusions from each item's own loop except PEN-019 (new, this loop). No item was closed without objective evidence; no item was silently dropped.
+
+**No paid action occurred in this loop. No cloud account, D1/R2/Clerk resource, or deployment action was performed.**
 
 ## Architecture Decisions Log
 | Date | Decision | Status |
