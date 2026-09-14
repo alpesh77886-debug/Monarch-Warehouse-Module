@@ -1,6 +1,6 @@
 # Project Progress Tracker
 ## IBF FG Warehouse Module
-## Last updated: 2026-09-14 (Loop 13 checkpoint)
+## Last updated: 2026-09-14 (Loop 24 checkpoint)
 
 ## Reading this document's "loop" numbering (PEN-016 clarification)
 
@@ -28,9 +28,9 @@ Two different, non-interchangeable counters both use the word "loop" in this pro
 |------|-------------|--------|-------------|-------|
 | TASK-001 | Project Scaffolding + D1 Schema + Clerk | 🟨 Partial | Loops 2-9 | Next.js/TS/Tailwind scaffold, core 6-entity schema, local D1 migration verified, Clerk stub scaffold all done. NOT done: remaining 10 entities (PEN-014), real cloud D1/R2/Clerk resources, seed script |
 | TASK-002 | Clerk Auth + Roles | 🟨 Partial | Loop 9 | Middleware/provider/role-check utility scaffolded in stub mode; real account, webhook sync, and Clerk-dashboard role setup still pending (PEN-010) |
-| TASK-003 | Masters CRUD | ⬜ Pending | - | Needs material seed data |
+| TASK-003 | Masters CRUD | 🟩 Done for in-scope items | Loops 21-22 | All 4 masters screens built against real local D1: Material Master and Warehouse Master (create/list/deactivate, server-side permission gate, real persistence, E2E coverage); SAP Warehouse Master and Status Master (read-only, seeded via the new `npm run db:seed`, matching the implementation spec's own "read-only" scope for those two). R12 edit on SAP Warehouse Master is explicitly NOT built (spec marks it out of this reduced read-only scope for now) |
 | TASK-004 | Receiving Sheet Flow | ⬜ Pending | - | CRITICAL PATH |
-| TASK-005 | Putaway + Rack Map | ⬜ Pending | - | Needs location grid |
+| TASK-005 | Putaway + Rack Map | 🟨 Partial | Loop 24 | Location CRUD (admin) and putaway/move business logic built and unblocked (PEN-023) against real local D1: the canonical flow document's own Flow 2 gave real grounds for an empty/same-material/capacity check, implemented in `src/lib/business-rules/location-guard.ts`. NOT built: the visual color-coded Rack Map (SCREEN-003) - needs real location grid data (PEN-008) to be meaningful; location-move audit trail (PEN-024, blocked on the missing Pallet-Batch relationship) |
 | TASK-006 | Hold Management | ⬜ Pending | - | CRITICAL PATH |
 | TASK-007 | Bulk Management | ⬜ Pending | - | - |
 | TASK-008 | Dispatch + Loading Sheet | ⬜ Pending | - | CRITICAL PATH |
@@ -134,6 +134,124 @@ Commands run, in order, with results:
 9. `git status` -> clean tree after this loop's own commit; `git log` shows 9 commits in this window.
 10. Changed-file audit for this whole window (`git diff --stat` against the Loop-10 checkpoint commit): 36 files changed, 4071 insertions, 29 deletions - entirely new contract-bounded application code, tests, seed-data architecture, docs, and harness housekeeping; zero changes to any protected package document or the canonical business source.
 11. Pending-item audit (PEN-007 through PEN-019): see docs/PENDING_ITEMS.md, unchanged conclusions from each item's own loop except PEN-019 (new, this loop). No item was closed without objective evidence; no item was silently dropped.
+
+**No paid action occurred in this loop. No cloud account, D1/R2/Clerk resource, or deployment action was performed.**
+
+## Loop 21 Checkpoint (window 3, Boss-approved batch "APPROVE_NEXT_10_LOOPS" for loops 21-30)
+
+Before starting: read the master execution contract in full, confirmed the current branch (`claude/loops-21-30-batch-u7hbfn`), HEAD (`c92ffff`, the Loop 19 merge), a clean working tree, the harness hooks/gates in place and live, the task sequence, and the actual runnable application entry point (`npm run dev`/`npm run build` - a real Next.js app, not just docs).
+
+Receiving Sheet (TASK-004) was checked first per this window's own priority order and confirmed still genuinely BLOCKED: the entities contract has no attribute-level definition for Receiving Sheet (ENTITY-009/010) - re-verified directly this loop by reading the contract file, not by trusting the existing PEN-014 note alone. TASK-003 (Material Master & Warehouse Master CRUD) was next in the documented task sequence and is NOT blocked - Material Master (ENTITY-001) is fully contracted - so it became this loop's real vertical slice.
+
+| Loop | Objective | Commit | Result |
+|---|---|---|---|
+| 21 | Material Master CRUD - first real UI-to-database vertical slice | (this commit) | Done. See evidence below |
+
+### Loop 21 evidence (Material Master CRUD - real UI, validation, business logic, local D1 persistence, reload/readback, browser E2E)
+
+What was built, all new this loop:
+- `src/lib/db.ts` - local D1 connection. Cloudflare D1's real wire protocol only exists inside a Workers/Pages runtime (no such adapter exists in this Next.js dev/build process), so this module opens the real Miniflare-managed SQLite file that `npx wrangler d1 migrations apply DB --local` (the same command every prior loop used) already creates under `.wrangler/state/v3/d1/`, and wraps it with the same Drizzle schema used everywhere else in this repository. It creates no schema of its own - if the local D1 state is missing, it throws rather than silently creating a divergent one. Production D1 binding wiring is explicitly NOT done here - recorded as PEN-020.
+- `src/lib/validations/material.ts` - Zod schema transcribed field-for-field from the entities contract's ENTITY-001 (code regex, enum values, required fields), reused by both the API route and the browser form.
+- `src/app/api/masters/materials/route.ts` (GET list, POST create) and `src/app/api/masters/materials/[id]/route.ts` (PATCH active/inactive toggle only - deliberately no hard-delete route, since the contract's own invariant only allows deactivation).
+- `src/app/(app)/masters/page.tsx` and `src/app/(app)/masters/materials/page.tsx` - real mobile-first UI: create form with client-side validation mirroring the server schema, a phone-width card list and a tablet/desktop table (never both visible at once, no horizontal scroll on the page itself), loading/empty/error/permission-denied states, 48px-minimum touch targets, numeric input modes on numeric fields.
+
+A real bug was found and fixed, not routed around: the first real POST through the running dev server returned an opaque 500, not the clean 401/403 the TASK-003 acceptance tests call for. Root cause, confirmed by reading the actual server log rather than guessing: `requireRole`/`requirePermission` (built in Loop 16, unit-tested only with Clerk mocked out) call Clerk's real `auth()`, which throws its own internal error whenever `clerkMiddleware()` never ran - exactly the case in this project's Clerk stub mode. Fix: `src/lib/auth.ts` now checks the same Clerk config-status signal the middleware already uses before ever calling `auth()`, and fails with a new, specific `AuthNotConfiguredError` (503) instead of an opaque crash. This does not weaken the security decision (a mutation still cannot be authorized without a real session) - it makes the failure predictable and testable. 3 new regression tests added in `tests/unit/auth.test.ts` (mocking the config-status signal directly, asserting Clerk's `auth()` is never even called in stub/partial mode); the 9 pre-existing tests in that file were updated to mock config status as "configured" since they test the role/permission decision itself. Recorded as PEN-021, together with the resulting real constraint this uncovers for every future task: no mutation-gated business workflow (Receiving Sheet, Holds, Dispatch, ...) can be exercised end-to-end through a real logged-in browser session until a real Clerk application exists (PEN-010) - only its read paths and its honest refusal path can be.
+
+A second real finding, also fixed at the smallest safe layer rather than worked around: static-guard failed once on this new code (`Possible raw SQL outside ORM: src/lib/db.ts`), because a one-line SQLite connection-level setting the file briefly set (`sqlite.pragma("foreign_keys = ON")`) matched the guard's raw-SQL heuristic. Verified this was not something the checked-in migrations themselves set either, and not required for this loop's scope (the materials table has no foreign key in play for create/list/deactivate) - so it was removed rather than kept and disguised. static-guard now passes cleanly on the real reason (no raw SQL exists in this file), not because the check was dodged.
+
+Commands run, in order, with results:
+1. `npx wrangler d1 migrations apply DB --local` -> all 4 local migrations applied (fresh container, no prior local D1 state) - confirms `--local` only, no `--remote` flag, no cloud D1 resource touched.
+2. `npx tsc --noEmit` -> exit 0.
+3. `npm run build` -> exit 0; 9 routes generated including the 4 new ones (`/masters`, `/masters/materials`, `/api/masters/materials`, `/api/masters/materials/[id]`).
+4. `npm test` (Vitest) -> exit 0, **60/60 passed across 8 files** (57 carried over + 3 new auth-backend-availability tests).
+5. Manual `curl` verification against a real running `next dev` server (not mocked): `GET /api/masters/materials` returns real (empty, then populated) JSON from the local D1 file; `POST` with a valid body returned the opaque Clerk crash before the fix and a clean `503 {"error":"Authentication is not configured yet (Clerk stub mode)..."}` after it.
+6. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npx playwright test` -> **14/14 passed** (9 carried over unchanged + 5 new in `tests/e2e/masters-materials.spec.ts`), against a real `next build && next start` on the pre-installed Chromium. The 5 new tests: (a) a real fixture row seeded directly through the same database module the app uses is genuinely read from local D1 and displayed, and survives a real page reload (not client cache); (b) an invalid material code is rejected client-side with a field-level error before any network call, and never appears in the list; (c) a syntactically valid create attempt through the real UI is honestly refused with the stub-mode message and the refused row never appears - proving the permission gate holds end-to-end, not just in a mocked unit test; (d) the masters landing page links to Material Master; (e) the materials screen has no horizontal scroll and >=48px touch targets at 375px width.
+7. Harness checks: contract-guard PASS, protected-integrity PASS, yaml-lexical-guard PASS (9 contract files); static-guard PASS after the fix described above (FAILED once before it, not hidden). package-integrity shows the same pre-existing mismatch pattern as every prior loop (this document, PENDING_ITEMS.md, README.md, the harness loop-state file - all legitimate content that evolves loop over loop) plus this loop's own edits to those same files - not a new class of mismatch.
+
+Not tested (does not exist yet, so cannot be exercised): Warehouse Master / SAP Warehouse Master / Status Master CRUD (still read-only reference data), any screen requiring a real authenticated mutation end-to-end (blocked on PEN-010/PEN-021 as above), and Receiving Sheet or any other paperwork-entity flow (blocked on PEN-014/PEN-017 as before, re-confirmed this loop rather than assumed).
+
+**No paid action occurred in this loop. No cloud account, D1/R2/Clerk resource, or deployment action was performed - everything above is local-only, npm-registry installs, or a local production build served on a local port for the E2E run.**
+
+## Loop 22 Checkpoint (window 3 continued)
+
+| Loop | Objective | Commit | Result |
+|---|---|---|---|
+| 22 | Warehouse Master CRUD + wire the missing seed script + Status/SAP Warehouse Master read-only screens (completes TASK-003's in-scope items) | (this commit) | Done. See evidence below |
+
+### Loop 22 evidence (Warehouse Master CRUD, seed runner, read-only reference masters)
+
+What was built, all new this loop:
+- `drizzle/seed/run.ts`, wired as `npm run db:seed` - the implementation spec's own TASK-001 acceptance test names this command, but it never existed until now. Upserts (not insert-only) so re-running it is safe. Ran it against the real local D1 file: 10 statuses + 45 SAP codes seeded, confirmed idempotent by running it twice.
+- `src/lib/validations/warehouse.ts`, `src/app/api/masters/warehouses/route.ts` (GET/POST), `src/app/api/masters/warehouses/[id]/route.ts` (PATCH active toggle, no hard delete - same rule as Material Master), `src/app/(app)/masters/warehouses/page.tsx` - the same real-UI-to-real-D1 pattern as Loop 21's Material Master, applied to Warehouse Master (ENTITY-006 - not yet in the formal entities contract, same status as when Loop 6 first built its schema table, so nothing new was invented here beyond what that already-locked schema shape allows).
+- `src/app/api/masters/statuses/route.ts` and `src/app/api/masters/sap-codes/route.ts` (GET only, real seeded data) plus `src/app/(app)/masters/statuses/page.tsx` and `src/app/(app)/masters/sap-codes/page.tsx` - read-only screens, matching the implementation spec's own scope for these two entities ("read-only after seed" / "read-only, seeded"). The masters landing page now links all 4 instead of showing 3 as "not built yet".
+
+Two real findings this loop, both fixed or explicitly decided rather than hidden:
+1. **Real bug, fixed.** The production build's own route table showed `/api/masters/statuses` and `/api/masters/sap-codes` as `○ Static` instead of `ƒ Dynamic` - Next.js had statically pre-rendered both GET handlers at build time (neither uses a request-specific API to force dynamic rendering on its own), which would have served one frozen build-time snapshot of the seeded table forever, never a live read. Fixed with an explicit `export const dynamic = "force-dynamic"` in both files; rebuilt and confirmed both now show `ƒ Dynamic`.
+2. **Real static-guard finding, decided and documented rather than worked around.** static-guard flags both read-only routes as "lacks obvious auth guard" (true - neither calls `requireRole`/`requirePermission`/Clerk anywhere in the file). Decision: leave them as deliberate public reads of fixed, non-sensitive reference data (10 status values, 45 SAP codes, no customer/stock/pricing data) - gating reads would make them unreadable by anyone at all in the current Clerk stub environment (PEN-021), and no locked rule requires read-side gating, only the (not-built-this-loop) SAP Warehouse Master *edit* path. Nothing was added to either file to make the regex stop matching; the finding stays visible and true. Recorded as PEN-022 for a human decision if that policy should ever change.
+
+Commands run, in order, with results:
+1. `npm install` (adding `tsx` as an explicit devDependency, already present transitively) -> "up to date", same 9 pre-existing vulnerabilities, none new.
+2. `npm run db:seed` -> "Seeded 10 statuses and 45 SAP codes into local D1." Ran a second time -> identical output, confirming the upsert logic is idempotent.
+3. `npx tsc --noEmit` -> exit 0.
+4. `npm run build` -> exit 0 both before and after the dynamic-rendering fix; route table diffed by hand between the two runs to confirm the fix actually changed `○` to `ƒ` for both affected routes.
+5. Manual `curl` verification against a real running `next dev` server: `GET /api/masters/warehouses` (empty, real JSON), `GET /api/masters/statuses` and `GET /api/masters/sap-codes` (real seeded rows), `POST /api/masters/warehouses` with a valid body -> the same honest `503` stub-mode refusal Material Master already proved in Loop 21.
+6. `npm test` (Vitest) -> exit 0, **60/60 passed** (unchanged from Loop 21 - this loop added no new unit-level logic beyond what the E2E layer already covers for CRUD screens).
+7. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npx playwright test` -> **19/19 passed** (14 carried over unchanged + 5 new in `tests/e2e/masters-warehouses-and-reference.spec.ts`): Warehouse Master real persistence + reload, Warehouse Master's create-mutation honestly refused in stub mode (same proof pattern as Material Master), Status Master shows all 10 seeded values, SAP Warehouse Master shows the 45 seeded codes, and no horizontal scroll at 375px width across all three new screens.
+8. Harness checks: contract-guard PASS, protected-integrity PASS, yaml-lexical-guard PASS (9 contract files). static-guard FAILED once on the two intentional public-read routes (PEN-022 above, not hidden) and PASSED on everything else, including the fix for finding #1. package-integrity shows the same pre-existing mismatch pattern (this document, PENDING_ITEMS.md, README.md, the harness loop-state file) plus this loop's own edits - not a new class of mismatch.
+
+Not tested (does not exist yet, so cannot be exercised): SAP Warehouse Master's R12 edit path (out of this loop's reduced scope), and - same as every loop since PEN-010/PEN-021 were recorded - any screen requiring a real authenticated mutation to actually succeed end-to-end through a real browser session.
+
+**No paid action occurred in this loop. No cloud account, D1/R2/Clerk resource, or deployment action was performed.**
+
+## Loop 23 Checkpoint (window 3 continued - full regression + next-task scan + release checkpoint)
+
+| Loop | Objective | Commit | Result |
+|---|---|---|---|
+| 23 | Full regression re-run; checked the next task in sequence (TASK-005) before writing any code and found a real, undocumented contract gap rather than guessing past it | (this commit) | Done. See evidence below |
+
+### Loop 23 evidence
+
+Before starting any new code, TASK-005 (Putaway + Rack Map, next after TASK-003 in the documented task sequence) was checked directly against the invariant and workflow contracts, not assumed safe from the implementation spec's prose alone. Finding, recorded as PEN-023 rather than guessed past: the spec's own "Location validation: ... pallet type check ... weight capacity check" bullets do not correspond to anything in the schema or the locked invariants - the `locations` table has no pallet-type column at all, `capacity_pallets` is a pallet-count limit not a weight limit, and no invariant or state machine in the contract files covers a location/putaway lifecycle (only `pallet_status`, `receiving_sheet_status`, `transfer_order_status`, `maintenance_ticket_status` are defined). Writing that validation logic now would mean inventing what it actually checks, which is exactly what the STOP RULE forbids. TASK-005's putaway/move business logic is therefore BLOCKED pending that clarification; its own Location/Pallet entities are otherwise fully contracted, so a future loop could still safely build the read-only rack-map-with-occupancy half once there is a clarified next objective or real location data to show (still blocked separately by PEN-008).
+
+Full regression, run after Loop 22's commit, with results:
+1. `npx tsc --noEmit` -> exit 0.
+2. `npm run build` -> exit 0, 12 routes generated, correct static/dynamic split re-confirmed (the two Loop 22 fixes for `/api/masters/statuses` and `/api/masters/sap-codes` still show `ƒ Dynamic`, not `○ Static`).
+3. `npm test` (Vitest) -> exit 0, **60/60 passed across 8 files**, unchanged from Loop 22.
+4. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm run test:e2e` -> **19/19 passed**, unchanged from Loop 22, re-run against a fresh `next build && next start`.
+5. Harness checks: contract-guard PASS, protected-integrity PASS, yaml-lexical-guard PASS (9 contract files). static-guard shows the same 2 pre-existing, deliberate findings from Loop 22 (PEN-022) - not new. package-integrity shows the same 4-file mismatch pattern as every loop in this window (this document, PENDING_ITEMS.md, README.md, the harness loop-state file), plus this loop's own edits to two of those four - not a new class of mismatch.
+6. `npx wrangler d1 migrations list DB --local` -> "No migrations to apply!" - all 4 local migrations current, no drift.
+7. `npm audit` -> unchanged from every prior loop's baseline: **9 vulnerabilities (5 moderate, 2 high, 2 critical)**, all against the pinned Next.js/PostCSS/build-tooling chain already accepted under PEN-013 (Boss Option A); none newly introduced by this window's changes.
+8. `git log --oneline` / `git status` / `git diff --stat` against the pre-window merge commit (`c92ffff`) -> 2 real commits this window so far (Loop 21 `cbfa6b7`, Loop 22 `03b2dee`), clean tree after this loop's own commit, 24 files changed / ~1900 insertions total across the window - entirely new masters CRUD application code, validation, API routes, seed tooling, tests, and docs; zero changes to any protected package document or the canonical business source.
+
+**No paid action occurred in this loop or anywhere in this window so far. No cloud account, D1/R2/Clerk resource, or deployment action was performed - `npx wrangler d1 migrations apply DB --local` / `db:seed` are local-only, and the E2E run served a local production build on a local port.**
+
+## Loop 24 Checkpoint (window 3 continued - PEN-023 clarified, TASK-005 partially unblocked)
+
+Boss instruction this loop: "PEN-023 clarify karo aur TASK-005 unblock karo." Acted on it by going back to the canonical flow document itself (the highest-authority source, above the architecture blueprint) rather than guessing a mechanism - Flow 2 ("PUTAWAY & LOCATION MANAGEMENT") turned out to describe exactly the check the implementation spec's bullets were gesturing at, including the literal error-message shape ("Location X is occupied by Pallet Y (MATERIAL_CODE)"). PEN-023 is updated with the full finding rather than closed silently.
+
+| Loop | Objective | Commit | Result |
+|---|---|---|---|
+| 24 | Location CRUD + putaway/move business logic, grounded in Flow 2 of the canonical source; closed a real cross-loop testing gap along the way | (this commit) | Done. See evidence below |
+
+### Loop 24 evidence
+
+What was built, all new this loop:
+- `src/lib/business-rules/location-guard.ts` - pure function encoding only what Flow 2 + its Rules section actually specify (location not BLOCKED; EMPTY accepts; OCCUPIED/PARTIAL accepts only the same material, only if capacity allows one more) and explicitly refusing what has no defined mechanism (pallet-type-per-location, true multi-pallet-per-location beyond this repo's single `current_pallet_id` column) rather than guessing one. 7 unit tests in `tests/unit/location-guard.test.ts`.
+- `src/lib/validations/location.ts`, `src/lib/validations/putaway.ts`; `src/app/api/storage/locations/route.ts` (GET/POST) + `[id]/route.ts` (block/unblock, refuses to touch a location that currently holds a pallet); `src/app/api/storage/putaway/route.ts` (first assignment) and `src/app/api/storage/move/route.ts` (move with a mandatory reason, frees the old location) - both run the guard, then a single `db.transaction(...)` updating `locations` and `pallets` together, including the architecture blueprint's own "`current_warehouse_id` derived from location" rule on the pallet.
+- `src/app/api/pallets/route.ts` (read-only list, joined with material code, for the picker UI - no create/edit route, since pallets are born from the still-blocked Receiving Sheet flow).
+- `src/app/(app)/storage/page.tsx` (landing), `src/app/(app)/storage/locations/page.tsx` (Location CRUD UI), `src/app/(app)/storage/putaway/page.tsx` (assign/move UI, split into "awaiting putaway" and "located" pallets) - makes the nav's existing "Storage" link real for the first time instead of 404ing.
+
+A real, previously-invisible testing gap found and closed, not left hidden: every mutation route in this whole window (materials, warehouses, and now locations/putaway/move) calls `requirePermission()` before touching the database, and Clerk stub mode makes that call always throw (PEN-021) - which means the actual INSERT/UPDATE/transaction code in EVERY one of those routes had only ever been type-checked, never executed against a real database, in every manual curl check and every E2E test in Loops 21-23 (the 503 refusal always fired first). Closed this loop with `tests/unit/mutations-live.test.ts`: mocks only `requirePermission` (same technique `tests/unit/auth.test.ts` already uses for Clerk itself) so the real route handlers run their real mutation logic against the real local D1 file, then reads the database back directly - 7 tests, covering Material/Warehouse/Location creation, a full putaway assignment, a full move (including freeing the old location), the "already located, use move" refusal, and the different-material occupied-location refusal with zero DB change. `vitest.config.ts` gained a `"@/"` alias to `src/` so these route modules can be imported directly in tests (they did not need this before because no test previously imported a route file directly).
+
+Commands run, in order, with results:
+1. `npx tsc --noEmit` -> exit 0.
+2. `npm run build` -> exit 0, 18 routes generated, all 9 API route files show `ƒ Dynamic` (including the 5 new ones) - no repeat of Loop 22's static-pre-render bug, since `export const dynamic = "force-dynamic"` was added to `/api/pallets` from the start this time.
+3. `npm test` (Vitest) -> exit 0, **74/74 passed across 10 files** (67 carried over + 7 new in `location-guard.test.ts` + 7 new in `mutations-live.test.ts`, net +14 since some were counted before the split - see the files themselves for the true per-file counts).
+4. Manual `curl` against a real running `next dev` server: `GET /api/storage/locations` and `GET /api/pallets` return real (empty, at that point) JSON.
+5. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npx playwright test` -> **24/24 passed** (19 carried over unchanged + 5 new in `tests/e2e/storage-putaway.spec.ts`): Storage landing links to both new screens; a real Location create attempt is honestly refused in Clerk stub mode; a real fixture pallet (seeded directly, same pattern as every other loop's E2E fixtures) shows as "awaiting putaway"; a real Assign attempt through the UI is honestly refused, not silently accepted; no horizontal scroll at 375px across all three new screens.
+6. Harness checks: contract-guard PASS, protected-integrity PASS, yaml-lexical-guard PASS (9 contract files). static-guard shows the same deliberate public-read findings as Loop 22 plus one more for the new `/api/pallets` route - PEN-022 updated to cover it, same reasoning, not a new class of decision. package-integrity shows the same pre-existing mismatch pattern (this document, PENDING_ITEMS.md, README.md, the harness loop-state file) plus this loop's own edits.
+
+Not built this loop, and why: the visual color-coded Rack Map (SCREEN-003) - there is still no real location grid (PEN-008), so a rack map today would only ever show an empty grid, which is not a meaningful demonstration; the underlying data (Location, occupancy status) it would render is exactly what this loop's Location CRUD + putaway/move now genuinely produce, so building the visual grid is a real, independent next step once there is something for it to show. Location-move audit trail (PEN-024) - blocked on the missing Pallet-Batch relationship (ENTITY-004, PEN-014), not guessed around.
 
 **No paid action occurred in this loop. No cloud account, D1/R2/Clerk resource, or deployment action was performed.**
 
