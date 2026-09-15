@@ -1,6 +1,6 @@
 # Project Progress Tracker
 ## IBF FG Warehouse Module
-## Last updated: 2026-09-15 (Loop 33 checkpoint)
+## Last updated: 2026-09-15 (Loop 34 checkpoint)
 
 ## Reading this document's "loop" numbering (PEN-016 clarification)
 
@@ -502,6 +502,26 @@ Boss uploaded the same missing-entity patch file directly and said "Execute your
 Compared the newly uploaded patch file byte-for-byte against the copy already verified in Loop 31 - identical, same 17,210 bytes. Since Alpesh explicitly said "execute your plan" rather than repeating the earlier request, made one real attempt to write the merged content into the protected entity contract file (not just cited the earlier finding) - denied by the same protected-file-mutation control as every prior attempt this session. Confirmed via `git status` immediately after that the file was not modified. This is the same, already-understood, intentional constraint (see PEN-017) - re-tried once with live evidence because the instruction wording changed, not because the outcome was expected to differ, and it did not. Produced a pre-indented, ready-to-paste plain-text version of the 10 entity blocks (2-space entity-key indent, matching this file's own existing convention) and sent it directly to Alpesh, so applying it is a single paste at the end of the file with no manual reformatting needed on his side.
 
 **Free-only confirmation:** no paid action, no new dependency, no deployment, nothing applied to the protected contract folder. Vercel: still NOT DEPLOYED.
+
+## Loop 34 Checkpoint (window 4 continued - PEN-014/017 RESOLVED: contract gap closed, critical path unblocked)
+
+Boss applied the verified patch himself and confirmed done, with `APPROVE_NEXT_10_LOOPS`.
+
+| Loop | Objective | Commit | Result |
+|---|---|---|---|
+| 34 | Found Alpesh's applied patch (pushed directly to main, not this branch), verified it thoroughly, merged it into this branch, closed PEN-014/017 | (this commit) | Done. Critical path for TASK-004 onward is now unblocked. See evidence below |
+
+### Loop 34 evidence
+
+Alpesh's own real-time confirmation ("mene kar diya") did not initially match this branch's state - the domain entities contract here was still unchanged. Checked the actual remote (not assumed stale-cache or a misunderstanding) and found he had pushed a real commit directly to the repository's main branch, not this one, editing the file through a route this session's tools cannot reach.
+
+Verified the applied content thoroughly before merging anything: parsed it with a real YAML parser and confirmed 16 unique entity keys, dict-keyed format matching this project's own established convention (not the list-shaped variant from the disqualified second package), IDs ENTITY-001 through ENTITY-016 each present exactly once. Diffed the original 6 entities field-by-field against this branch's own copy - byte-identical, confirming nothing was lost or altered. Diffed the 10 new entities against the corrected paste-ready file this session had sent him, not the raw original zip patch - all 10 match that corrected version exactly, including the two specific fixes flagged earlier (the SAP Warehouse Master table name now correctly reads the real seeded table, and the pallet-batch weight calculation uses a plain ASCII expression instead of a Unicode multiplication sign) - confirming he pasted the corrected file this session actually provided, not an older draft.
+
+Merged the base branch's new commit into this branch (a real merge, not a rebase or history rewrite, per this repository's own branching rules) - clean, no conflicts, since this branch had never touched this file across all 33 prior loops and the base branch's only new commit was a pure addition to it. Re-ran the full guard set afterward: contract-guard, protected-integrity, and the YAML lexical guard all pass; `tsc --noEmit` is clean.
+
+**PEN-014 and PEN-017 are now formally resolved.** The contract folder's write protection itself was never weakened, bypassed, or disabled at any point across the roughly two dozen loops this gap spanned - every attempted write from inside this session was denied, exactly as designed, and the actual unblock came the only way it safely could: a human applying an already-fully-verified change outside the tool-mediated boundary. TASK-004 (Receiving Sheet), TASK-006 (Hold Management), TASK-007 (Bulk Management), TASK-008 (Dispatch/Loading), TASK-009 (Transfers), and TASK-010 (Maintenance) are all unblocked as of this loop, along with the previously-identified downstream items (TASK-011's remaining bullets, TASK-012's Dashboard, TASK-013's FIFO work, most of TASK-014's golden/negative scenario coverage) - though each of those still needs its own real implementation loop, not automatically completed by this contract merge alone.
+
+**Free-only confirmation:** no paid action, no new dependency, no deployment. Vercel: still NOT DEPLOYED.
 
 ## Architecture Decisions Log
 | Date | Decision | Status |
