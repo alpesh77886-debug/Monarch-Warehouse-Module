@@ -461,7 +461,7 @@ entities:
         required: false
       - name: status
         type: text
-        check_constraint: "status IN ('DRAFT', 'PENDING_PACKING', 'PENDING_WAREHOUSE', 'LOCKED')"
+        check_constraint: "status IN ('DRAFT', 'PENDING_PACKING', 'PENDING_WAREHOUSE', 'LOCKED', 'CANCELLED')"
         required: true
       - name: default_pallet_status
         type: text
