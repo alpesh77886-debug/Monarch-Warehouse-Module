@@ -1,6 +1,6 @@
 # Project Progress Tracker
 ## IBF FG Warehouse Module
-## Last updated: 2026-09-15 (Loop 32 checkpoint)
+## Last updated: 2026-09-15 (Loop 33 checkpoint)
 
 ## Reading this document's "loop" numbering (PEN-016 clarification)
 
@@ -488,6 +488,20 @@ Boss uploaded a second zip - a full governance-scaffold package with the entity 
 **Recommendation given to Alpesh:** ignore this package's documentation, loop-state, and entity-contract files entirely; the already-verified, correctly-shaped patch from Loop 31 (the original zip's own missing-entity patch file) remains the one to paste. Claude Code still cannot write to the protected contract folder itself - re-confirmed the pre-tool safety hook is byte-identical between this repository and the new package, so nothing about that constraint has changed.
 
 **Free-only confirmation:** no paid action, no new dependency, no deployment, nothing applied to the repository. Vercel: still NOT DEPLOYED.
+
+## Loop 33 Checkpoint (window 4 continued - live write attempt on Alpesh's explicit "execute" instruction, confirmed still blocked)
+
+Boss uploaded the same missing-entity patch file directly and said "Execute your plan," with `APPROVE_NEXT_10_LOOPS`.
+
+| Loop | Objective | Commit | Result |
+|---|---|---|---|
+| 33 | Confirmed the freshly uploaded patch file is byte-identical to the one already verified; attempted the real write to the protected contract file, per Alpesh's explicit instruction, rather than only repeating the prior finding from memory; confirmed the attempt was denied and the file is untouched; handed Alpesh a pre-indented, ready-to-paste text file so the manual step needs no formatting work on his side | (this commit) | Done. See evidence below |
+
+### Loop 33 evidence
+
+Compared the newly uploaded patch file byte-for-byte against the copy already verified in Loop 31 - identical, same 17,210 bytes. Since Alpesh explicitly said "execute your plan" rather than repeating the earlier request, made one real attempt to write the merged content into the protected entity contract file (not just cited the earlier finding) - denied by the same protected-file-mutation control as every prior attempt this session. Confirmed via `git status` immediately after that the file was not modified. This is the same, already-understood, intentional constraint (see PEN-017) - re-tried once with live evidence because the instruction wording changed, not because the outcome was expected to differ, and it did not. Produced a pre-indented, ready-to-paste plain-text version of the 10 entity blocks (2-space entity-key indent, matching this file's own existing convention) and sent it directly to Alpesh, so applying it is a single paste at the end of the file with no manual reformatting needed on his side.
+
+**Free-only confirmation:** no paid action, no new dependency, no deployment, nothing applied to the protected contract folder. Vercel: still NOT DEPLOYED.
 
 ## Architecture Decisions Log
 | Date | Decision | Status |
