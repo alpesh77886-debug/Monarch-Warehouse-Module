@@ -1,6 +1,6 @@
 # Project Progress Tracker
 ## IBF FG Warehouse Module
-## Last updated: 2026-09-15 (Loop 31 checkpoint)
+## Last updated: 2026-09-15 (Loop 32 checkpoint)
 
 ## Reading this document's "loop" numbering (PEN-016 clarification)
 
@@ -468,6 +468,26 @@ Commands run, in order, with results:
 8. Updated the pending-items log (superseded-draft note, corrected PEN-014/017 entry, new pending item for the integrity-guard finding) and the now-superseded draft document's own header - no application code, schema, contract file, or CI configuration changed.
 
 **Free-only confirmation:** no paid action, no new dependency, no deployment. Vercel: still NOT DEPLOYED.
+
+## Loop 32 Checkpoint (window 4 continued - Alpesh's "merged" v1.3 package checked before touching anything; not applied)
+
+Boss uploaded a second zip - a full governance-scaffold package with the entity patch already merged in, plus a machine-generated verification report claiming 16 entities and zero duplicates - with `APPROVE_NEXT_10_LOOPS` and no further instruction.
+
+| Loop | Objective | Commit | Result |
+|---|---|---|---|
+| 32 | Verified the new package before applying anything; found it is built on a stale, disconnected baseline (not a sync of this repository's real, 31-loops-deep state) and its merged entity contract uses a different structural shape than this project's established convention; did not apply any part of it | (this commit) | Done - a verification loop, nothing written to the app or the protected contract folder. See evidence below |
+
+### Loop 32 evidence
+
+**Confirmed the entity content itself is correct, and identical to what was already verified in Loop 31.** Converted the new package's entities contract (a list of objects, each carrying its own `entity_id` field) back into the same key-per-entity shape this project's real file and Loop 31's already-approved patch both use, and diffed all 10 newly-added entities field-by-field against Loop 31's already-verified patch content - all 10 are byte-for-byte identical. Nothing new or different was introduced in the entity definitions themselves.
+
+**Found the package is not safe to apply as a whole - it is a stale, disconnected snapshot, not a merge onto this repository's real current state.** Line counts alone make this unambiguous: the package's own progress log is 46 lines against this repository's real 477; its own pending-items log is 26 lines against this repository's real 48, and contains zero mentions of any pending item numbered above the high-20s - meaning it predates essentially all of this session's own findings (PEN-028 through PEN-032). Its own loop-state counter shows 0 completed loops in window 1, versus this repository's real, current counter. Applying this package's files wholesale would have silently discarded 31 loops of real, evidence-backed engineering history - not a small risk, a severe one. Not applied. Cross-checked the other 8 non-entity contract files, the governing top-level docs, both governance hook scripts, and the harness settings file byte-for-byte against this repository's real copies - all identical, so the divergence is isolated to the entity contract's shape and the stale docs/loop-state files, not a wider governance rewrite.
+
+**Found the package's own merged entity contract uses a different structural shape than every other file in this project.** This repository's real domain entities contract, Loop 30's own superseded draft, and Loop 31's already-verified patch all represent the entity list as a mapping keyed by each entity's own snake_case name (e.g. `material_master:` -> its fields). The new package's version represents it as a plain list of objects, each carrying a new `entity_id` field instead of being keyed by name. Checked whether either of this repository's own contract-validating guards cares about this distinction - neither does today (one only regex-scans raw text for `id:` values, the other is purely lexical/tab-and-escape checking, and neither one currently even inspects this file's structure) - so this would not fail any check that exists right now. Still flagged, not silently accepted: adopting a different shape than every other file in this project, unprompted, for no functional reason, is an inconsistency worth a real decision rather than a quiet switch, especially since any future tooling that does read this contract would need to pick one shape and every other file already committed to the key-per-entity one.
+
+**Recommendation given to Alpesh:** ignore this package's documentation, loop-state, and entity-contract files entirely; the already-verified, correctly-shaped patch from Loop 31 (the original zip's own missing-entity patch file) remains the one to paste. Claude Code still cannot write to the protected contract folder itself - re-confirmed the pre-tool safety hook is byte-identical between this repository and the new package, so nothing about that constraint has changed.
+
+**Free-only confirmation:** no paid action, no new dependency, no deployment, nothing applied to the repository. Vercel: still NOT DEPLOYED.
 
 ## Architecture Decisions Log
 | Date | Decision | Status |
