@@ -612,3 +612,81 @@ export const loadingSheetPallets = sqliteTable(
     ),
   })
 );
+
+// Loop 43 / TASK-009 (Inter-Warehouse Transfers, Flow 4). Transcribed
+// field-for-field from ENTITY-012 - same as loading_sheet before it, this
+// entity has no material/batch/pallet/quantity field of its own, so
+// transfer_order_pallets is the same disclosed junction-table translation
+// already applied to loading_sheet_pallets/receiving_sheet_pallets/
+// pallet_batches/hold_pallets (see PEN-014's own precedent, and PEN-041
+// in docs/PENDING_ITEMS.md for the full reasoning specific to this task).
+export const transferOrders = sqliteTable(
+  "transfer_orders",
+  {
+    id: text("id").primaryKey(),
+    transferNumber: text("transfer_number").notNull().unique(),
+    sourceWarehouseId: text("source_warehouse_id")
+      .notNull()
+      .references(() => warehouses.id),
+    destinationWarehouseId: text("destination_warehouse_id")
+      .notNull()
+      .references(() => warehouses.id),
+    transferType: text("transfer_type").notNull(),
+    vehicleNumber: text("vehicle_number"),
+    driverName: text("driver_name"),
+    transporter: text("transporter"),
+    temperatureC: real("temperature_c"),
+    lrNumber: text("lr_number"),
+    status: text("status").notNull().default("DRAFT"),
+    initiatedById: text("initiated_by_id").references(() => users.id),
+    receivedById: text("received_by_id").references(() => users.id),
+    dispatchedAt: text("dispatched_at"),
+    receivedAt: text("received_at"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => ({
+    transferTypeCheck: check(
+      "transfer_orders_transfer_type_check",
+      sql`${table.transferType} IN ('NORMAL','HOLD_TAG','BULK_TAG')`
+    ),
+    statusCheck: check(
+      "transfer_orders_status_check",
+      // Fully contracted, transcribed exactly from workflows.yaml's own
+      // transfer_order_status states - unlike loading_sheet_status, this
+      // one already lists every state (including CANCELLED) with no gap.
+      sql`${table.status} IN ('DRAFT','PICKED','LOADED','IN_TRANSIT','RECEIVED','COMPLETED','CANCELLED')`
+    ),
+    sourceDestDifferentCheck: check(
+      "transfer_orders_source_dest_different_check",
+      sql`${table.sourceWarehouseId} != ${table.destinationWarehouseId}`
+    ),
+  })
+);
+
+export const transferOrderPallets = sqliteTable(
+  "transfer_order_pallets",
+  {
+    id: text("id").primaryKey(),
+    transferOrderId: text("transfer_order_id")
+      .notNull()
+      .references(() => transferOrders.id),
+    palletId: text("pallet_id")
+      .notNull()
+      .references(() => pallets.id),
+    materialId: text("material_id")
+      .notNull()
+      .references(() => materials.id),
+    batchId: text("batch_id")
+      .notNull()
+      .references(() => batches.id),
+    cartonQty: integer("carton_qty").notNull(),
+    weightKg: real("weight_kg").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => ({
+    transferOrderPalletUnique: uniqueIndex("transfer_order_pallets_order_pallet_unique").on(
+      table.transferOrderId,
+      table.palletId
+    ),
+  })
+);
