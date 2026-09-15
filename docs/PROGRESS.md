@@ -1,6 +1,6 @@
 # Project Progress Tracker
 ## IBF FG Warehouse Module
-## Last updated: 2026-09-15 (Loop 36 checkpoint)
+## Last updated: 2026-09-15 (Loop 37 checkpoint)
 
 ## Reading this document's "loop" numbering (PEN-016 clarification)
 
@@ -29,8 +29,8 @@ Two different, non-interchangeable counters both use the word "loop" in this pro
 | TASK-001 | Project Scaffolding + D1 Schema + Clerk | 🟨 Partial | Loops 2-9, 27 | Next.js/TS/Tailwind scaffold, core 6-entity schema, local D1 migration verified, Clerk stub scaffold, seed script (Loop 22) all done. Loop 27: real Cloudflare D1 database created and migrated (PEN-009 mostly resolved). NOT done: remaining 10 entities (PEN-014), real R2 (blocked on an Alpesh-only dashboard step), real Clerk resources (PEN-010 - the Clerk connector cannot create these either, confirmed Loop 27), production D1 binding wiring (PEN-020) |
 | TASK-002 | Clerk Auth + Roles | 🟨 Partial | Loop 9 | Middleware/provider/role-check utility scaffolded in stub mode; real account, webhook sync, and Clerk-dashboard role setup still pending (PEN-010) |
 | TASK-003 | Masters CRUD | 🟩 Done for in-scope items | Loops 21-22 | All 4 masters screens built against real local D1: Material Master and Warehouse Master (create/list/deactivate, server-side permission gate, real persistence, E2E coverage); SAP Warehouse Master and Status Master (read-only, seeded via the new `npm run db:seed`, matching the implementation spec's own "read-only" scope for those two). R12 edit on SAP Warehouse Master is explicitly NOT built (spec marks it out of this reduced read-only scope for now) |
-| TASK-004 | Receiving Sheet Flow | ⬜ Pending | - | CRITICAL PATH |
-| TASK-005 | Putaway + Rack Map | 🟩 Done for in-scope items | Loops 24-25, 28 | Location CRUD (admin), putaway/move business logic (unblocked via PEN-023), and the visual color-coded Rack Map (SCREEN-003) are all built against real local D1, verified with a real browser and screenshots (5/6 legend colors + click-to-detail popup + search highlighting). Loop 28: PEN-008 resolved - the real Limbasi CR1/CR2 grid (1442 locations) is now seeded from the real DSR Excel file. NOT built: location-move audit trail (PEN-024) and the "mix of batches" legend color (PEN-025) - both blocked on the same missing Pallet-Batch relationship (PEN-014) |
+| TASK-004 | Receiving Sheet Flow | 🟩 Done for in-scope items | Loops 35-36 | Full Flow 1 lifecycle built and tested against real local D1: schema (receiving_sheets, receiving_sheet_pallets, pallet_batches), business rules, 5 API routes (create/list/detail/update/add-pallet/confirm-packing/confirm-warehouse), lock-time materialization (real batch/pallets/pallet_batches/stock_ledger rows), and the 3-screen UI (Inward landing, list/create, detail). NOT built: the `cancel` action (PEN-033 - the applied entities contract and workflows.yaml disagree on whether a CANCELLED state exists at all, needs Alpesh's decision) |
+| TASK-005 | Putaway + Rack Map | 🟩 Done | Loops 24-25, 28, 37 | Location CRUD (admin), putaway/move business logic (unblocked via PEN-023), and the visual color-coded Rack Map (SCREEN-003) are all built against real local D1, verified with a real browser and screenshots (all 6/6 legend colors + click-to-detail popup + search highlighting). Loop 28: PEN-008 resolved - the real Limbasi CR1/CR2 grid (1442 locations) is now seeded from the real DSR Excel file. Loop 37: putaway/move now write real stock_ledger MOVE rows (PEN-024 closed - location history is traceable) and the Rack Map's "mix of batches" yellow legend color is real (PEN-025 closed) |
 | TASK-006 | Hold Management | ⬜ Pending | - | CRITICAL PATH |
 | TASK-007 | Bulk Management | ⬜ Pending | - | - |
 | TASK-008 | Dispatch + Loading Sheet | ⬜ Pending | - | CRITICAL PATH |
