@@ -417,3 +417,95 @@ export const receivingSheetPallets = sqliteTable(
     ),
   })
 );
+
+// ENTITY-011 Hold Record (Loop 38 / TASK-006). `hold_reason` uses the
+// entities contract's own `fixed_hold_reasons` list (20 values, INV-015 -
+// "no free text") as a real SQLite CHECK constraint, same treatment as
+// every other fixed-dropdown field in this schema. `custom_reason` is
+// required only when hold_reason is the last value ("Other (requires
+// supervisor approval)") - the contract's own conditional_rule - enforced
+// in the application layer (Zod), since SQLite CHECK constraints can't
+// easily cross-reference two columns' text values cleanly here.
+export const holdRecords = sqliteTable(
+  "hold_records",
+  {
+    id: text("id").primaryKey(),
+    holdNumber: text("hold_number").notNull().unique(),
+    materialId: text("material_id")
+      .notNull()
+      .references(() => materials.id),
+    batchId: text("batch_id")
+      .notNull()
+      .references(() => batches.id),
+    holdReason: text("hold_reason").notNull(),
+    customReason: text("custom_reason"),
+    placedById: text("placed_by_id")
+      .notNull()
+      .references(() => users.id),
+    placedByDepartment: text("placed_by_department").notNull(),
+    placedAt: text("placed_at").notNull(),
+    releasedById: text("released_by_id").references(() => users.id),
+    releasedAt: text("released_at"),
+    releaseRemarks: text("release_remarks"),
+    status: text("status").notNull().default("ACTIVE"),
+    qcFollowupCount: integer("qc_followup_count").notNull().default(0),
+    lastFollowupAt: text("last_followup_at"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => ({
+    statusCheck: check("hold_records_status_check", sql`${table.status} IN ('ACTIVE','RELEASED','REJECTED')`),
+    holdReasonCheck: check(
+      "hold_records_hold_reason_check",
+      sql`${table.holdReason} IN (
+        'High Temperature',
+        'Metal piece found (repass needed)',
+        'Thread contamination',
+        'Enzyme test positive',
+        'Uneven coating / Belt mark',
+        'High defects / Major defects',
+        'Dull appearance and color difference',
+        'Short length',
+        'Black particles',
+        'White patches on product surface',
+        'Wrong batch code printed',
+        'Batter bubbles',
+        'Product carton not available',
+        'Low retention time',
+        'Bad smell in product',
+        'Misshapes',
+        'Over-production (bulk)',
+        'Defective fries (bulk)',
+        'Trial / Sample',
+        'Other (requires supervisor approval)'
+      )`
+    ),
+  })
+);
+
+// ENTITY-011's own `pallet_ids` attribute is `type: array`, which SQLite/
+// Drizzle cannot store directly - the same translation already applied to
+// Receiving Sheet's pallet rows and the Pallet-Batch relationship
+// (ENTITY-004): a real junction table, not an invented new relationship.
+// A hold covers 1..N pallets (Flow 3's own "select pallet(s) to hold").
+export const holdPallets = sqliteTable(
+  "hold_pallets",
+  {
+    id: text("id").primaryKey(),
+    holdId: text("hold_id")
+      .notNull()
+      .references(() => holdRecords.id),
+    palletId: text("pallet_id")
+      .notNull()
+      .references(() => pallets.id),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => ({
+    // A given pallet can only be on ONE active hold at a time in practice
+    // (its own status can only be QC_HOLD/HOLD once), but the same pallet
+    // legitimately appears across multiple hold_pallets rows over its
+    // lifetime (placed on hold, released, later held again) - so this
+    // index only prevents the same pallet being added twice to the SAME
+        // hold record, not across different ones.
+    holdPalletUnique: uniqueIndex("hold_pallets_hold_pallet_unique").on(table.holdId, table.palletId),
+  })
+);

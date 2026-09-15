@@ -1,6 +1,6 @@
 # Project Progress Tracker
 ## IBF FG Warehouse Module
-## Last updated: 2026-09-15 (Loop 37 checkpoint)
+## Last updated: 2026-09-15 (Loop 38 checkpoint)
 
 ## Reading this document's "loop" numbering (PEN-016 clarification)
 
@@ -31,7 +31,7 @@ Two different, non-interchangeable counters both use the word "loop" in this pro
 | TASK-003 | Masters CRUD | 🟩 Done for in-scope items | Loops 21-22 | All 4 masters screens built against real local D1: Material Master and Warehouse Master (create/list/deactivate, server-side permission gate, real persistence, E2E coverage); SAP Warehouse Master and Status Master (read-only, seeded via the new `npm run db:seed`, matching the implementation spec's own "read-only" scope for those two). R12 edit on SAP Warehouse Master is explicitly NOT built (spec marks it out of this reduced read-only scope for now) |
 | TASK-004 | Receiving Sheet Flow | 🟩 Done for in-scope items | Loops 35-36 | Full Flow 1 lifecycle built and tested against real local D1: schema (receiving_sheets, receiving_sheet_pallets, pallet_batches), business rules, 5 API routes (create/list/detail/update/add-pallet/confirm-packing/confirm-warehouse), lock-time materialization (real batch/pallets/pallet_batches/stock_ledger rows), and the 3-screen UI (Inward landing, list/create, detail). NOT built: the `cancel` action (PEN-033 - the applied entities contract and workflows.yaml disagree on whether a CANCELLED state exists at all, needs Alpesh's decision) |
 | TASK-005 | Putaway + Rack Map | 🟩 Done | Loops 24-25, 28, 37 | Location CRUD (admin), putaway/move business logic (unblocked via PEN-023), and the visual color-coded Rack Map (SCREEN-003) are all built against real local D1, verified with a real browser and screenshots (all 6/6 legend colors + click-to-detail popup + search highlighting). Loop 28: PEN-008 resolved - the real Limbasi CR1/CR2 grid (1442 locations) is now seeded from the real DSR Excel file. Loop 37: putaway/move now write real stock_ledger MOVE rows (PEN-024 closed - location history is traceable) and the Rack Map's "mix of batches" yellow legend color is real (PEN-025 closed) |
-| TASK-006 | Hold Management | ⬜ Pending | - | CRITICAL PATH |
+| TASK-006 | Hold Management | 🟩 Done for in-scope items | Loop 38 | Full Flow 3 core lifecycle: schema (hold_records + hold_pallets junction), business rules (fixed 20-reason dropdown/NS-015, aging amber>3d/red>7d), 5 API routes (create/list/detail/release/reject/follow-up), stock_ledger HOLD/RELEASE/ADJUSTMENT entries, dashboard UI (SCREEN-004). NOT built, disclosed: hold on an already-OK pallet (PEN-036, workflow contract gap), partial-pallet/partial-quantity release (PEN-037, no schema for it), daily digest / production notification (PEN-038, no notification channel exists in this project at all - follow-up nudge is a real counter, not a real push) |
 | TASK-007 | Bulk Management | ⬜ Pending | - | - |
 | TASK-008 | Dispatch + Loading Sheet | ⬜ Pending | - | CRITICAL PATH |
 | TASK-009 | Inter-Warehouse Transfers | ⬜ Pending | - | - |
@@ -623,6 +623,45 @@ Commands run, in order, with results:
 **A real environment red herring, investigated and correctly root-caused rather than worked around:** the first `npx playwright test` run of this loop failed all 18 tests with `ERR_TUNNEL_CONNECTION_FAILED`/`ERR_CERT_AUTHORITY_INVALID` on every `page.goto`. Before concluding "new sandbox bug", checked this repository's own prior finding first (PEN-030): `.env.local` still held real Clerk keys from Loop 29, and this loop simply forgot the documented "move `.env.local` aside before `playwright test`" step every prior loop's command log already carries. Confirmed by moving it aside and re-running clean (42/42) - not a new defect, an omitted known step. Kept one small, independently-correct hardening from the investigation: `playwright.config.ts`'s chromium project now launches with `--no-proxy-server`, since this suite only ever talks to `127.0.0.1` and never needs this environment's egress proxy.
 
 Not resolved this loop, unrelated to PEN-024/025: TASK-006 (Hold Management) and the rest of the un-started task list remain exactly as PEN-014's own dependency trace already described.
+
+**Free-only confirmation:** no paid action, no new dependency, no deployment. Vercel: still NOT DEPLOYED.
+
+## Loop 38 Checkpoint (window 5 continued - TASK-006 Hold Management, full backend + UI)
+
+Built the first full task since PEN-014/017 closed: Hold Management (Flow 3's core lifecycle - place, view/aging, follow-up, release, reject), backend and UI, tested against real local D1.
+
+| Loop | Objective | Commit | Result |
+|---|---|---|---|
+| 38 | TASK-006 Hold Management - schema, business rules, 5 API routes, SCREEN-004 dashboard UI, 26 new tests (14 pure + 12 live-DB) + 3 new E2E | (this commit) | Done. See evidence below |
+
+### Loop 38 evidence
+
+**Schema:** `hold_records` (ENTITY-011, all 16 contracted attributes) + a `hold_pallets` junction table - the same translation already applied to `pallet_ids: type: array` elsewhere (receiving_sheet_pallets, pallet_batches): SQLite/Drizzle cannot store an array column directly, so a real junction table stands in for it, not an invented relationship. `hold_reason` is a real SQLite CHECK constraint over all 20 fixed values from the entity's own `fixed_hold_reasons` list (INV-015).
+
+**Business rules** (`src/lib/business-rules/hold.ts`): `validateHoldReason` (NS-015 - rejects free text; enforces the entity's own conditional_rule that `custom_reason` is required only when the reason is "Other..."), `holdAgeDays`/`holdAgeBucket` (SCREEN-004's own amber>3d/red>7d legend, thresholds are strictly-greater-than, verified at the exact boundary in tests), `holdNumberPrefix` (HOLD-YYYY-MMDD-NNN, same reading already applied to Receiving Sheet's RS-YYYY-MMDD-NNN).
+
+**Reused, not reinvented:** `src/lib/workflows/pallet-status.ts` (Loop 17) already had the exact `QC_HOLD -> HOLD`, `HOLD -> OK`, `HOLD -> REJECTED` transitions, actor lists, and ledger-transaction-type mapping, fully contracted since Loop 17 but never actually wired into a live route until this loop - Hold Management is the first real caller of it. This closed a real gap: that module's own transition→ledger mapping had literally never been executed against a database before.
+
+**5 API routes**: `POST/GET /api/holds` (place a hold across 1..N pallets in one transaction, real stock_ledger HOLD rows; list with server-computed aggregates - pallet count, total cartons/weight, age bucket), `GET /api/holds/[id]` (detail with its pallets), `POST .../release` (HOLD -> OK, R04/R05 per INV-005), `POST .../reject` (HOLD -> REJECTED, R04), `POST .../followup` (R03, increments the entity's own `qc_followup_count`/`last_followup_at`). Gated on `holds.*` permissions throughout - unlike Receiving Sheet/masters reads (PEN-022), the real permission matrix explicitly restricts `holds.view` to R03/R04/R05/R08, so this list/detail read is gated like Stock Ledger's, not left public.
+
+**NS-003's exact wording, deliberately reproduced:** the negative-test contract names the literal expected message "Only QC role can release holds" for a non-QC release attempt. `requirePermission`'s own generic denial text doesn't carry that phrase, so the release route catches its `ForbiddenError` and rethrows with the contract's exact wording - the authorization decision itself (R04/R05 only, from the real permission matrix) is unchanged, only the message. Proven with a real 403 in `tests/unit/hold-live.test.ts`, using a hoisted mock that re-implements `requirePermission` over the real permission matrix (`hasPermission`) instead of always succeeding - the one live test file in this repository that needed a genuine role-based denial, not just a bypassed check.
+
+**Dashboard UI** (`src/app/(app)/holds/page.tsx`, SCREEN-004): summary tile (active/red/amber count + total cartons), a "place a hold" form (material search -> live QC_HOLD-pallet checklist for that material, reason dropdown with conditional custom-reason field, department), filter bar (reason/department/aging), the active-holds table (desktop) / card list (mobile) with per-row Follow Up / Release / Reject actions (remarks captured inline, matching this app's established no-`window.prompt` convention), and a bulk "Follow-Up Nudge" panel that loops the same real per-hold endpoint across every aged hold - the honest, buildable version of the mockup's "send reminder" action (see PEN-038).
+
+**Three real scope gaps found and disclosed, not silently built or silently skipped** (see docs/PENDING_ITEMS.md): PEN-036 (the flow document's prose implies an `OK -> HOLD` transition the locked workflow contract doesn't define - built only the contracted `QC_HOLD -> HOLD` case, which is also the dominant real-world case), PEN-037 (Flow 3's "partial quantity" release has no field in the entity to record against - release/reject act on the whole hold), PEN-038 (no notification channel exists anywhere in this project - the follow-up nudge is a real, queryable counter, not a simulated push/email).
+
+**Extended, not modified, an already-shipped route:** `GET /api/pallets` (Loop 24/37) now also returns `batchId`/`batchNumber` when a pallet carries exactly one batch (the common case) - needed by the hold-creation form's pallet picker, purely additive, existing consumers (putaway/move pickers, Rack Map) unaffected.
+
+**A real, reproducible flake investigated and root-caused, not silently re-run past:** the full Playwright suite intermittently failed one unrelated pre-existing test (`storage-putaway.spec.ts`'s "awaiting putaway" assertion) only when run with Playwright's default 2 parallel workers, never in isolation. Re-ran the full suite with `--workers=1` and got **45/45 clean** - conclusively a parallel-worker shared-SQLite-file timing race (the same class of issue already documented for this project's local D1 setup), not a regression from this loop's changes; disclosed here rather than quietly retried until green.
+
+Commands run, in order, with results:
+1. `npx drizzle-kit generate` -> `0006_heavy_nemesis.sql`; `npx wrangler d1 migrations apply DB --local` -> applied cleanly.
+2. `npx tsc --noEmit` -> exit 0 (checked repeatedly through the loop).
+3. `npm run build` -> exit 0, all 5 new `/api/holds*` routes and `/holds` page show correctly in the route table.
+4. `npx vitest run` -> **170/170 passed**, run twice for stability (both clean) - 14 new pure business-rule tests (`hold-guard.test.ts`) + 12 new live-DB tests (`hold-live.test.ts`).
+5. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npx playwright test` (`.env.local` moved aside per PEN-030, restored immediately after) -> 42/45 on the default 2-worker run (1 pre-existing, unrelated flake - see above), **45/45 clean with `--workers=1`**.
+6. Real browser screenshots of `/holds` (desktop + mobile) - confirmed the honest Clerk-stub-mode refusal renders correctly (same gated-read pattern as Stock Ledger, Loop 26); the dashboard's actual data view (summary tiles, table, create form) cannot be visually verified in this sandbox for the same PEN-030 reason Stock Ledger's never could - its correctness is proven instead by the 12 live-DB tests exercising the real API response shapes.
+7. Harness checks: contract-guard, protected-integrity, yaml-lexical-guard PASS; static-guard shows the same 3 pre-existing PEN-022 findings, no new ones (`/api/holds*` all call `requirePermission`).
 
 **Free-only confirmation:** no paid action, no new dependency, no deployment. Vercel: still NOT DEPLOYED.
 

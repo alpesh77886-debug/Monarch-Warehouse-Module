@@ -43,6 +43,13 @@
       "when": 1789441482441,
       "tag": "0005_receiving_sheet_locked_immutable",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789454308437,
+      "tag": "0006_heavy_nemesis",
+      "breakpoints": true
     }
   ]
 }
