@@ -200,3 +200,611 @@ entities:
       - name: active
         type: integer
         default: 1
+
+  pallet_batch:
+    id: ENTITY-004
+    table: pallet_batches
+    purpose: Junction entity supporting multiple batches on one pallet
+    authority: BUSINESS
+    attributes:
+      - name: id
+        type: text
+        required: true
+      - name: pallet_id
+        type: text
+        references: pallets
+        required: true
+      - name: batch_id
+        type: text
+        references: batches
+        required: true
+      - name: carton_qty
+        type: integer
+        required: true
+      - name: weight_kg
+        type: real
+        required: true
+        calculated: "carton_qty x material.uom_kg_per_carton"
+    invariants:
+      - "All batches on a pallet must belong to the same material"
+      - "Sum of all pallet-batch weights must not exceed pallet_weight_limit_kg"
+
+  warehouse_master:
+    id: ENTITY-006
+    table: warehouses
+    purpose: Warehouse master
+    authority: BUSINESS
+    attributes:
+      - name: id
+        type: text
+        required: true
+      - name: code
+        type: text
+        unique: true
+        required: true
+      - name: name
+        type: text
+        required: true
+      - name: type
+        type: text
+        check_constraint: "type IN ('OWN', '3PL', 'CROSS_PLANT')"
+        required: true
+      - name: plant
+        type: text
+        check_constraint: "plant IN ('LIMBASI', 'SABARKANTHA', 'PATAN')"
+        required: true
+      - name: sap_code
+        type: text
+        required: true
+      - name: address
+        type: text
+        required: false
+      - name: location_structure
+        type: text
+        check_constraint: "location_structure IN ('RACK', 'FLAT')"
+        required: true
+      - name: active
+        type: integer
+        required: true
+      - name: created_at
+        type: text
+        required: true
+
+  sap_warehouse_master:
+    id: ENTITY-007
+    table: sap_codes
+    purpose: SAP warehouse reference data
+    authority: BUSINESS
+    attributes:
+      - name: sap_code
+        type: text
+        unique: true
+        required: true
+      - name: sap_name
+        type: text
+        required: true
+      - name: plant
+        type: text
+        required: true
+      - name: type
+        type: text
+        check_constraint: "type IN ('STATUS', '3PL', 'CROSS_PLANT', 'OTHER')"
+        required: true
+      - name: module_status_mapping
+        type: text
+        required: true
+      - name: fg_relevant
+        type: integer
+        required: true
+    seed_data_source: "Appendix D of the flow document - 110 codes; 44 FG-relevant codes"
+
+  status_master:
+    id: ENTITY-008
+    table: statuses
+    purpose: Fixed status master; no free-text status values
+    authority: BUSINESS
+    attributes:
+      - name: code
+        type: text
+        unique: true
+        required: true
+      - name: description
+        type: text
+        required: true
+      - name: dispatchable
+        type: integer
+        required: true
+      - name: transferable
+        type: text
+        required: true
+      - name: sap_limbasi
+        type: text
+        required: false
+      - name: sap_sabarkantha
+        type: text
+        required: false
+    fixed_values:
+      - code: QC_HOLD
+        description: "QC Hold (new inward)"
+        dispatchable: false
+        transferable: true
+        sap_limbasi: LMFGQ
+        sap_sabarkantha: SKFGQ
+      - code: OK
+        description: "OK / Available"
+        dispatchable: true
+        transferable: true
+        sap_limbasi: LMFGA
+        sap_sabarkantha: SKFGA
+      - code: HOLD
+        description: "Hold"
+        dispatchable: false
+        transferable: "YES_WITH_TAG"
+        sap_limbasi: LMFGH
+        sap_sabarkantha: SKFGH
+      - code: BULK
+        description: "Bulk"
+        dispatchable: false
+        transferable: "YES_WITH_TAG"
+        sap_limbasi: LMFGBULK
+        sap_sabarkantha: SKFGBULK
+      - code: DISPATCHED
+        description: "Dispatched"
+        dispatchable: "N/A"
+        transferable: "N/A"
+        sap_limbasi: LMFGD
+        sap_sabarkantha: SKSALES
+      - code: IN_TRANSIT
+        description: "In Transit"
+        dispatchable: "N/A"
+        transferable: "N/A"
+        sap_limbasi: LMFGIN
+        sap_sabarkantha: SKGJFGIN
+      - code: CUSTOMER_SAMPLE
+        description: "Customer Sample"
+        dispatchable: false
+        transferable: true
+        sap_limbasi: LMFGCS
+        sap_sabarkantha: SKFGCS
+      - code: SAMPLE
+        description: "Sample"
+        dispatchable: false
+        transferable: true
+        sap_limbasi: LMFGSMPL
+        sap_sabarkantha: SKFGSMPL
+      - code: REJECTED
+        description: "Rejected / Grade Out"
+        dispatchable: false
+        transferable: "CONDITIONAL"
+        sap_limbasi: LMGOA
+        sap_sabarkantha: SKGOA
+      - code: SCRAP
+        description: "Scrap"
+        dispatchable: false
+        transferable: false
+        sap_limbasi: LMSW
+        sap_sabarkantha: null
+    invariants:
+      - "Status values are fixed; no free text"
+      - "dispatchable is the hard-block enforcement point for loading-sheet generation"
+
+  receiving_sheet:
+    id: ENTITY-009
+    table: receiving_sheets
+    purpose: Receiving legal document
+    authority: BUSINESS
+    attributes:
+      - name: id
+        type: text
+        required: true
+      - name: sheet_number
+        type: text
+        unique: true
+        required: true
+        generated_format: "RS-YYYY-MMDD-NNN"
+      - name: date
+        type: text
+        required: true
+        editable_by: [R01]
+      - name: shift
+        type: text
+        check_constraint: "shift IN ('A', 'B', 'C')"
+        required: true
+        editable_by: [R01]
+      - name: line
+        type: text
+        check_constraint: "line IN ('FF', 'SPECIALITY')"
+        required: true
+        editable_by: [R01]
+      - name: material_id
+        type: text
+        references: materials
+        required: true
+        editable_by: [R01]
+      - name: batch_number
+        type: text
+        required: true
+        editable_by: [R01]
+      - name: total_qty
+        type: integer
+        required: true
+        calculated: true
+      - name: total_boxes
+        type: integer
+        required: true
+        calculated: true
+      - name: packing_supervisor_id
+        type: text
+        references: users
+        required: false
+        editable_by: [R06]
+      - name: packing_operator_id
+        type: text
+        references: users
+        required: false
+        editable_by: [R07]
+      - name: warehouse_executive_id
+        type: text
+        references: users
+        required: false
+        editable_by: [R01]
+      - name: warehouse_operator_id
+        type: text
+        references: users
+        required: false
+        editable_by: [R02]
+      - name: packing_confirmed_at
+        type: text
+        required: false
+      - name: warehouse_confirmed_at
+        type: text
+        required: false
+      - name: status
+        type: text
+        check_constraint: "status IN ('DRAFT', 'PENDING_PACKING', 'PENDING_WAREHOUSE', 'LOCKED')"
+        required: true
+      - name: default_pallet_status
+        type: text
+        check_constraint: "default_pallet_status IN ('QC_HOLD', 'BULK')"
+        required: true
+      - name: created_at
+        type: text
+        required: true
+    invariants:
+      - "Once both sides confirm, status becomes LOCKED and the record is immutable"
+      - "One sheet equals one material, one batch, one shift and one line"
+      - "Discrepancy must be recorded before lock"
+      - "Lock is a legal document"
+
+  receiving_sheet_pallet:
+    id: ENTITY-010
+    table: receiving_sheet_pallets
+    purpose: Receiving-sheet child pallet line
+    authority: BUSINESS
+    attributes:
+      - name: id
+        type: text
+        required: true
+      - name: receiving_sheet_id
+        type: text
+        references: receiving_sheets
+        required: true
+      - name: sr_no
+        type: integer
+        required: true
+        validation: "sequential 1-35"
+      - name: pallet_number
+        type: text
+        required: true
+      - name: qty
+        type: integer
+        required: true
+      - name: receiving_time
+        type: text
+        required: true
+      - name: carton_condition
+        type: text
+        check_constraint: "carton_condition IN ('OK', 'BULGING', 'DAMAGED', 'WET', 'SHORT_QUANTITY', 'OTHER')"
+        required: true
+      - name: temperature_c
+        type: real
+        required: false
+      - name: remarks
+        type: text
+        required: false
+        conditional_rule: "mandatory if carton_condition != OK"
+
+  hold_record:
+    id: ENTITY-011
+    table: hold_records
+    purpose: Quality/operational hold record
+    authority: BUSINESS
+    attributes:
+      - name: id
+        type: text
+        required: true
+      - name: hold_number
+        type: text
+        unique: true
+        required: true
+        generated_format: "HOLD-YYYY-MMDD-NNN"
+      - name: material_id
+        type: text
+        references: materials
+        required: true
+      - name: batch_id
+        type: text
+        references: batches
+        required: true
+      - name: pallet_ids
+        type: array
+        required: true
+      - name: hold_reason
+        type: text
+        required: true
+        fixed_dropdown: true
+      - name: custom_reason
+        type: text
+        required: false
+        conditional_rule: "required if hold_reason = OTHER"
+      - name: placed_by_id
+        type: text
+        references: users
+        required: true
+      - name: placed_by_department
+        type: text
+        required: true
+      - name: placed_at
+        type: text
+        required: true
+      - name: released_by_id
+        type: text
+        references: users
+        required: false
+      - name: released_at
+        type: text
+        required: false
+      - name: release_remarks
+        type: text
+        required: false
+      - name: status
+        type: text
+        check_constraint: "status IN ('ACTIVE', 'RELEASED', 'REJECTED')"
+        required: true
+      - name: qc_followup_count
+        type: integer
+        required: true
+      - name: last_followup_at
+        type: text
+        required: false
+    fixed_hold_reasons:
+      - "High Temperature"
+      - "Metal piece found (repass needed)"
+      - "Thread contamination"
+      - "Enzyme test positive"
+      - "Uneven coating / Belt mark"
+      - "High defects / Major defects"
+      - "Dull appearance and color difference"
+      - "Short length"
+      - "Black particles"
+      - "White patches on product surface"
+      - "Wrong batch code printed"
+      - "Batter bubbles"
+      - "Product carton not available"
+      - "Low retention time"
+      - "Bad smell in product"
+      - "Misshapes"
+      - "Over-production (bulk)"
+      - "Defective fries (bulk)"
+      - "Trial / Sample"
+      - "Other (requires supervisor approval)"
+
+  transfer_order:
+    id: ENTITY-012
+    table: transfer_orders
+    purpose: Warehouse transfer order
+    authority: BUSINESS
+    attributes:
+      - name: id
+        type: text
+        required: true
+      - name: transfer_number
+        type: text
+        unique: true
+        required: true
+        generated_format: "TO-YYYY-MMDD-NNN"
+      - name: source_warehouse_id
+        type: text
+        references: warehouses
+        required: true
+      - name: destination_warehouse_id
+        type: text
+        references: warehouses
+        required: true
+      - name: transfer_type
+        type: text
+        check_constraint: "transfer_type IN ('NORMAL', 'HOLD_TAG', 'BULK_TAG')"
+        required: true
+      - name: vehicle_number
+        type: text
+        required: true
+      - name: driver_name
+        type: text
+        required: true
+      - name: transporter
+        type: text
+        required: false
+      - name: temperature_c
+        type: real
+        required: false
+      - name: lr_number
+        type: text
+        required: false
+      - name: status
+        type: text
+        check_constraint: "status IN ('DRAFT', 'PICKED', 'LOADED', 'IN_TRANSIT', 'RECEIVED', 'COMPLETED', 'CANCELLED')"
+        required: true
+      - name: initiated_by_id
+        type: text
+        references: users
+        required: true
+      - name: received_by_id
+        type: text
+        references: users
+        required: false
+      - name: dispatched_at
+        type: text
+        required: false
+      - name: received_at
+        type: text
+        required: false
+      - name: created_at
+        type: text
+        required: true
+
+  loading_sheet:
+    id: ENTITY-013
+    table: loading_sheets
+    purpose: Dispatch/loading legal document
+    authority: BUSINESS
+    attributes:
+      - name: id
+        type: text
+        required: true
+      - name: loading_sheet_number
+        type: text
+        unique: true
+        required: true
+        generated_format: "LS-YYYY-MMDD-NNN"
+      - name: date
+        type: text
+        required: true
+      - name: vehicle_number
+        type: text
+        required: true
+      - name: driver_name
+        type: text
+        required: true
+      - name: transporter
+        type: text
+        required: false
+      - name: party_name
+        type: text
+        required: true
+      - name: destination
+        type: text
+        required: true
+      - name: export_domestic
+        type: text
+        check_constraint: "export_domestic IN ('EXPORT', 'DOMESTIC')"
+        required: true
+      - name: temperature_c
+        type: real
+        required: true
+      - name: qc_approval_by_id
+        type: text
+        references: users
+        required: false
+        conditional_rule: "required for EXPORT"
+      - name: qc_approval_at
+        type: text
+        required: false
+        conditional_rule: "required for EXPORT"
+      - name: container_number
+        type: text
+        required: false
+        conditional_rule: "required for EXPORT"
+      - name: seal_number
+        type: text
+        required: false
+        conditional_rule: "required for EXPORT"
+      - name: bolt_number
+        type: text
+        required: false
+        conditional_rule: "required for EXPORT"
+      - name: gate_pass_number
+        type: text
+        required: true
+      - name: gate_pass_time
+        type: text
+        required: true
+      - name: loaded_by_id
+        type: text
+        references: users
+        required: true
+      - name: verified_by_id
+        type: text
+        references: users
+        required: true
+      - name: status
+        type: text
+        check_constraint: "status IN ('DRAFT', 'STAGING', 'LOADED', 'VERIFIED', 'GATE_PASSED', 'DISPATCHED')"
+        required: true
+      - name: created_at
+        type: text
+        required: true
+
+  maintenance_ticket:
+    id: ENTITY-014
+    table: maintenance_tickets
+    purpose: Maintenance and breakdown ticket
+    authority: BUSINESS
+    attributes:
+      - name: id
+        type: text
+        required: true
+      - name: ticket_number
+        type: text
+        unique: true
+        required: true
+        generated_format: "MT-YYYY-MMDD-NNN"
+      - name: category
+        type: text
+        check_constraint: "category IN ('DOOR', 'FORKLIFT', 'RACKING', 'ELECTRICAL', 'REFRIGERATION', 'PPE', 'OTHER')"
+        required: true
+      - name: location
+        type: text
+        required: true
+      - name: description
+        type: text
+        required: true
+      - name: severity
+        type: text
+        check_constraint: "severity IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')"
+        required: true
+      - name: status
+        type: text
+        check_constraint: "status IN ('OPEN', 'ACKNOWLEDGED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'REOPENED')"
+        required: true
+      - name: raised_by_id
+        type: text
+        references: users
+        required: true
+      - name: acknowledged_by_id
+        type: text
+        references: users
+        required: false
+      - name: resolved_by_id
+        type: text
+        references: users
+        required: false
+      - name: resolution_notes
+        type: text
+        required: false
+        conditional_rule: "required on resolve"
+      - name: parts_used
+        type: text
+        required: false
+      - name: created_at
+        type: text
+        required: true
+      - name: acknowledged_at
+        type: text
+        required: false
+      - name: resolved_at
+        type: text
+        required: false
+      - name: closed_at
+        type: text
+        required: false
+
