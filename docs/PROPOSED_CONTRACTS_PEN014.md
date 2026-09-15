@@ -1,5 +1,11 @@
 # Proposed Machine-Readable Contracts for PEN-014 (Loop 12 — BLOCKED)
 
+## SUPERSEDED (Loop 31)
+
+Alpesh separately supplied his own patch package (`MONARCH_Warehouse_Missing_Entity_Contract_Patch_v1.zip`, entity file `entities_missing_patch.yaml`) covering the same 10 entity IDs this document drafts. Verified in Loop 31 (hash-checked, YAML-parsed, merge-simulated against the real domain entities contract - see the pending items log's PEN-014/017 update for the full check) and Alpesh directed that his package be the one applied.
+
+**Do not paste both this document's blocks and his patch's blocks into the same file - that produces real duplicate top-level entity keys** (this doc and his patch both define `warehouse_master`, `pallet_batch`, etc., with slightly different content each time), and depending on which YAML parser reads it later, the second occurrence of a duplicate key can silently win with no error, silently discarding the first. **Use only Alpesh's zip patch going forward.** This document is kept for its historical record (the Loop 12 stop condition, and the Loop 30 reasoning) but its YAML blocks below are not the ones to apply.
+
 ## Stop condition hit this loop
 
 Loop 12's objective was to add formal contract entries for the highest-priority uncontracted entities directly into the machine-readable contract folder. Attempting to create even one new file there was denied:

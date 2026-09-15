@@ -1,6 +1,6 @@
 # Project Progress Tracker
 ## IBF FG Warehouse Module
-## Last updated: 2026-09-14 (Loop 30 checkpoint)
+## Last updated: 2026-09-15 (Loop 31 checkpoint)
 
 ## Reading this document's "loop" numbering (PEN-016 clarification)
 
@@ -434,6 +434,38 @@ Boss sent `APPROVE_NEXT_10_LOOPS` with no new task attached - read as "keep goin
 **New finding, recorded before being guessed at (PEN-031):** opened the real DSR file's IN-OUT sheet directly (not assumed from the architecture blueprint's brief description) while scoping the In-Out Summary feature, and found it is a composite, print-oriented layout - four unrelated sub-reports (shift-wise production, per-warehouse indent/pending, and two returns blocks) stacked side by side with no row-level correspondence between them, not the simple daily material in/out table the blueprint's own wording implies. Recorded as a real blueprint-vs-source mismatch (same class as PEN-018) so it is visible before anyone attempts to build "an exact DSR IN-OUT match" - the buildable alternative (a real IN/OUT aggregation from the stock ledger's own transaction-type field) is a disclosed reinterpretation that still needs Alpesh's sign-off, not a guess to build silently.
 
 No application code changed this loop - only the pending-items log and this document. No regression risk; full test/build/harness suite from Loop 29 stands unchanged (not re-run for a docs-only loop, per the same practice used for prior pure-documentation turns in this project).
+
+**Free-only confirmation:** no paid action, no new dependency, no deployment. Vercel: still NOT DEPLOYED.
+
+## Loop 31 Checkpoint (window 4 continued - Alpesh's own contract-patch package reviewed and verified safe; two real findings surfaced before any write)
+
+Boss sent his own prepared patch package (a zip containing a missing-entity YAML patch, an apply-instructions file, a source-and-scope note, and a file manifest) plus 13 explicit apply rules, and separately asked directly whether applying it risks creating duplicates or damaging the warehouse module - to be checked and reported before proceeding.
+
+| Loop | Objective | Commit | Result |
+|---|---|---|---|
+| 31 | Verified Alpesh's own contract-patch package end to end (hash integrity, YAML syntax, merge simulation) before any write; found it is safe to apply with no duplicate/ID-overlap risk; found and disclosed two separate real issues along the way (a superseded/duplicate-draft risk from Loop 30's own earlier work, and a pre-existing, unrelated CI-blocking integrity-guard failure); did not write to the protected contract folder, since no tool available to this session can do so | (this commit) | Done - a verification/documentation loop. See evidence below |
+
+### Loop 31 evidence
+
+**Package integrity verified, not assumed:** recomputed SHA-256 for all 4 files in Alpesh's zip directly and compared against the values in its own bundled file manifest - all 4 matched exactly. The patch file parses as valid YAML on its own (10 top-level entity keys, IDs ENTITY-004 and ENTITY-006 through ENTITY-014). Simulated merging those 10 keys under the real domain entities contract's existing 6 (material_master, batch, pallet, location, stock_ledger, user - IDs ENTITY-001/002/003/005/015/016) and confirmed: zero key-name overlap, zero ID overlap, a combined 16 unique entity keys with ENTITY-001 through ENTITY-016 each present exactly once - satisfying Alpesh's own stated verification bar.
+
+**Three content-accuracy notes found in the patch itself, disclosed rather than silently fixed or silently accepted:** (1) the SAP Warehouse Master entry names a table that does not match the real, already-seeded Drizzle table (the real one is `sap_codes`, confirmed in the schema module and in the now-superseded Loop 30 draft, which got this one right); (2) Hold Record's multi-pallet field is left as a bare `array` type, which SQLite/Drizzle cannot implement directly - a junction-table translation will still be needed when this entity is actually built, same conclusion Loop 30 reached independently; (3) Status Master's fixed-value reference rows mix boolean and string values for the same two fields inconsistently - informational only, not a machine constraint, low risk. None of these block applying the patch; all three are worth a decision before or shortly after.
+
+**Real finding: two independent drafts of the same 10 entities now exist, a genuine duplicate-paste risk if not resolved.** Loop 30 already drafted and committed its own version of all 10 missing entities to a docs file, before Alpesh's package arrived. Both drafts cover the identical 10 entity IDs with different exact content. If both were ever pasted into the real contract file, the result would have real duplicate top-level YAML keys - undefined/parser-dependent behavior, and at least one common YAML library silently keeps only the last-parsed occurrence of a duplicate key with no error raised, meaning the first pasted block's content would vanish silently. Resolved by marking the Loop 30 draft document superseded in place (not deleted - kept as the historical record of why it was written) with an explicit instruction not to paste from it, and directing all future application specifically to Alpesh's own package.
+
+**Real finding, unrelated to the contract patch: the package self-integrity CI gate has likely been silently red for most of this project's history.** While checking this guard's exit code specifically because Alpesh's own rules require running it and stopping on any failure, found that an earlier loop's own verification of this exact guard was measured incorrectly - piping the guard's output through `tail` before reading the shell's `$?` captures `tail`'s exit status, not the guard's, so multiple earlier loop checkpoints' "harness checks: PASS" lines for this one guard were never actually true verifications. Run directly, the guard's real exit code is 1: it pins expected file hashes at some earlier baseline and 4 already-tracked files (the raw per-turn loop counter, plus three of this project's own most frequently updated documentation files) have justifiably drifted from that baseline across many prior loops' legitimate work, with no documented procedure anywhere in this repository for refreshing the pinned baseline as engineering proceeds. This is a pre-existing structural gap, not something this loop's review caused - the domain entities contract file itself is confirmed still untouched (matches its own pinned hash), consistent with PEN-017. Recorded as a new pending item rather than silently worked around, since regenerating that pinned-hash file is itself a protected-path write this session cannot perform either.
+
+**Confirmed directly, not assumed, that no tool available to this session can write to the protected contract folder under any approval wording.** Read the actual pre-tool safety hook's source code (not just relied on the repeated denial messages): it applies to every tool call, and denies whenever the call's content contains one of several protected-path substrings together with any of a list of mutation-indicating words - with no override flag, approval token, or exception path reachable from within a tool call. This is a hard technical block, not a conversational "waiting for confirmation" gate that Alpesh's own explicit approval in chat can lift - confirmed by design, matching this project's own established PEN-017 finding from many loops ago, not a new limitation. Did not attempt any workaround (an untriggered command shape was visible while reading the hook's regex, and was deliberately not tried - finding and using such a gap would be exactly the "route around it" behavior this project's own governance forbids). Alpesh applies his own package's patch himself, per its own bundled apply-instructions file.
+
+Commands run, in order, with results:
+1. Extracted the zip to the session's own scratchpad directory and read all 4 bundled files in full.
+2. Recomputed SHA-256 for each of the 4 files directly and diffed against the bundled manifest's claimed values - all 4 matched exactly.
+3. Parsed the patch file standalone with a real YAML parser - 10 entity keys, no syntax errors.
+4. Parsed the real domain entities contract file directly, then simulated the merge in memory and re-parsed the combined result - 16 unique keys, 16 unique IDs, zero overlap either way.
+5. Cross-checked the SAP Warehouse Master table-name and Hold Record array-type findings against the real Drizzle schema module read directly, not from memory.
+6. Ran the package self-integrity guard directly (not through a `tail`-piped exit-code check) and confirmed its real exit code and exact mismatch list.
+7. Read the pre-tool safety hook's own source file directly to confirm, from the actual mechanism rather than the denial message alone, that no approval-mediated exception path exists.
+8. Updated the pending-items log (superseded-draft note, corrected PEN-014/017 entry, new pending item for the integrity-guard finding) and the now-superseded draft document's own header - no application code, schema, contract file, or CI configuration changed.
 
 **Free-only confirmation:** no paid action, no new dependency, no deployment. Vercel: still NOT DEPLOYED.
 
