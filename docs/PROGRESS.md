@@ -1,6 +1,6 @@
 # Project Progress Tracker
 ## IBF FG Warehouse Module
-## Last updated: 2026-09-15 (Loop 39 checkpoint)
+## Last updated: 2026-09-15 (Loop 40 checkpoint)
 
 ## Reading this document's "loop" numbering (PEN-016 clarification)
 
@@ -697,6 +697,20 @@ Commands run, in order, with results:
 Not resolved this loop, carried forward honestly rather than guessed: PEN-013/028 (CVE-accept question not actually answered in Alpesh's message - re-asked), PEN-032 (CI-check-refresh approach not actually answered - re-asked), PEN-011 (offline/PWA wanted, but needs its own scoping pass before implementation, not a same-loop build), PEN-034 (wooden pallets are real, but where the UI picks pallet type is still an open sub-question), and the R2/Cloudflare-dashboard + Clerk-sandbox-limitation explanation - Alpesh said the earlier explanation didn't make sense, re-explained in plain terms in this loop's own chat reply rather than repeating the same wording here.
 
 **Free-only confirmation:** no paid action, no new dependency, no deployment. Vercel: still NOT DEPLOYED.
+
+## Loop 40 Checkpoint (window 5 continued - merged and verified Alpesh's own applied patches)
+
+| Loop | Objective | Commit | Result |
+|---|---|---|---|
+| 40 | Merge Alpesh's own directly-applied patches (PEN-033 contract text, PEN-032 manifest fix) from `main`, verify both by hand rather than trusting the commit messages | (this commit) | Done. See evidence below |
+
+Alpesh applied both requested patches himself directly to `main` (`02e9567` "Update entities.yaml", `13db29d` "Update the upgrade-file manifest"). Fetched and diffed both commits before merging - each is byte-for-byte the exact, minimal change asked for: the contract's Receiving Sheet status check_constraint gains `'CANCELLED'` (one word), and exactly the 4 always-changing manifest lines (harness loop-state, README, the two running-log docs) are removed, nothing else touched. Merged cleanly into the working branch, no conflicts.
+
+Verified the actual effect, not just the diff: ran the package-integrity checker directly (bypassing a shell pipeline this time, since PEN-032's own earlier finding already caught that piping into `tail` swallows the real exit code) - the 4 previously-failing always-changing files are gone from its mismatch output. One mismatch remains, correctly: the domain entities contract file's own pinned hash was never updated to match Alpesh's just-applied edit (or Loop 34's original patch before it) - the guard doing its real job, not a defect, and not something this loop tried to silence. contract-guard, protected-integrity, and yaml-lexical-guard all PASS; static-guard shows the same 3 pre-existing, already-accepted PEN-022 findings, unchanged.
+
+Commands run: `git fetch origin main`, `git show` on both commits (diff review before merging, not after), `git merge origin/main`, harness checks run individually with real exit codes captured.
+
+**Free-only confirmation:** no paid action, no new dependency, no deployment.
 
 ## Architecture Decisions Log
 | Date | Decision | Status |
