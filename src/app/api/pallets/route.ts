@@ -49,15 +49,20 @@ export async function GET() {
       // this same result below instead of its own separate grouped
       // query, now that both need the same underlying rows.
       db
-        .select({ palletId: palletBatches.palletId, batchId: palletBatches.batchId, batchNumber: batches.batchNumber })
+        .select({
+          palletId: palletBatches.palletId,
+          batchId: palletBatches.batchId,
+          batchNumber: batches.batchNumber,
+          productionDate: batches.productionDate,
+        })
         .from(palletBatches)
         .innerJoin(batches, eq(palletBatches.batchId, batches.id)),
     ]);
 
-    const batchesByPalletId = new Map<string, { batchId: string; batchNumber: string }[]>();
+    const batchesByPalletId = new Map<string, { batchId: string; batchNumber: string; productionDate: string }[]>();
     for (const r of batchRows) {
       const list = batchesByPalletId.get(r.palletId) ?? [];
-      list.push({ batchId: r.batchId, batchNumber: r.batchNumber });
+      list.push({ batchId: r.batchId, batchNumber: r.batchNumber, productionDate: r.productionDate });
       batchesByPalletId.set(r.palletId, list);
     }
 
@@ -71,6 +76,11 @@ export async function GET() {
           distinctBatchCount,
           batchId: onlyBatch?.batchId ?? null,
           batchNumber: onlyBatch?.batchNumber ?? null,
+          // Loop 41 / TASK-008: FIFO pick-list ordering (Flow 5 Step 2)
+          // needs a real production date to sort by, not just the batch
+          // number string - only meaningful for a single-batch pallet,
+          // same reasoning as batchId/batchNumber above.
+          productionDate: onlyBatch?.productionDate ?? null,
         };
       }),
     });

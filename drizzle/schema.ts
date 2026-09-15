@@ -511,3 +511,88 @@ export const holdPallets = sqliteTable(
     holdPalletUnique: uniqueIndex("hold_pallets_hold_pallet_unique").on(table.holdId, table.palletId),
   })
 );
+
+// ENTITY-013 Loading Sheet (Loop 41 / TASK-008). loaded_by_id, verified_by_id,
+// gate_pass_number and gate_pass_time are listed `required: true` in the
+// domain entities contract, but - same reading already applied to Receiving
+// Sheet's own confirmation fields - that means "required for the document
+// to be complete", not "required at the moment the DRAFT row is first
+// created" (Flow 5's own Steps 3/5 fill these in progressively, long after
+// creation). They are nullable here for exactly that reason, populated as
+// the loading sheet moves through its real lifecycle.
+export const loadingSheets = sqliteTable(
+  "loading_sheets",
+  {
+    id: text("id").primaryKey(),
+    loadingSheetNumber: text("loading_sheet_number").notNull().unique(),
+    date: text("date").notNull(),
+    vehicleNumber: text("vehicle_number").notNull(),
+    driverName: text("driver_name").notNull(),
+    transporter: text("transporter"),
+    partyName: text("party_name").notNull(),
+    destination: text("destination").notNull(),
+    exportDomestic: text("export_domestic").notNull(),
+    temperatureC: real("temperature_c").notNull(),
+    qcApprovalById: text("qc_approval_by_id").references(() => users.id),
+    qcApprovalAt: text("qc_approval_at"),
+    containerNumber: text("container_number"),
+    sealNumber: text("seal_number"),
+    boltNumber: text("bolt_number"),
+    gatePassNumber: text("gate_pass_number"),
+    gatePassTime: text("gate_pass_time"),
+    loadedById: text("loaded_by_id").references(() => users.id),
+    verifiedById: text("verified_by_id").references(() => users.id),
+    status: text("status").notNull().default("DRAFT"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => ({
+    exportDomesticCheck: check(
+      "loading_sheets_export_domestic_check",
+      sql`${table.exportDomestic} IN ('EXPORT','DOMESTIC')`
+    ),
+    statusCheck: check(
+      "loading_sheets_status_check",
+      sql`${table.status} IN ('DRAFT','STAGING','LOADED','VERIFIED','GATE_PASSED','DISPATCHED')`
+    ),
+  })
+);
+
+// ENTITY-013's own attribute list has no pallet_ids/material/batch/quantity
+// fields at all (unlike Receiving Sheet, which at least models pallet_ids
+// as an uncontracted array) - "Material Details (table)" and "Pallet-wise
+// loading sequence" are described only in the flow document's own Step 3
+// prose. Same translation already applied elsewhere (receiving_sheet_pallets,
+// pallet_batches, hold_pallets): a real junction/child table, not invented
+// business logic - one row per pallet picked onto this loading sheet.
+// fifo_override_reason is INV-010's own "logged override with reason",
+// attached to the specific pick it applies to rather than the whole sheet.
+export const loadingSheetPallets = sqliteTable(
+  "loading_sheet_pallets",
+  {
+    id: text("id").primaryKey(),
+    loadingSheetId: text("loading_sheet_id")
+      .notNull()
+      .references(() => loadingSheets.id),
+    palletId: text("pallet_id")
+      .notNull()
+      .references(() => pallets.id),
+    materialId: text("material_id")
+      .notNull()
+      .references(() => materials.id),
+    batchId: text("batch_id")
+      .notNull()
+      .references(() => batches.id),
+    cartonQty: integer("carton_qty").notNull(),
+    weightKg: real("weight_kg").notNull(),
+    loadingSequence: integer("loading_sequence").notNull(),
+    fifoOverrideReason: text("fifo_override_reason"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => ({
+    sequencePositiveCheck: check("loading_sheet_pallets_sequence_positive_check", sql`${table.loadingSequence} >= 1`),
+    loadingSheetPalletUnique: uniqueIndex("loading_sheet_pallets_sheet_pallet_unique").on(
+      table.loadingSheetId,
+      table.palletId
+    ),
+  })
+);
