@@ -10,7 +10,7 @@ import { ValidationError, ConflictError } from "../errors";
  * docs/PENDING_ITEMS.md for exactly what those are and why.
  */
 
-export type ReceivingSheetStatus = "DRAFT" | "PENDING_PACKING" | "PENDING_WAREHOUSE" | "LOCKED";
+export type ReceivingSheetStatus = "DRAFT" | "PENDING_PACKING" | "PENDING_WAREHOUSE" | "LOCKED" | "CANCELLED";
 
 export const MAX_PALLETS_PER_SHEET = 35;
 export const TEMPERATURE_WARNING_THRESHOLD_C = -15;
@@ -116,4 +116,27 @@ export function nextReceivingSheetStatus(
   throw new ConflictError(
     `Cannot ${action} a sheet in status ${current} - it may have just been confirmed by someone else.`
   );
+}
+
+/**
+ * PEN-033 (Loop 39, Alpesh-approved): workflows.yaml's own
+ * receiving_sheet_status state machine names exactly one transition into
+ * CANCELLED - {from: DRAFT, to: CANCELLED, action: cancel} - and no actor
+ * restriction narrower than "whoever can already create/edit a DRAFT
+ * sheet" is stated anywhere, so this is gated with the same
+ * "receiving_sheet.create" permission the PATCH (edit) route already
+ * uses, not a new, invented permission string.
+ */
+export function assertCanCancel(current: ReceivingSheetStatus): void {
+  if (current === "LOCKED") {
+    throw new ValidationError("Locked sheets are immutable.");
+  }
+  if (current === "CANCELLED") {
+    throw new ValidationError("This sheet is already cancelled.");
+  }
+  if (current !== "DRAFT") {
+    throw new ValidationError(
+      `Only a DRAFT sheet can be cancelled - this sheet is ${current}. Cancel it before either side confirms.`
+    );
+  }
 }

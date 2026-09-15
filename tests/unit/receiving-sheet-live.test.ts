@@ -27,6 +27,7 @@ const { PATCH: updateSheet, GET: getSheet } = await import("@/app/api/receiving-
 const { POST: addPallet } = await import("@/app/api/receiving-sheets/[id]/pallets/route");
 const { POST: confirmPacking } = await import("@/app/api/receiving-sheets/[id]/confirm-packing/route");
 const { POST: confirmWarehouse } = await import("@/app/api/receiving-sheets/[id]/confirm-warehouse/route");
+const { POST: cancelSheet } = await import("@/app/api/receiving-sheets/[id]/cancel/route");
 
 function jsonRequest(url: string, method: string, body: unknown) {
   return new NextRequest(new URL(url, "http://localhost"), {
@@ -40,6 +41,7 @@ const db = getDb();
 
 const FIXTURE_MATERIAL_CODE = "LFG00006";
 const FIXTURE_BATCH_NUMBER = "L26I070006";
+const CANCEL_BATCH_NUMBER = "L26I070060";
 
 let materialId: string;
 let warehouseId: string;
@@ -58,11 +60,13 @@ let warehouseId: string;
  * live-mutation test file in this repository.
  */
 async function cleanup() {
-  const rows = await db.select().from(receivingSheets).where(eq(receivingSheets.batchNumber, FIXTURE_BATCH_NUMBER));
-  for (const r of rows) {
-    await db.delete(receivingSheetPallets).where(eq(receivingSheetPallets.receivingSheetId, r.id));
+  for (const batchNumber of [FIXTURE_BATCH_NUMBER, CANCEL_BATCH_NUMBER]) {
+    const rows = await db.select().from(receivingSheets).where(eq(receivingSheets.batchNumber, batchNumber));
+    for (const r of rows) {
+      await db.delete(receivingSheetPallets).where(eq(receivingSheetPallets.receivingSheetId, r.id));
+    }
+    await db.delete(receivingSheets).where(eq(receivingSheets.batchNumber, batchNumber));
   }
-  await db.delete(receivingSheets).where(eq(receivingSheets.batchNumber, FIXTURE_BATCH_NUMBER));
 }
 
 beforeAll(async () => {
@@ -322,5 +326,61 @@ describe("Receiving Sheet - dual confirmation and lock (Flow 1 Step 3/4)", () =>
     expect(res.status).toBe(200);
     expect(body.receivingSheet.status).toBe("LOCKED");
     expect(body.pallets).toHaveLength(2);
+  });
+});
+
+// Loop 39 / PEN-033 (Alpesh-approved): DRAFT -> CANCELLED. Uses its own
+// fresh sheet (a different batch number) rather than the file's shared
+// `sheetId`, which the block above has already driven to LOCKED.
+describe("Receiving Sheet - cancel a DRAFT sheet (PEN-033)", () => {
+  let cancelSheetId: string;
+
+  it("creates a fresh DRAFT sheet and cancels it", async () => {
+    const createRes = await createSheet(
+      jsonRequest("/api/receiving-sheets", "POST", {
+        date: "2026-09-07",
+        shift: "B",
+        line: "FF",
+        materialId,
+        batchNumber: CANCEL_BATCH_NUMBER,
+      })
+    );
+    const createBody = await createRes.json();
+    expect(createRes.status, JSON.stringify(createBody)).toBe(201);
+    cancelSheetId = createBody.receivingSheet.id;
+
+    const res = await cancelSheet(jsonRequest(`/api/receiving-sheets/${cancelSheetId}/cancel`, "POST", {}), {
+      params: { id: cancelSheetId },
+    });
+    const body = await res.json();
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.receivingSheet.status).toBe("CANCELLED");
+
+    const [row] = await db.select().from(receivingSheets).where(eq(receivingSheets.id, cancelSheetId));
+    expect(row.status).toBe("CANCELLED");
+  });
+
+  it("refuses to cancel an already-cancelled sheet", async () => {
+    const res = await cancelSheet(jsonRequest(`/api/receiving-sheets/${cancelSheetId}/cancel`, "POST", {}), {
+      params: { id: cancelSheetId },
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it("refuses to cancel a LOCKED sheet (the file's own main fixture)", async () => {
+    const res = await cancelSheet(jsonRequest(`/api/receiving-sheets/${sheetId}/cancel`, "POST", {}), {
+      params: { id: sheetId },
+    });
+    expect(res.status).toBe(422);
+    const [row] = await db.select().from(receivingSheets).where(eq(receivingSheets.id, sheetId));
+    expect(row.status).toBe("LOCKED"); // unchanged
+  });
+
+  it("a cancelled sheet cannot be edited via PATCH either", async () => {
+    const res = await updateSheet(
+      jsonRequest(`/api/receiving-sheets/${cancelSheetId}`, "PATCH", { line: "SPECIALITY" }),
+      { params: { id: cancelSheetId } }
+    );
+    expect(res.status).toBe(422);
   });
 });

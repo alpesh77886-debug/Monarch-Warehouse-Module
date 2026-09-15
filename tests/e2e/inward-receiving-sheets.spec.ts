@@ -159,11 +159,21 @@ test.describe("Receiving Sheet detail - real persistence (read, ungated per PEN-
     // Both confirmation buttons are present (DRAFT, neither side confirmed yet).
     await expect(page.getByRole("button", { name: /Confirm \(Packing\)/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /Confirm \(Warehouse\)/i })).toBeVisible();
+    // PEN-033 (Loop 39): a DRAFT sheet also offers Cancel.
+    await expect(page.getByRole("button", { name: "Cancel this draft" })).toBeVisible();
   });
 
   test("confirming is honestly refused in Clerk stub mode, not silently accepted", async ({ page }) => {
     await page.goto(`/inward/receiving-sheets/${FIXTURE_SHEET_ID}`);
     await page.getByRole("button", { name: /Confirm \(Packing\)/i }).click();
+    await expect(page.getByText(/Clerk stub mode/i)).toBeVisible();
+    // Still DRAFT - the refusal is real, not cosmetic.
+    await expect(page.getByText("Draft", { exact: true })).toBeVisible();
+  });
+
+  test("cancelling is honestly refused in Clerk stub mode, not silently accepted (PEN-033)", async ({ page }) => {
+    await page.goto(`/inward/receiving-sheets/${FIXTURE_SHEET_ID}`);
+    await page.getByRole("button", { name: "Cancel this draft" }).click();
     await expect(page.getByText(/Clerk stub mode/i)).toBeVisible();
     // Still DRAFT - the refusal is real, not cosmetic.
     await expect(page.getByText("Draft", { exact: true })).toBeVisible();

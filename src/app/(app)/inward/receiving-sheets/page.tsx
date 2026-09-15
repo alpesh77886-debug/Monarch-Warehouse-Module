@@ -17,7 +17,7 @@ type ReceivingSheetRow = {
   batchNumber: string;
   totalQty: number;
   totalBoxes: number;
-  status: "DRAFT" | "PENDING_PACKING" | "PENDING_WAREHOUSE" | "LOCKED";
+  status: "DRAFT" | "PENDING_PACKING" | "PENDING_WAREHOUSE" | "LOCKED" | "CANCELLED";
   defaultPalletStatus: "QC_HOLD" | "BULK";
 };
 
@@ -37,6 +37,7 @@ const STATUS_LABEL: Record<ReceivingSheetRow["status"], string> = {
   PENDING_PACKING: "Awaiting packing confirm",
   PENDING_WAREHOUSE: "Awaiting warehouse confirm",
   LOCKED: "Locked",
+  CANCELLED: "Cancelled",
 };
 
 export default function ReceivingSheetsPage() {
@@ -279,6 +280,7 @@ function StatusPill({ status }: { status: ReceivingSheetRow["status"] }) {
     PENDING_PACKING: "bg-warning-light text-warning",
     PENDING_WAREHOUSE: "bg-warning-light text-warning",
     LOCKED: "bg-success-light text-success",
+    CANCELLED: "bg-danger-light text-danger",
   };
   return (
     <span className={"rounded-full px-2 py-0.5 text-xs font-bold " + styles[status]}>

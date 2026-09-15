@@ -20,11 +20,23 @@ beforeAll(() => {
   }
 });
 
-describe("Warehouse Master seed (Loop 28, real DSR-derived data)", () => {
-  it("has exactly one real Limbasi FG warehouse row", () => {
-    expect(WAREHOUSE_SEED_ROWS).toHaveLength(1);
-    expect(WAREHOUSE_SEED_ROWS[0].code).toBe("LIMBASI-FG");
-    expect(WAREHOUSE_SEED_ROWS[0].plant).toBe("LIMBASI");
+describe("Warehouse Master seed (Loop 28 Limbasi + Loop 39 Sabarkantha, PEN-035)", () => {
+  it("has exactly the real Limbasi FG warehouse row (rack grid)", () => {
+    const limbasi = WAREHOUSE_SEED_ROWS.find((w) => w.code === "LIMBASI-FG");
+    expect(limbasi).toBeDefined();
+    expect(limbasi!.plant).toBe("LIMBASI");
+    expect(limbasi!.locationStructure).toBe("RACK");
+  });
+
+  it("has the real Sabarkantha FG warehouse row (Alpesh-approved PEN-035: transfer only, no location grid)", () => {
+    const sabarkantha = WAREHOUSE_SEED_ROWS.find((w) => w.code === "SABARKANTHA-FG");
+    expect(sabarkantha).toBeDefined();
+    expect(sabarkantha!.plant).toBe("SABARKANTHA");
+    expect(sabarkantha!.locationStructure).toBe("FLAT");
+  });
+
+  it("has exactly these 2 warehouse rows, no more", () => {
+    expect(WAREHOUSE_SEED_ROWS).toHaveLength(2);
   });
 });
 

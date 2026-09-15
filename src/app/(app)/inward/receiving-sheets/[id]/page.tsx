@@ -18,7 +18,7 @@ type ReceivingSheet = {
   totalBoxes: number;
   packingConfirmedAt: string | null;
   warehouseConfirmedAt: string | null;
-  status: "DRAFT" | "PENDING_PACKING" | "PENDING_WAREHOUSE" | "LOCKED";
+  status: "DRAFT" | "PENDING_PACKING" | "PENDING_WAREHOUSE" | "LOCKED" | "CANCELLED";
   defaultPalletStatus: "QC_HOLD" | "BULK";
 };
 
@@ -65,6 +65,10 @@ export default function ReceivingSheetDetailPage() {
   const [confirming, setConfirming] = useState<"packing" | "warehouse" | null>(null);
   const [confirmNotice, setConfirmNotice] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelNotice, setCancelNotice] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   async function load() {
     setLoadState("loading");
@@ -163,6 +167,33 @@ export default function ReceivingSheetDetailPage() {
     }
   }
 
+  async function handleCancel() {
+    setCancelling(true);
+    setCancelError(null);
+    setCancelNotice(null);
+    try {
+      const res = await fetch(`/api/receiving-sheets/${id}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        if (res.status === 503) {
+          setCancelNotice(body.error);
+        } else {
+          setCancelError(body.error ?? `Request failed (${res.status}).`);
+        }
+        return;
+      }
+      await load();
+    } catch {
+      setCancelError("Network error - could not reach the server.");
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   if (loadState === "loading") {
     return (
       <>
@@ -189,6 +220,7 @@ export default function ReceivingSheetDetailPage() {
 
   const isDraft = sheet.status === "DRAFT";
   const isLocked = sheet.status === "LOCKED";
+  const isCancelled = sheet.status === "CANCELLED";
 
   return (
     <>
@@ -346,7 +378,15 @@ export default function ReceivingSheetDetailPage() {
           ) : null}
         </section>
 
-        {!isLocked ? (
+        {isCancelled ? (
+          <section className="rounded-xl border border-line bg-canvas p-4 text-sm font-semibold text-muted shadow-card sm:p-6">
+            Cancelled - this draft was withdrawn before either side confirmed it.
+          </section>
+        ) : isLocked ? (
+          <section className="rounded-xl border border-success bg-success-light p-4 text-sm font-semibold text-success shadow-card sm:p-6">
+            Locked - both sides confirmed. This sheet is now a permanent, immutable record.
+          </section>
+        ) : (
           <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
             <h2 className="text-sm font-bold text-navy">Confirmation</h2>
             <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -394,10 +434,29 @@ export default function ReceivingSheetDetailPage() {
                 {confirmError}
               </p>
             ) : null}
-          </section>
-        ) : (
-          <section className="rounded-xl border border-success bg-success-light p-4 text-sm font-semibold text-success shadow-card sm:p-6">
-            Locked - both sides confirmed. This sheet is now a permanent, immutable record.
+
+            {isDraft ? (
+              <div className="mt-4 border-t border-line pt-4">
+                <button
+                  type="button"
+                  disabled={cancelling}
+                  onClick={handleCancel}
+                  className="min-h-[48px] w-full rounded-lg border border-danger px-4 text-sm font-bold text-danger disabled:opacity-60 sm:w-auto"
+                >
+                  {cancelling ? "Cancelling..." : "Cancel this draft"}
+                </button>
+                {cancelNotice ? (
+                  <p className="mt-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-warning" role="status">
+                    {cancelNotice}
+                  </p>
+                ) : null}
+                {cancelError ? (
+                  <p className="mt-3 rounded-lg bg-danger-light p-3 text-xs font-semibold text-danger" role="alert">
+                    {cancelError}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </section>
         )}
       </div>
@@ -420,12 +479,14 @@ function StatusPill({ status }: { status: ReceivingSheet["status"] }) {
     PENDING_PACKING: "Awaiting packing confirm",
     PENDING_WAREHOUSE: "Awaiting warehouse confirm",
     LOCKED: "Locked",
+    CANCELLED: "Cancelled",
   };
   const styles: Record<ReceivingSheet["status"], string> = {
     DRAFT: "bg-line text-muted",
     PENDING_PACKING: "bg-warning-light text-warning",
     PENDING_WAREHOUSE: "bg-warning-light text-warning",
     LOCKED: "bg-success-light text-success",
+    CANCELLED: "bg-danger-light text-danger",
   };
   return (
     <span className={"rounded-full px-2 py-0.5 text-xs font-bold " + styles[status]}>{label[status]}</span>

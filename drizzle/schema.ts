@@ -355,13 +355,15 @@ export const receivingSheets = sqliteTable(
     ),
     statusCheck: check(
       "receiving_sheets_status_check",
-      // Matches the entities contract's own check_constraint for this
-      // field exactly (4 values, no CANCELLED) - see PEN-033 for the
-      // disclosed discrepancy against workflows.yaml's 5-state machine,
-      // which lists a CANCELLED state this contract's own CHECK constraint
-      // does not; TASK-004's IN SCOPE bullets never mention cancel either,
-      // so it is out of this loop's bounded scope, not silently dropped.
-      sql`${table.status} IN ('DRAFT','PENDING_PACKING','PENDING_WAREHOUSE','LOCKED')`
+      // Loop 39 / PEN-033: Alpesh decided CANCELLED should exist,
+      // resolving the disagreement between the applied domain entities
+      // contract (originally 4 values, no CANCELLED) and workflows.yaml's
+      // 5-state machine (which already had it). This CHECK constraint now
+      // matches workflows.yaml; the domain entities contract file itself
+      // is protected and still needs Alpesh's own paste of the matching
+      // one-line patch - see docs/PENDING_ITEMS.md PEN-033 for that exact
+      // text, prepared but not self-applied.
+      sql`${table.status} IN ('DRAFT','PENDING_PACKING','PENDING_WAREHOUSE','LOCKED','CANCELLED')`
     ),
     defaultPalletStatusCheck: check(
       "receiving_sheets_default_pallet_status_check",

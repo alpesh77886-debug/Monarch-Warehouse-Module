@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
 
-// Stock section landing (Loop 26 / TASK-011, partial). Only the
-// Stock Ledger list is built this loop - Excel export, In-Out
-// Summary, and the FIFO Aging Report are separate TASK-011 bullets,
-// listed here as not-yet-built rather than linked to nothing.
+// Stock section landing (Loop 26 / TASK-011, partial; Loop 39 adds
+// In-Out Summary - PEN-031). Excel export is not its own screen - it's
+// the "Export" button already on Stock Ledger and In-Out Summary
+// themselves, using the real DSR column layout (Loop 28). Only the
+// FIFO Aging Report remains not built.
 export default function StockLandingPage() {
   return (
     <>
@@ -22,18 +23,18 @@ export default function StockLandingPage() {
           </div>
           <span className="text-teal">&rarr;</span>
         </Link>
-        <div className="flex min-h-[64px] items-center justify-between rounded-xl border border-dashed border-line bg-white/60 p-4 text-muted">
+        <Link
+          href="/stock/in-out-summary"
+          className="flex min-h-[64px] items-center justify-between rounded-xl border border-line bg-white p-4 shadow-card"
+        >
           <div>
-            <div className="text-sm font-bold">In-Out Summary</div>
-            <div className="text-xs">Not built yet.</div>
+            <div className="text-sm font-bold text-navy">In-Out Summary</div>
+            <div className="text-xs text-muted">
+              IN vs OUT quantity by material/shift/day, with a full-detail export.
+            </div>
           </div>
-        </div>
-        <div className="flex min-h-[64px] items-center justify-between rounded-xl border border-dashed border-line bg-white/60 p-4 text-muted">
-          <div>
-            <div className="text-sm font-bold">Excel Export (DSR format)</div>
-            <div className="text-xs">Not built yet - the real DSR column layout is not available yet (same class of gap as PEN-007).</div>
-          </div>
-        </div>
+          <span className="text-teal">&rarr;</span>
+        </Link>
         <div className="flex min-h-[64px] items-center justify-between rounded-xl border border-dashed border-line bg-white/60 p-4 text-muted">
           <div>
             <div className="text-sm font-bold">FIFO Aging Report</div>

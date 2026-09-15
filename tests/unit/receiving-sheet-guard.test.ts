@@ -6,6 +6,7 @@ import {
   assertCanAddPalletRow,
   nextReceivingSheetStatus,
   productionDateFromBatchNumber,
+  assertCanCancel,
   MAX_PALLETS_PER_SHEET,
 } from "../../src/lib/business-rules/receiving-sheet";
 import { ValidationError, ConflictError } from "../../src/lib/errors";
@@ -93,5 +94,27 @@ describe("nextReceivingSheetStatus (workflows.yaml's own state machine)", () => 
   it("rejects any transition out of LOCKED (INV-008/NS-006)", () => {
     expect(() => nextReceivingSheetStatus("LOCKED", "packing_confirm")).toThrow(ValidationError);
     expect(() => nextReceivingSheetStatus("LOCKED", "warehouse_confirm")).toThrow(ValidationError);
+  });
+});
+
+// Loop 39 / PEN-033 (Alpesh-approved): DRAFT -> CANCELLED, the one
+// transition workflows.yaml's own receiving_sheet_status state machine
+// names for this action.
+describe("assertCanCancel (PEN-033)", () => {
+  it("allows cancelling a DRAFT sheet", () => {
+    expect(() => assertCanCancel("DRAFT")).not.toThrow();
+  });
+
+  it("rejects cancelling once either side has confirmed", () => {
+    expect(() => assertCanCancel("PENDING_PACKING")).toThrow(ValidationError);
+    expect(() => assertCanCancel("PENDING_WAREHOUSE")).toThrow(ValidationError);
+  });
+
+  it("rejects cancelling a LOCKED sheet, with the same NS-006 wording", () => {
+    expect(() => assertCanCancel("LOCKED")).toThrow(/immutable/i);
+  });
+
+  it("rejects cancelling an already-cancelled sheet", () => {
+    expect(() => assertCanCancel("CANCELLED")).toThrow(/already cancelled/i);
   });
 });

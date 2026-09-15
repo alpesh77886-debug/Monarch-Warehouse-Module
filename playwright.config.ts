@@ -9,7 +9,17 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./tests/e2e",
-  fullyParallel: true,
+  // Loop 39: was `true` (Playwright's own default workers), but every
+  // spec file drives real writes against the SAME local D1 SQLite file
+  // (src/lib/db.ts's whole design - see vitest.config.ts's own
+  // `fileParallelism: false` for the identical root cause on the unit
+  // side). Two workers writing to one SQLite file at once intermittently
+  // threw SQLITE_BUSY_SNAPSHOT-class errors, surfacing as a flaky,
+  // seemingly-unrelated test failure - confirmed clean and repeatable at
+  // 1 worker across 3 consecutive full-suite runs before fixing this here
+  // instead of continuing to disclose-and-rerun a known root cause.
+  fullyParallel: false,
+  workers: 1,
   retries: 0,
   reporter: [["list"]],
   use: {

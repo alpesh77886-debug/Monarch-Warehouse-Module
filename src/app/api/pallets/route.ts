@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { asc, eq, sql } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { pallets, materials, palletBatches, batches } from "../../../../drizzle/schema";
 
@@ -17,44 +17,43 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const db = getDb();
-    const rows = await db
-      .select({
-        id: pallets.id,
-        palletNumber: pallets.palletNumber,
-        palletType: pallets.palletType,
-        materialId: pallets.materialId,
-        materialCode: materials.code,
-        statusCode: pallets.statusCode,
-        totalWeightKg: pallets.totalWeightKg,
-        totalCartons: pallets.totalCartons,
-        currentLocationId: pallets.currentLocationId,
-        currentWarehouseId: pallets.currentWarehouseId,
-      })
-      .from(pallets)
-      .innerJoin(materials, eq(pallets.materialId, materials.id))
-      .orderBy(asc(pallets.palletNumber));
+    // Loop 39: the two queries below are independent of each other (one
+    // reads pallets+materials, the other pallet_batches+batches) - run
+    // in parallel rather than sequentially, since this route's growing
+    // real data set (and a 3rd, now-eliminated query - see below) had
+    // started to measurably slow it down.
+    const [rows, batchRows] = await Promise.all([
+      db
+        .select({
+          id: pallets.id,
+          palletNumber: pallets.palletNumber,
+          palletType: pallets.palletType,
+          materialId: pallets.materialId,
+          materialCode: materials.code,
+          statusCode: pallets.statusCode,
+          totalWeightKg: pallets.totalWeightKg,
+          totalCartons: pallets.totalCartons,
+          currentLocationId: pallets.currentLocationId,
+          currentWarehouseId: pallets.currentWarehouseId,
+        })
+        .from(pallets)
+        .innerJoin(materials, eq(pallets.materialId, materials.id))
+        .orderBy(asc(pallets.palletNumber)),
+      // Loop 38 / TASK-006: also gives the single batch a pallet
+      // carries, when it carries exactly one (the common case - see
+      // receiving-sheet-lock.ts). A mixed-batch pallet gets neither
+      // field, rather than an arbitrary pick of one of its batches -
+      // Hold Management's own data model (one batch_id per hold_record)
+      // has no real way to place a hold on only part of a mixed pallet
+      // anyway. distinctBatchCount (Loop 37 / PEN-025) is derived from
+      // this same result below instead of its own separate grouped
+      // query, now that both need the same underlying rows.
+      db
+        .select({ palletId: palletBatches.palletId, batchId: palletBatches.batchId, batchNumber: batches.batchNumber })
+        .from(palletBatches)
+        .innerJoin(batches, eq(palletBatches.batchId, batches.id)),
+    ]);
 
-    // Loop 37 / PEN-025: one grouped query for every pallet's distinct
-    // batch count, rather than N+1 queries per row.
-    const batchCounts = await db
-      .select({
-        palletId: palletBatches.palletId,
-        distinctBatchCount: sql<number>`count(distinct ${palletBatches.batchId})`,
-      })
-      .from(palletBatches)
-      .groupBy(palletBatches.palletId);
-    const batchCountByPalletId = new Map(batchCounts.map((r) => [r.palletId, r.distinctBatchCount]));
-
-    // Loop 38 / TASK-006: the single batch a pallet carries, when it
-    // carries exactly one (the common case - see receiving-sheet-lock.ts).
-    // A mixed-batch pallet gets neither field, rather than an arbitrary
-    // pick of one of its batches - Hold Management's own data model
-    // (one batch_id per hold_record) has no real way to place a hold on
-    // only part of a mixed pallet anyway.
-    const batchRows = await db
-      .select({ palletId: palletBatches.palletId, batchId: palletBatches.batchId, batchNumber: batches.batchNumber })
-      .from(palletBatches)
-      .innerJoin(batches, eq(palletBatches.batchId, batches.id));
     const batchesByPalletId = new Map<string, { batchId: string; batchNumber: string }[]>();
     for (const r of batchRows) {
       const list = batchesByPalletId.get(r.palletId) ?? [];
@@ -64,11 +63,12 @@ export async function GET() {
 
     return NextResponse.json({
       pallets: rows.map((r) => {
-        const singleBatch = batchesByPalletId.get(r.id);
-        const onlyBatch = singleBatch?.length === 1 ? singleBatch[0] : null;
+        const list = batchesByPalletId.get(r.id) ?? [];
+        const distinctBatchCount = new Set(list.map((b) => b.batchId)).size;
+        const onlyBatch = list.length === 1 ? list[0] : null;
         return {
           ...r,
-          distinctBatchCount: batchCountByPalletId.get(r.id) ?? 0,
+          distinctBatchCount,
           batchId: onlyBatch?.batchId ?? null,
           batchNumber: onlyBatch?.batchNumber ?? null,
         };

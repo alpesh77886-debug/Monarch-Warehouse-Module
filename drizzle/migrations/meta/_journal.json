@@ -50,6 +50,13 @@
       "when": 1789454308437,
       "tag": "0006_heavy_nemesis",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1789460404204,
+      "tag": "0007_real_meltdown",
+      "breakpoints": true
     }
   ]
 }

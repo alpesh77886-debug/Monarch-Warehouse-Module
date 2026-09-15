@@ -132,9 +132,16 @@ test.describe("Putaway - real pallet read from local D1", () => {
     // fixture pallets (e.g. tests/unit/stock-ledger-read.test.ts's)
     // legitimately add to that list too.
     const section = page.locator("section", { hasText: "Awaiting putaway" });
+    // Loop 39: /api/pallets now joins pallet_batches/batches too (Loop
+    // 37/38) and this repository's shared local D1 file accumulates more
+    // real pallets every loop, so this query has gotten measurably
+    // slower than the 5s default under full-suite load - a real latency
+    // margin issue, not a flake to just re-run past. A longer timeout
+    // here is the honest fix; see also the route's own Promise.all
+    // parallelization (src/app/api/pallets/route.ts) done the same loop.
     await expect(
       section.getByText(`Pallet ${FIXTURE_PALLET_NUMBER} · ${FIXTURE_MATERIAL_CODE}`)
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15000 });
   });
 
   test("an assign attempt is honestly refused in Clerk stub mode, not silently accepted", async ({
