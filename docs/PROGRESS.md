@@ -592,6 +592,40 @@ Commands run, in order, with results:
 
 **Free-only confirmation:** no paid action, no new dependency, no deployment. Vercel: still NOT DEPLOYED.
 
+## Loop 37 Checkpoint (window 5 - closes PEN-024/PEN-025: putaway/move ledger writes, Rack Map yellow)
+
+Closed the two remaining follow-ups Loop 35 left open: putaway/move now write real, append-only `stock_ledger` rows (PEN-024), and the Rack Map's sixth legend color, "Mix (batches)", is now real (PEN-025).
+
+| Loop | Objective | Commit | Result |
+|---|---|---|---|
+| 37 | `/api/storage/putaway` and `/api/storage/move` write real stock_ledger MOVE rows via pallet_batches; `rack-map.ts` gets a real yellow "mix" color; `GET /api/pallets` exposes a distinct-batch count; fixed a pre-existing pagination-fragile assertion in stock-ledger-read.test.ts along the way | (this commit) | Done. See evidence below |
+
+### Loop 37 evidence
+
+**PEN-024 closed:** `/api/storage/putaway` and `/api/storage/move` each now write one append-only `stock_ledger` row (transaction_type `MOVE`) per `pallet_batches` entry the pallet carries, inside the same DB transaction as the location/pallet update. qty/weight are 0-change (only the location itself is new information on a plain move); the move route's mandatory reason lands in the ledger row's own `remarks` column, which existed for exactly this and was unused until now. A pallet with zero `pallet_batches` rows (hand-inserted test/legacy data, never true for a pallet created through the real Receiving Sheet flow) still has no real batch_id to write with, so that narrower case is still honestly skipped, not guessed - same reasoning as the original PEN-024 finding, just closed for the real, common path now. Both routes gained a `requireCurrentUserId()` call (stock_ledger.user_id is a NOT NULL FK) alongside their existing `requirePermission`.
+
+**PEN-025 closed:** `rackMapCellColor` (`src/lib/rack-map.ts`) takes an optional `distinctBatchCount` on the occupant and returns `yellow` when it is greater than 1 (undefined/1 still reads as a single batch - never guessed as a mix). `GET /api/pallets` now runs one additional grouped query (`count(distinct batch_id)` over `pallet_batches`, grouped by `pallet_id`) and merges it into the response instead of N+1 per-pallet queries. The Rack Map page wires the count through to both the cell color and a new "Mix of N batches" line in the pallet-detail popup. Color precedence (undocumented by the flow document, decided and recorded in the module comment): BLOCKED/EMPTY first, then HOLD (an operator needs "do not touch" before contents detail), then the mix question, then plain partial/full.
+
+**Real browser verification, not just tests:** seeded a pallet with two distinct batches at one location via a throwaway script (`.env.local` moved aside per PEN-030 for the whole browser-verification step, restored immediately after), started a real server, and screenshotted the Rack Map - the fixture cell renders yellow, distinct from every other color, and clicking it opens the real popup showing "Mix of 2 batches". Fixture data cleaned up afterward (no ledger reference was ever created for it, so it was fully deletable, unlike this repository's permanent live-test fixtures).
+
+**A genuine test-design bug, found and fixed before commit:** the first version of the new putaway/move ledger tests (`tests/unit/mutations-live.test.ts`) asserted `rows.length === 1` for a query filtered by a deterministic, find-or-create pallet+location pair. That passed in isolation but failed on a full-suite run, because `stock_ledger` is append-only and this repository's local D1 file persists across separate `npx vitest run` invocations - re-running the file (as the full suite does, alongside every other file) adds one more matching row on top of whatever earlier runs left behind, so an exact-count assertion was wrong on its face, not flaky. Fixed by asserting "at least one row exists with exactly these values" instead (`toContainEqual(expect.objectContaining(...))`), the same shape of fix `stock-ledger-read.test.ts` already had to apply to its own count assertions - not a new pattern invented here, but the same one applied properly.
+
+**A second, previously-latent test bug this loop's own new rows finally exposed:** `stock-ledger-read.test.ts`'s "returns the fixture entries with the joined material code" test assumed its own fixture rows would always be visible on page 1 of `GET /api/stock/ledger`'s default (no filter, newest-first, 25-per-page) listing. That held only while total accumulated `stock_ledger` rows across this repository's ~13 loops of live-mutation tests stayed under 25 - by this loop it no longer does (partly *because of* this loop's own new putaway/move ledger rows, which are newer and push the older LFG00005 fixture off page 1). The route has no material/pallet filter to page down to that fixture with, so the fix splits the test: the join itself is now proven generically against whatever page 1 actually holds (every entry must carry a non-empty materialCode), and the fixture's own persistence is proven with a direct DB read, independent of pagination.
+
+Commands run, in order, with results:
+1. `npx tsc --noEmit` -> exit 0.
+2. `npx vitest run` -> **144/144 passed**, run twice for stability (both clean); includes 3 new tests in `rack-map.test.ts`, a new "Putaway/move write real stock_ledger rows" block in `mutations-live.test.ts`, and the fixed pagination-independent assertions in `stock-ledger-read.test.ts`.
+3. `npm run build` -> exit 0, `/api/pallets` and both storage mutation routes unchanged in the route table shape.
+4. Real dev/prod server + a throwaway seed/screenshot script (see evidence above) -> Rack Map yellow color visually confirmed, not just asserted by a unit test.
+5. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npx playwright test` (`.env.local` moved aside per PEN-030, restored immediately after) -> **42/42 passed**, unchanged pass count, no regressions from the ledger-write changes.
+6. Harness checks: contract-guard, protected-integrity, yaml-lexical-guard PASS; static-guard shows the same 3 pre-existing PEN-022 findings, no new ones (both mutation routes still call `requirePermission`).
+
+**A real environment red herring, investigated and correctly root-caused rather than worked around:** the first `npx playwright test` run of this loop failed all 18 tests with `ERR_TUNNEL_CONNECTION_FAILED`/`ERR_CERT_AUTHORITY_INVALID` on every `page.goto`. Before concluding "new sandbox bug", checked this repository's own prior finding first (PEN-030): `.env.local` still held real Clerk keys from Loop 29, and this loop simply forgot the documented "move `.env.local` aside before `playwright test`" step every prior loop's command log already carries. Confirmed by moving it aside and re-running clean (42/42) - not a new defect, an omitted known step. Kept one small, independently-correct hardening from the investigation: `playwright.config.ts`'s chromium project now launches with `--no-proxy-server`, since this suite only ever talks to `127.0.0.1` and never needs this environment's egress proxy.
+
+Not resolved this loop, unrelated to PEN-024/025: TASK-006 (Hold Management) and the rest of the un-started task list remain exactly as PEN-014's own dependency trace already described.
+
+**Free-only confirmation:** no paid action, no new dependency, no deployment. Vercel: still NOT DEPLOYED.
+
 ## Architecture Decisions Log
 | Date | Decision | Status |
 |------|----------|--------|

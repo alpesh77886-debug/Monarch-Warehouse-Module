@@ -22,6 +22,7 @@ type Pallet = {
   statusCode: string;
   totalCartons: number;
   totalWeightKg: number;
+  distinctBatchCount: number;
 };
 
 type LoadState = "loading" | "ready" | "error";
@@ -32,6 +33,10 @@ const COLOR_CLASSES: Record<RackMapColor, string> = {
   blue: "bg-sky-light border-sky text-sky",
   orange: "bg-warning-light border-warning text-warning",
   grey: "bg-line border-muted2 text-muted",
+  // Tailwind's default "yellow" scale (not the "warning" design token,
+  // which is already amber-ish and used for orange/HOLD above - reusing
+  // it here would make mix and hold look the same color).
+  yellow: "bg-yellow-100 border-yellow-500 text-yellow-700",
 };
 
 export default function RackMapPage() {
@@ -165,7 +170,12 @@ export default function RackMapPage() {
                   <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
                     {blockLocations.map((loc) => {
                       const occupant = loc.currentPalletId ? palletById.get(loc.currentPalletId) ?? null : null;
-                      const color = rackMapCellColor(loc, occupant ? { statusCode: occupant.statusCode } : null);
+                      const color = rackMapCellColor(
+                        loc,
+                        occupant
+                          ? { statusCode: occupant.statusCode, distinctBatchCount: occupant.distinctBatchCount }
+                          : null
+                      );
                       const isMatch = matchesSearch(loc);
                       return (
                         <button
@@ -238,6 +248,9 @@ function PalletDetailPopup({
               {pallet.totalCartons} cartons | {pallet.totalWeightKg} kg
             </div>
             <div>Pallet status: {pallet.statusCode}</div>
+            {pallet.distinctBatchCount > 1 ? (
+              <div className="font-bold text-yellow-700">Mix of {pallet.distinctBatchCount} batches</div>
+            ) : null}
           </div>
         ) : (
           <div className="mt-3 text-sm text-muted">No pallet at this location.</div>

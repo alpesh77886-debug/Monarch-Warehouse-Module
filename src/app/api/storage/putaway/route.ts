@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { locations, pallets, materials } from "../../../../../drizzle/schema";
-import { requirePermission } from "@/lib/auth";
+import { locations, pallets, materials, palletBatches, stockLedger } from "../../../../../drizzle/schema";
+import { requirePermission, requireCurrentUserId } from "@/lib/auth";
 import { assignPalletSchema } from "@/lib/validations/putaway";
 import {
   UnauthorizedError,
@@ -42,17 +42,26 @@ function errorResponse(err: unknown) {
  * endpoint intentionally refuses that case rather than silently
  * reassigning without a reason.
  *
- * No stock_ledger entry is written here - see PEN-024 in
- * docs/PENDING_ITEMS.md: stock_ledger.batch_id is NOT NULL, but the
- * pallet-to-batch relationship (the architecture blueprint's own
- * Pallet-Batch junction, ENTITY-004) has no table yet (PEN-014), so
- * there is no real batch_id to write - guessing one would put
- * permanently-wrong data in an append-only ledger, which is worse
- * than not writing the row yet.
+ * **Loop 37 update (closes PEN-024):** now writes one append-only
+ * stock_ledger MOVE row per pallet_batches entry the pallet carries
+ * (usually one - see receiving-sheet-lock.ts, which is how every
+ * pallet gets its first pallet_batches row today). qty/weight do not
+ * change on a plain location assignment, so qty_change/weight_change
+ * are 0 and qty_after/weight_after just restate the batch's own
+ * carton_qty/weight_kg - the ledger row exists to make the location
+ * itself traceable (Flow 2's "location history per pallet must be
+ * traceable"), not to record a quantity movement. A pallet with no
+ * pallet_batches row at all (a pre-Loop-35 fixture, or any pallet
+ * inserted directly rather than through the Receiving Sheet flow) has
+ * no real batch_id to write with - writing a fabricated one into an
+ * append-only ledger is still worse than not writing the row, so that
+ * case is silently skipped, same reasoning as the original PEN-024
+ * finding, just narrower in scope now.
  */
 export async function POST(request: NextRequest) {
   try {
     await requirePermission("putaway.confirm_location");
+    const currentUserId = await requireCurrentUserId();
 
     const body = await request.json();
     const parsed = assignPalletSchema.safeParse(body);
@@ -83,6 +92,7 @@ export async function POST(request: NextRequest) {
       occupant
     );
 
+    const today = new Date().toISOString().slice(0, 10);
     db.transaction((tx) => {
       tx.update(locations)
         .set({ status: newStatus, currentPalletId: pallet.id })
@@ -94,6 +104,32 @@ export async function POST(request: NextRequest) {
         .set({ currentLocationId: location.id, currentWarehouseId: location.warehouseId })
         .where(eq(pallets.id, pallet.id))
         .run();
+
+      const batchRows = tx.select().from(palletBatches).where(eq(palletBatches.palletId, pallet.id)).all();
+      for (const batchRow of batchRows) {
+        tx.insert(stockLedger)
+          .values({
+            id: crypto.randomUUID(),
+            date: today,
+            shift: "NA",
+            transactionType: "MOVE",
+            materialId: pallet.materialId,
+            batchId: batchRow.batchId,
+            palletId: pallet.id,
+            locationId: location.id,
+            warehouseId: location.warehouseId,
+            qtyChange: 0,
+            qtyAfter: batchRow.cartonQty,
+            weightChangeKg: 0,
+            weightAfterKg: batchRow.weightKg,
+            statusBefore: pallet.statusCode,
+            statusAfter: pallet.statusCode,
+            referenceType: "MANUAL_MOVE",
+            referenceId: pallet.id,
+            userId: currentUserId,
+          })
+          .run();
+      }
     });
 
     const [updatedPallet] = await db.select().from(pallets).where(eq(pallets.id, pallet.id));

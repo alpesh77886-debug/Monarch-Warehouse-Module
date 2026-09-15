@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { locations, pallets, materials } from "../../../../../drizzle/schema";
-import { requirePermission } from "@/lib/auth";
+import { locations, pallets, materials, palletBatches, stockLedger } from "../../../../../drizzle/schema";
+import { requirePermission, requireCurrentUserId } from "@/lib/auth";
 import { movePalletSchema } from "@/lib/validations/putaway";
 import {
   UnauthorizedError,
@@ -38,13 +38,18 @@ function errorResponse(err: unknown) {
  * Move an already-located pallet to a new location (Flow 2 Step 4:
  * "select pallet -> select new location -> confirm", with a mandatory
  * reason - "Reason for move recorded"). Frees the pallet's previous
- * location back to EMPTY as part of the same transaction. See the
- * putaway route's module comment for why no stock_ledger row is
- * written yet (PEN-024).
+ * location back to EMPTY as part of the same transaction. **Loop 37
+ * update (closes PEN-024):** also writes one append-only stock_ledger
+ * MOVE row per pallet_batches entry, same shape as the putaway route -
+ * see its module comment for the qty/weight-unchanged reasoning and
+ * the no-pallet_batches-row skip case. The one real difference here:
+ * "Reason for move recorded" lands in the ledger row's own `remarks`
+ * column, since that column exists for exactly this.
  */
 export async function POST(request: NextRequest) {
   try {
     await requirePermission("putaway.move_pallet");
+    const currentUserId = await requireCurrentUserId();
 
     const body = await request.json();
     const parsed = movePalletSchema.safeParse(body);
@@ -82,6 +87,7 @@ export async function POST(request: NextRequest) {
       occupant
     );
 
+    const today = new Date().toISOString().slice(0, 10);
     db.transaction((tx) => {
       if (previousLocation) {
         tx.update(locations)
@@ -97,6 +103,33 @@ export async function POST(request: NextRequest) {
         .set({ currentLocationId: newLocation.id, currentWarehouseId: newLocation.warehouseId })
         .where(eq(pallets.id, pallet.id))
         .run();
+
+      const batchRows = tx.select().from(palletBatches).where(eq(palletBatches.palletId, pallet.id)).all();
+      for (const batchRow of batchRows) {
+        tx.insert(stockLedger)
+          .values({
+            id: crypto.randomUUID(),
+            date: today,
+            shift: "NA",
+            transactionType: "MOVE",
+            materialId: pallet.materialId,
+            batchId: batchRow.batchId,
+            palletId: pallet.id,
+            locationId: newLocation.id,
+            warehouseId: newLocation.warehouseId,
+            qtyChange: 0,
+            qtyAfter: batchRow.cartonQty,
+            weightChangeKg: 0,
+            weightAfterKg: batchRow.weightKg,
+            statusBefore: pallet.statusCode,
+            statusAfter: pallet.statusCode,
+            referenceType: "MANUAL_MOVE",
+            referenceId: pallet.id,
+            userId: currentUserId,
+            remarks: parsed.data.reason,
+          })
+          .run();
+      }
     });
 
     const [updatedPallet] = await db.select().from(pallets).where(eq(pallets.id, pallet.id));

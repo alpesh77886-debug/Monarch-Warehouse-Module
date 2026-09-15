@@ -29,4 +29,25 @@ describe("rackMapCellColor (Loop 25 / SCREEN-003 legend)", () => {
   it("PARTIAL with a HOLD pallet -> orange (hold takes priority over partial)", () => {
     expect(rackMapCellColor({ status: "PARTIAL" }, { statusCode: "HOLD" })).toBe("orange");
   });
+
+  // Loop 37 / PEN-025: the sixth legend color, unblocked by pallet_batches.
+  it("OCCUPIED with a 2-distinct-batch pallet -> yellow (mix)", () => {
+    expect(rackMapCellColor({ status: "OCCUPIED" }, { statusCode: "OK", distinctBatchCount: 2 })).toBe("yellow");
+  });
+
+  it("PARTIAL with a 2-distinct-batch pallet -> yellow (mix takes priority over plain partial)", () => {
+    expect(rackMapCellColor({ status: "PARTIAL" }, { statusCode: "OK", distinctBatchCount: 2 })).toBe("yellow");
+  });
+
+  it("OCCUPIED with a single-batch pallet -> red, not yellow", () => {
+    expect(rackMapCellColor({ status: "OCCUPIED" }, { statusCode: "OK", distinctBatchCount: 1 })).toBe("red");
+  });
+
+  it("OCCUPIED with an unknown batch count (legacy pallet, no pallet_batches row) -> red, not guessed as a mix", () => {
+    expect(rackMapCellColor({ status: "OCCUPIED" }, { statusCode: "OK" })).toBe("red");
+  });
+
+  it("HOLD still wins over a mix - orange, not yellow", () => {
+    expect(rackMapCellColor({ status: "OCCUPIED" }, { statusCode: "HOLD", distinctBatchCount: 2 })).toBe("orange");
+  });
 });

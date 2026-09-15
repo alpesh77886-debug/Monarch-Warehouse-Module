@@ -234,13 +234,41 @@ beforeAll(async () => {
 });
 
 describe("GET /api/stock/ledger - real query against local D1", () => {
-  it("returns the fixture entries with the joined material code", async () => {
+  /**
+   * Loop 37 fix: this used to assert the fixture's own rows appear on
+   * page 1 of the default (no-filter, newest-first) listing. That
+   * held only while the shared local D1 file's total stock_ledger row
+   * count stayed under one page (25) - by Loop 37 it no longer does
+   * (many other live-mutation tests, including Loop 37's own new
+   * putaway/move ledger tests, have since added far more real rows,
+   * all newer than this fixture's fixed 2026-09-14 date). The route
+   * has no material/pallet filter to page down to this fixture with,
+   * so the join itself is now proven generically against whatever
+   * page 1 actually holds, and the fixture's own persistence is
+   * proven with a direct DB read instead of through pagination.
+   */
+  it("returns entries with the joined material code (join proven generically, not tied to this fixture's page)", async () => {
     const res = await getLedger(getRequest("/api/stock/ledger"));
     const body = await res.json();
     expect(res.status, JSON.stringify(body)).toBe(200);
     expect(body.total).toBeGreaterThanOrEqual(5);
-    const fixtureRows = body.entries.filter((e: { materialCode: string }) => e.materialCode === MATERIAL_CODE);
-    expect(fixtureRows.length).toBeGreaterThan(0);
+    expect(body.entries.length).toBeGreaterThan(0);
+    for (const entry of body.entries) {
+      expect(typeof entry.materialCode).toBe("string");
+      expect(entry.materialCode.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("the fixture's own rows are really persisted with the right material (direct DB read, page-independent)", async () => {
+    const rows = await db
+      .select({ materialCode: materials.code })
+      .from(stockLedger)
+      .innerJoin(materials, eq(stockLedger.materialId, materials.id))
+      .where(eq(stockLedger.palletId, palletId));
+    expect(rows.length).toBeGreaterThanOrEqual(5);
+    for (const row of rows) {
+      expect(row.materialCode).toBe(MATERIAL_CODE);
+    }
   });
 
   it("filters by transaction_type", async () => {
