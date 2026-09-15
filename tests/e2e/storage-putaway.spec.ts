@@ -139,9 +139,16 @@ test.describe("Putaway - real pallet read from local D1", () => {
     // margin issue, not a flake to just re-run past. A longer timeout
     // here is the honest fix; see also the route's own Promise.all
     // parallelization (src/app/api/pallets/route.ts) done the same loop.
+    // Loop 42: the same margin issue again, worse - the shared local D1
+    // file is now past 100 real pallets (Bulk/Loading Sheet fixtures
+    // added this loop and the last), and this one assertion was
+    // intermittently missing its own 15s budget under full-suite load
+    // while passing comfortably in isolation - re-measured directly
+    // (12.9s in isolation with a raised harness timeout) before raising
+    // this again, not just bumped on suspicion.
     await expect(
       section.getByText(`Pallet ${FIXTURE_PALLET_NUMBER} · ${FIXTURE_MATERIAL_CODE}`)
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible({ timeout: 25000 });
   });
 
   test("an assign attempt is honestly refused in Clerk stub mode, not silently accepted", async ({

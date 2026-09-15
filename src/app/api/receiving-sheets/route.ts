@@ -5,6 +5,7 @@ import { receivingSheets, materials } from "../../../../drizzle/schema";
 import { requirePermission } from "@/lib/auth";
 import { receivingSheetCreateSchema } from "@/lib/validations/receiving-sheet";
 import { validateBatchNumberFormat } from "@/lib/business-rules/receiving-sheet";
+import { assertBulkReasonConsistency } from "@/lib/business-rules/bulk";
 import {
   UnauthorizedError,
   ForbiddenError,
@@ -62,6 +63,8 @@ export async function GET() {
         totalBoxes: receivingSheets.totalBoxes,
         status: receivingSheets.status,
         defaultPalletStatus: receivingSheets.defaultPalletStatus,
+        bulkReason: receivingSheets.bulkReason,
+        originalBulkPalletId: receivingSheets.originalBulkPalletId,
         createdAt: receivingSheets.createdAt,
       })
       .from(receivingSheets)
@@ -99,6 +102,7 @@ export async function POST(request: NextRequest) {
       throw new ValidationError(parsed.error.issues.map((i) => i.message).join("; "));
     }
     validateBatchNumberFormat(parsed.data.batchNumber);
+    assertBulkReasonConsistency(parsed.data.defaultPalletStatus, parsed.data.bulkReason);
 
     const db = getDb();
     const [material] = await db.select().from(materials).where(eq(materials.id, parsed.data.materialId));
@@ -137,6 +141,7 @@ export async function POST(request: NextRequest) {
         materialId: parsed.data.materialId,
         batchNumber: parsed.data.batchNumber,
         defaultPalletStatus: parsed.data.defaultPalletStatus,
+        bulkReason: parsed.data.bulkReason ?? null,
         status: "DRAFT",
       });
     } catch (e) {

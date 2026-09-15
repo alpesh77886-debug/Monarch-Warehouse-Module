@@ -341,6 +341,14 @@ export const receivingSheets = sqliteTable(
     warehouseConfirmedAt: text("warehouse_confirmed_at"),
     status: text("status").notNull().default("DRAFT"),
     defaultPalletStatus: text("default_pallet_status").notNull().default("QC_HOLD"),
+    // Loop 42 / TASK-007 (Bulk Management, Flow 3 Step 7): both nullable,
+    // used only when defaultPalletStatus is 'BULK' (bulkReason) or when
+    // this sheet is itself a repack receipt (originalBulkPalletId) - see
+    // src/lib/business-rules/bulk.ts's own comment and PEN-040 in
+    // docs/PENDING_ITEMS.md for the disclosed reasoning (neither field
+    // exists on ENTITY-009's own contracted attribute list).
+    bulkReason: text("bulk_reason"),
+    originalBulkPalletId: text("original_bulk_pallet_id").references(() => pallets.id),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => ({
@@ -368,6 +376,14 @@ export const receivingSheets = sqliteTable(
     defaultPalletStatusCheck: check(
       "receiving_sheets_default_pallet_status_check",
       sql`${table.defaultPalletStatus} IN ('QC_HOLD','BULK')`
+    ),
+    // Loop 42 / TASK-007: the two values transcribed exactly from the
+    // domain entities contract's own fixed_hold_reasons list (ENTITY-011,
+    // already reused verbatim as HOLD_REASONS in hold.ts) - not a new,
+    // invented vocabulary.
+    bulkReasonCheck: check(
+      "receiving_sheets_bulk_reason_check",
+      sql`(${table.bulkReason} IS NULL OR ${table.bulkReason} IN ('Over-production (bulk)', 'Defective fries (bulk)'))`
     ),
     // NS-012 backstop: "Duplicate receiving sheet (same material+batch+
     // shift)" must be rejected. The API route checks this first for a

@@ -127,6 +127,20 @@ export function nextReceivingSheetStatus(
  * "receiving_sheet.create" permission the PATCH (edit) route already
  * uses, not a new, invented permission string.
  */
+/**
+ * sheet_number generated_format "RS-YYYY-MMDD-NNN" (ENTITY-009's own
+ * format string). Pulled out as its own pure function (Loop 42) so the
+ * new bulk-repack route can generate a repack receiving sheet's number
+ * with the exact same convention as the original create route, without
+ * duplicating the format string itself - only the DB query that counts
+ * today's existing sheets stays local to each route, same as
+ * loadingSheetNumberPrefix/nextLoadingSheetNumber's own split.
+ */
+export function receivingSheetNumberPrefix(date: string): string {
+  const [y, m, d] = date.split("-");
+  return `RS-${y}-${m}${d}-`;
+}
+
 export function assertCanCancel(current: ReceivingSheetStatus): void {
   if (current === "LOCKED") {
     throw new ValidationError("Locked sheets are immutable.");

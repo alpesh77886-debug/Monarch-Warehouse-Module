@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CARTON_CONDITIONS } from "../business-rules/receiving-sheet";
+import { BULK_REASONS } from "../business-rules/bulk";
 
 /**
  * Receiving Sheet validation (Loop 35 / TASK-004), transcribed from the
@@ -16,8 +17,25 @@ export const receivingSheetCreateSchema = z.object({
   materialId: z.string().trim().min(1, "Material is required."),
   batchNumber: z.string().trim().min(1, "Batch number is required."),
   defaultPalletStatus: z.enum(["QC_HOLD", "BULK"]).default("QC_HOLD"),
+  bulkReason: z.enum(BULK_REASONS).nullable().optional(),
 });
 export type ReceivingSheetCreateInput = z.infer<typeof receivingSheetCreateSchema>;
+
+// Loop 42 / TASK-007: the repack-receipt route's own body - the header
+// fields a new receiving sheet needs, minus defaultPalletStatus/
+// bulkReason (a repack sheet is always QC_HOLD per the flow document's
+// own "new QC hold" wording - not a user choice, see the route's
+// comment) and minus batchNumber (the flow document's own scenario
+// allows "new batch reference (or same batch)" - left as the same
+// required field here, unchanged from the normal create schema, not a
+// second invented shape).
+export const bulkRepackCreateSchema = z.object({
+  date: z.string().trim().min(1, "Date is required."),
+  shift: z.enum(["A", "B", "C"]),
+  line: z.enum(["FF", "SPECIALITY"]),
+  batchNumber: z.string().trim().min(1, "Batch number is required."),
+});
+export type BulkRepackCreateInput = z.infer<typeof bulkRepackCreateSchema>;
 
 export const receivingSheetUpdateSchema = z.object({
   date: z.string().trim().min(1).optional(),

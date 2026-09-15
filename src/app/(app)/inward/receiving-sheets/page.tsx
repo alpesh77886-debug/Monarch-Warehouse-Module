@@ -19,9 +19,13 @@ type ReceivingSheetRow = {
   totalBoxes: number;
   status: "DRAFT" | "PENDING_PACKING" | "PENDING_WAREHOUSE" | "LOCKED" | "CANCELLED";
   defaultPalletStatus: "QC_HOLD" | "BULK";
+  bulkReason: string | null;
+  originalBulkPalletId: string | null;
 };
 
 type LoadState = "loading" | "ready" | "error";
+
+const BULK_REASONS = ["Over-production (bulk)", "Defective fries (bulk)"] as const;
 
 const EMPTY_FORM = {
   date: new Date().toISOString().slice(0, 10),
@@ -30,6 +34,7 @@ const EMPTY_FORM = {
   materialCode: "",
   batchNumber: "",
   defaultPalletStatus: "QC_HOLD" as "QC_HOLD" | "BULK",
+  bulkReason: BULK_REASONS[0] as (typeof BULK_REASONS)[number],
 };
 
 const STATUS_LABEL: Record<ReceivingSheetRow["status"], string> = {
@@ -114,6 +119,7 @@ export default function ReceivingSheetsPage() {
           materialId: material!.id,
           batchNumber: form.batchNumber.trim(),
           defaultPalletStatus: form.defaultPalletStatus,
+          bulkReason: form.defaultPalletStatus === "BULK" ? form.bulkReason : null,
         }),
       });
       const body = await res.json();
@@ -208,6 +214,21 @@ export default function ReceivingSheetsPage() {
                 <option value="BULK">Bulk (over-production)</option>
               </select>
             </Field>
+            {form.defaultPalletStatus === "BULK" ? (
+              <Field label="Bulk reason">
+                <select
+                  className={inputClass()}
+                  value={form.bulkReason}
+                  onChange={(e) => setForm({ ...form, bulkReason: e.target.value as typeof form.bulkReason })}
+                >
+                  {BULK_REASONS.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            ) : null}
 
             <div className="sm:col-span-2">
               {submitNotice ? (
@@ -263,6 +284,12 @@ export default function ReceivingSheetsPage() {
                     <div className="mt-1 text-xs text-muted">
                       {s.date} - Shift {s.shift} - {s.totalBoxes} pallet(s), {s.totalQty} cartons
                     </div>
+                    {s.bulkReason ? (
+                      <div className="mt-1 text-xs font-semibold text-accent">Bulk - {s.bulkReason}</div>
+                    ) : null}
+                    {s.originalBulkPalletId ? (
+                      <div className="mt-1 text-xs font-semibold text-accent">Repack receipt (linked to original bulk pallet)</div>
+                    ) : null}
                   </Link>
                 </li>
               ))}
