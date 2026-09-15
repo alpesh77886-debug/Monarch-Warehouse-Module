@@ -29,6 +29,20 @@
       "when": 1789360205507,
       "tag": "0003_youthful_gamora",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1789441468389,
+      "tag": "0004_yielding_fixer",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1789441482441,
+      "tag": "0005_receiving_sheet_locked_immutable",
+      "breakpoints": true
     }
   ]
 }

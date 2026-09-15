@@ -34,6 +34,18 @@ export class NotFoundError extends Error {
   }
 }
 
+// NS-011 (concurrent dual-confirmation race), NS-012 (duplicate receiving
+// sheet) - a real conflict with existing state, distinct from a plain
+// validation failure (422): the request is well-formed, but the resource
+// it targets already exists or has already moved on.
+export class ConflictError extends Error {
+  status = 409 as const;
+  constructor(message: string) {
+    super(message);
+    this.name = "ConflictError";
+  }
+}
+
 // Loop 21 finding: distinct from UnauthorizedError (401, "no session
 // presented") - this means the auth backend itself cannot verify any
 // session at all yet (Clerk stub mode has no real login, so nobody -

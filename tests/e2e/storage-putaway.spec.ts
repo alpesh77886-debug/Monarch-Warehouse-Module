@@ -33,11 +33,21 @@ test.describe.configure({ mode: "serial" });
 let warehouseId: string;
 let materialId: string;
 
+/**
+ * Only the pallet/location/warehouse fixture rows are ever deleted here
+ * - not the material. This test itself never writes to stock_ledger,
+ * but another live test can now legitimately reuse the same material
+ * code and create real (append-only, FK-locked) ledger rows against it
+ * - PEN-026's own precedent: once anything references a materials row
+ * this way, deleting it fails with a real foreign-key error, and that
+ * is correct database behavior, not a bug to route around. Find-or-
+ * create for the material, same as every other live test that has
+ * already hit this.
+ */
 async function cleanup() {
   const db = getDb();
   await db.delete(pallets).where(eq(pallets.palletNumber, FIXTURE_PALLET_NUMBER));
   await db.delete(locations).where(eq(locations.fullCode, FIXTURE_LOCATION_CODE));
-  await db.delete(materials).where(eq(materials.code, FIXTURE_MATERIAL_CODE));
   await db.delete(warehouses).where(eq(warehouses.code, FIXTURE_WAREHOUSE_CODE));
 }
 
@@ -56,20 +66,25 @@ test.beforeAll(async () => {
     active: 1,
     createdAt: new Date().toISOString(),
   });
-  materialId = crypto.randomUUID();
-  await db.insert(materials).values({
-    id: materialId,
-    code: FIXTURE_MATERIAL_CODE,
-    description: "E2E fixture material (Loop 24)",
-    uomKgPerCarton: 10,
-    category: "E2E-FIXTURE",
-    palletWeightLimitKg: 1000,
-    palletType: "CARTON",
-    plantOrigin: "LIMBASI",
-    active: 1,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  });
+  const [existingMaterial] = await db.select().from(materials).where(eq(materials.code, FIXTURE_MATERIAL_CODE));
+  if (existingMaterial) {
+    materialId = existingMaterial.id;
+  } else {
+    materialId = crypto.randomUUID();
+    await db.insert(materials).values({
+      id: materialId,
+      code: FIXTURE_MATERIAL_CODE,
+      description: "E2E fixture material (Loop 24)",
+      uomKgPerCarton: 10,
+      category: "E2E-FIXTURE",
+      palletWeightLimitKg: 1000,
+      palletType: "CARTON",
+      plantOrigin: "LIMBASI",
+      active: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  }
   await db.insert(pallets).values({
     id: crypto.randomUUID(),
     palletNumber: FIXTURE_PALLET_NUMBER,

@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, check } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, check, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
 /**
@@ -32,8 +32,8 @@ export const users = sqliteTable("users", {
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
-// Minimal Warehouse Master shape (architecture-blueprint prose, ENTITY-006 -
-// not yet in the formal entities contract; see PEN-014).
+// Warehouse Master (ENTITY-006 - formally contracted since Loop 34, see
+// PEN-014; this table already matched the contract's shape once applied).
 export const warehouses = sqliteTable(
   "warehouses",
   {
@@ -286,6 +286,134 @@ export const stockLedger = sqliteTable(
     referenceTypeCheck: check(
       "stock_ledger_reference_type_check",
       sql`${table.referenceType} IN ('RECEIVING_SHEET','TRANSFER_ORDER','LOADING_SHEET','HOLD_RECORD','MANUAL_MOVE','CYCLE_COUNT')`
+    ),
+  })
+);
+
+// ENTITY-004 Pallet-Batch junction (Loop 35 / TASK-004) - now formally
+// contracted (Loop 34 closed PEN-014/017). Lets one pallet carry more than
+// one batch of the SAME material (INV-006 extension), and is the missing
+// link PEN-024/025 already identified: without this table, putaway/move
+// had no real batch_id to write a stock_ledger row with. This is what
+// unblocks that gap, not a new invented relationship.
+export const palletBatches = sqliteTable(
+  "pallet_batches",
+  {
+    id: text("id").primaryKey(),
+    palletId: text("pallet_id")
+      .notNull()
+      .references(() => pallets.id),
+    batchId: text("batch_id")
+      .notNull()
+      .references(() => batches.id),
+    cartonQty: integer("carton_qty").notNull(),
+    weightKg: real("weight_kg").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  }
+);
+
+// ENTITY-009 Receiving Sheet (Loop 35 / TASK-004). `batchNumber` is a plain
+// text field here, not a `batches` FK - matching the entities contract
+// exactly, which lists it as `type: text` rather than `references: batches`.
+// The application layer finds-or-creates the real `batches` row (by its
+// unique batch_number) only once the sheet locks, per the flow document's
+// own Step 4 - a DRAFT sheet may reference a batch number that does not
+// exist as a row yet.
+export const receivingSheets = sqliteTable(
+  "receiving_sheets",
+  {
+    id: text("id").primaryKey(),
+    sheetNumber: text("sheet_number").notNull().unique(),
+    date: text("date").notNull(),
+    shift: text("shift").notNull(),
+    line: text("line").notNull(),
+    materialId: text("material_id")
+      .notNull()
+      .references(() => materials.id),
+    batchNumber: text("batch_number").notNull(),
+    totalQty: integer("total_qty").notNull().default(0),
+    totalBoxes: integer("total_boxes").notNull().default(0),
+    packingSupervisorId: text("packing_supervisor_id").references(() => users.id),
+    packingOperatorId: text("packing_operator_id").references(() => users.id),
+    warehouseExecutiveId: text("warehouse_executive_id").references(() => users.id),
+    warehouseOperatorId: text("warehouse_operator_id").references(() => users.id),
+    packingConfirmedAt: text("packing_confirmed_at"),
+    warehouseConfirmedAt: text("warehouse_confirmed_at"),
+    status: text("status").notNull().default("DRAFT"),
+    defaultPalletStatus: text("default_pallet_status").notNull().default("QC_HOLD"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => ({
+    shiftCheck: check("receiving_sheets_shift_check", sql`${table.shift} IN ('A','B','C')`),
+    lineCheck: check("receiving_sheets_line_check", sql`${table.line} IN ('FF','SPECIALITY')`),
+    // Coarse shape check only, same convention as the batches table's own
+    // batch_number check - the full regex is enforced in the application
+    // layer (Zod), not invented here.
+    batchNumberShapeCheck: check(
+      "receiving_sheets_batch_number_shape_check",
+      sql`(${table.batchNumber} LIKE 'L%' AND length(${table.batchNumber}) >= 9)`
+    ),
+    statusCheck: check(
+      "receiving_sheets_status_check",
+      // Matches the entities contract's own check_constraint for this
+      // field exactly (4 values, no CANCELLED) - see PEN-033 for the
+      // disclosed discrepancy against workflows.yaml's 5-state machine,
+      // which lists a CANCELLED state this contract's own CHECK constraint
+      // does not; TASK-004's IN SCOPE bullets never mention cancel either,
+      // so it is out of this loop's bounded scope, not silently dropped.
+      sql`${table.status} IN ('DRAFT','PENDING_PACKING','PENDING_WAREHOUSE','LOCKED')`
+    ),
+    defaultPalletStatusCheck: check(
+      "receiving_sheets_default_pallet_status_check",
+      sql`${table.defaultPalletStatus} IN ('QC_HOLD','BULK')`
+    ),
+    // NS-012 backstop: "Duplicate receiving sheet (same material+batch+
+    // shift)" must be rejected. The API route checks this first for a
+    // clean 409 message; this unique index is the database-level
+    // guarantee for the same race-condition reason stock_ledger's own
+    // triggers exist - a bug or a future code path cannot silently
+    // create a second sheet for the same material+batch+shift even if
+    // the app-layer check is ever bypassed.
+    materialBatchShiftUnique: uniqueIndex("receiving_sheets_material_batch_shift_unique").on(
+      table.materialId,
+      table.batchNumber,
+      table.shift
+    ),
+  })
+);
+
+// ENTITY-010 Receiving Sheet Pallet (Loop 35 / TASK-004) - one row per
+// physical pallet entered on a receiving sheet (NS-019: max 35 per sheet).
+export const receivingSheetPallets = sqliteTable(
+  "receiving_sheet_pallets",
+  {
+    id: text("id").primaryKey(),
+    receivingSheetId: text("receiving_sheet_id")
+      .notNull()
+      .references(() => receivingSheets.id),
+    srNo: integer("sr_no").notNull(),
+    palletNumber: text("pallet_number").notNull(),
+    qty: integer("qty").notNull(),
+    receivingTime: text("receiving_time").notNull(),
+    cartonCondition: text("carton_condition").notNull().default("OK"),
+    temperatureC: real("temperature_c"),
+    remarks: text("remarks"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => ({
+    cartonConditionCheck: check(
+      "receiving_sheet_pallets_carton_condition_check",
+      sql`${table.cartonCondition} IN ('OK','BULGING','DAMAGED','WET','SHORT_QUANTITY','OTHER')`
+    ),
+    srNoPositiveCheck: check("receiving_sheet_pallets_sr_no_positive_check", sql`${table.srNo} >= 1`),
+    // "sequential 1-35" (the contract's own validation note) - two rows
+    // can't both be "row 3" of the same sheet; the 1-35 upper bound and
+    // true sequencing are enforced in the application layer, where the
+    // sheet's other rows are already loaded and the 35-row cap (NS-019)
+    // is checked.
+    sheetSrNoUnique: uniqueIndex("receiving_sheet_pallets_sheet_sr_no_unique").on(
+      table.receivingSheetId,
+      table.srNo
     ),
   })
 );

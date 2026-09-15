@@ -1,6 +1,6 @@
 # Project Progress Tracker
 ## IBF FG Warehouse Module
-## Last updated: 2026-09-15 (Loop 34 checkpoint)
+## Last updated: 2026-09-15 (Loop 35 checkpoint)
 
 ## Reading this document's "loop" numbering (PEN-016 clarification)
 
@@ -520,6 +520,43 @@ Verified the applied content thoroughly before merging anything: parsed it with 
 Merged the base branch's new commit into this branch (a real merge, not a rebase or history rewrite, per this repository's own branching rules) - clean, no conflicts, since this branch had never touched this file across all 33 prior loops and the base branch's only new commit was a pure addition to it. Re-ran the full guard set afterward: contract-guard, protected-integrity, and the YAML lexical guard all pass; `tsc --noEmit` is clean.
 
 **PEN-014 and PEN-017 are now formally resolved.** The contract folder's write protection itself was never weakened, bypassed, or disabled at any point across the roughly two dozen loops this gap spanned - every attempted write from inside this session was denied, exactly as designed, and the actual unblock came the only way it safely could: a human applying an already-fully-verified change outside the tool-mediated boundary. TASK-004 (Receiving Sheet), TASK-006 (Hold Management), TASK-007 (Bulk Management), TASK-008 (Dispatch/Loading), TASK-009 (Transfers), and TASK-010 (Maintenance) are all unblocked as of this loop, along with the previously-identified downstream items (TASK-011's remaining bullets, TASK-012's Dashboard, TASK-013's FIFO work, most of TASK-014's golden/negative scenario coverage) - though each of those still needs its own real implementation loop, not automatically completed by this contract merge alone.
+
+**Free-only confirmation:** no paid action, no new dependency, no deployment. Vercel: still NOT DEPLOYED.
+
+## Loop 35 Checkpoint (window 4 continued - TASK-004 Receiving Sheet flow, backend complete and tested)
+
+First real engineering loop since PEN-014/017 closed. Built the full Receiving Sheet backend (Flow 1): schema, migrations, business rules, validation, five API routes, and the lock-time materialization that finally closes PEN-024's real gap (a genuine Pallet-Batch relationship and real stock_ledger writes).
+
+| Loop | Objective | Commit | Result |
+|---|---|---|---|
+| 35 | TASK-004 backend: receiving_sheets + receiving_sheet_pallets + pallet_batches tables and migrations; the full dual-confirmation state machine (workflows.yaml's own receiving_sheet_status); dispute-prevention validation (GS-008); lock-time materialization (real batch/pallet/pallet_batches/stock_ledger rows); 5 new API routes; a new requireCurrentUserId() auth primitive; 35 new tests | (this commit) | Done. See evidence below |
+
+### Loop 35 evidence
+
+**Schema:** `pallet_batches` (ENTITY-004), `receiving_sheets` (ENTITY-009), `receiving_sheet_pallets` (ENTITY-010) added to `drizzle/schema.ts`, matching the now-applied entities contract field-for-field. Two new migrations: `0004_yielding_fixer.sql` (drizzle-kit generated) and a hand-written `0005_receiving_sheet_locked_immutable.sql` (INV-008's own DB trigger, same pattern as stock_ledger's append-only triggers from migration 0001, but conditional on `OLD.status = 'LOCKED'` since a receiving sheet is genuinely editable before that). Both applied to local D1 and verified.
+
+**Business rules** (`src/lib/business-rules/receiving-sheet.ts`): batch number format validation (NS-018), production-date derivation from the batch number (ENTITY-002's own "derived from batch_number" rule, verified against the entities contract's own worked example), carton-condition/remarks dispute-prevention validation (GS-008), the 35-pallet cap (NS-019), the temperature warning threshold (Flow 1 Step 2), and a pure state-machine function transcribed exactly from workflows.yaml's own `receiving_sheet_status` transitions - no transition accepted that is not explicitly listed there.
+
+**Lock-time materialization** (`src/lib/receiving-sheet-lock.ts`) - the real payoff of PEN-014/017 closing: on the second confirmation, in the same DB transaction, finds-or-creates the real `batches` row, creates one real `pallets` row and one `pallet_batches` row per pallet line, and writes one real, append-only `stock_ledger` INWARD row per pallet - closing PEN-024's exact gap (putaway/move never had a real batch_id to write with, because nothing in this app ever created a pallet-with-a-batch before now). Two disclosed, evidence-grounded assumptions where the contract is silent - not silently guessed - recorded as PEN-034 (new pallets default to PLASTIC, matching every pallet fixture already in this repository) and PEN-035 (the pallet's warehouse is resolved from the material's own plant_origin, since Receiving Sheet has no warehouse field at all - resolves for LIMBASI today, throws a clear, honest error for SABARKANTHA since no such warehouse is seeded, PEN-008).
+
+**New auth primitive** (`requireCurrentUserId` in `src/lib/auth.ts`): a real, previously-nonexistent need surfaced by actually trying to write a `stock_ledger.user_id` (NOT NULL FK) for the first time in this repository's history - resolves the signed-in Clerk session to its real local `users.id` row (not the role, not Clerk's own id), and throws rather than fabricate a user reference into an append-only ledger if no synced user row exists yet (PEN-010's still-unbuilt webhook).
+
+**5 new API routes**, all real transactions against local D1, not stubs: `POST/GET /api/receiving-sheets` (create + list, NS-012 duplicate check, auto-generated RS-YYYY-MMDD-NNN sheet numbers), `GET/PATCH /api/receiving-sheets/[id]` (detail with pallet rows; DRAFT-only edit, NS-006's exact 403 for a LOCKED sheet), `POST /api/receiving-sheets/[id]/pallets` (add a pallet row, running totals, NS-019/GS-008 enforced), `POST .../confirm-packing` and `POST .../confirm-warehouse` (the two workflow actions; NS-011's race condition handled with a conditional UPDATE checking the affected-row count, not just a plain read-then-write).
+
+**A genuine, caught-by-its-own-test bug, fixed before commit:** the first version of the sheet-number generator duplicated the year segment (`RS-2026-20260907-001` instead of `RS-2026-0907-001`) - caught by the live integration test's own regex assertion, not manual inspection.
+
+**A genuine test-fixture collision, found and fixed:** this loop's own new live test initially reused a material code (`LFG00003`) already owned by `tests/e2e/storage-putaway.spec.ts`. Once this loop's test wrote real, permanent (append-only-ledger-referenced) rows against that code, the E2E spec's own delete-then-recreate cleanup started failing with a real foreign-key error - caught by re-running the full E2E suite, not assumed safe. Fixed at the root, both ways: this loop's own test now uses an unused code (`LFG00006`, cross-checked against every other fixture code in this repository, including the 972 real seeded materials), and `storage-putaway.spec.ts` was hardened to find-or-create its material rather than delete-then-recreate it - the same PEN-026 pattern this repository's other live tests already had to adopt, now applied proactively rather than waiting for the next collision.
+
+Commands run, in order, with results:
+1. `npx drizzle-kit generate` -> `0004_yielding_fixer.sql`; `npx drizzle-kit generate --custom --name=receiving_sheet_locked_immutable` -> `0005_receiving_sheet_locked_immutable.sql` (hand-written trigger content).
+2. `npx wrangler d1 migrations apply DB --local` -> both applied cleanly.
+3. `npx tsc --noEmit` -> exit 0 (checked repeatedly through the loop, not only at the end).
+4. `npm run build` -> exit 0, all 5 new routes show `ƒ Dynamic` correctly, no new route-table regressions.
+5. `npx vitest run` -> **134/134 passed across 16 files** (22 new pure business-rule tests, 13 new live-transaction tests against real local D1).
+6. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npx playwright test` (with `.env.local` moved aside per the still-standing PEN-030 constraint) -> **34/34 passed**, unchanged pass count but including the fixture-collision fix above; `.env.local` restored immediately after.
+7. Harness checks: contract-guard, protected-integrity, yaml-lexical-guard all PASS; static-guard shows the same 3 pre-existing, deliberately-accepted findings (PEN-022) - not new, none of the 5 new routes are flagged (all correctly call requirePermission/requireRole).
+
+Not resolved this loop, disclosed rather than silently left implicit: PEN-033 (a real disagreement between the applied entities contract and workflows.yaml over whether Receiving Sheet has a CANCELLED state - this loop matched the entities contract, the one TASK-004's own scope actually names), PEN-034/PEN-035 (above). Putaway/move themselves still do not write stock_ledger entries (PEN-024's own remaining half) - the table they needed now exists, but updating those two routes is separate, not-yet-scoped work.
 
 **Free-only confirmation:** no paid action, no new dependency, no deployment. Vercel: still NOT DEPLOYED.
 
