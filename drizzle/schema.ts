@@ -690,3 +690,47 @@ export const transferOrderPallets = sqliteTable(
     ),
   })
 );
+
+// Loop 44 / TASK-010 (Maintenance Module, Flow 9). Transcribed
+// field-for-field from ENTITY-014 - unlike loading_sheet/transfer_order,
+// this entity is fully self-contained (no pallet/material/batch
+// reference at all), so no junction-table translation is needed here.
+export const maintenanceTickets = sqliteTable(
+  "maintenance_tickets",
+  {
+    id: text("id").primaryKey(),
+    ticketNumber: text("ticket_number").notNull().unique(),
+    category: text("category").notNull(),
+    location: text("location").notNull(),
+    description: text("description").notNull(),
+    severity: text("severity").notNull(),
+    status: text("status").notNull().default("OPEN"),
+    raisedById: text("raised_by_id")
+      .notNull()
+      .references(() => users.id),
+    acknowledgedById: text("acknowledged_by_id").references(() => users.id),
+    resolvedById: text("resolved_by_id").references(() => users.id),
+    resolutionNotes: text("resolution_notes"),
+    partsUsed: text("parts_used"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    acknowledgedAt: text("acknowledged_at"),
+    resolvedAt: text("resolved_at"),
+    closedAt: text("closed_at"),
+  },
+  (table) => ({
+    categoryCheck: check(
+      "maintenance_tickets_category_check",
+      sql`${table.category} IN ('DOOR','FORKLIFT','RACKING','ELECTRICAL','REFRIGERATION','PPE','OTHER')`
+    ),
+    severityCheck: check(
+      "maintenance_tickets_severity_check",
+      sql`${table.severity} IN ('LOW','MEDIUM','HIGH','CRITICAL')`
+    ),
+    statusCheck: check(
+      "maintenance_tickets_status_check",
+      // Fully contracted, transcribed exactly from workflows.yaml's own
+      // maintenance_ticket_status states - no gap to disclose here.
+      sql`${table.status} IN ('OPEN','ACKNOWLEDGED','IN_PROGRESS','RESOLVED','CLOSED','REOPENED')`
+    ),
+  })
+);

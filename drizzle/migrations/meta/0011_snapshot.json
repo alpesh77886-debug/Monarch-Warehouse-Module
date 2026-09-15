@@ -1,0 +1,2669 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "a3c308b2-6e1b-47ec-877c-7474542a88fd",
+  "prevId": "ff0ee3e0-8049-400b-9319-a326ec74d991",
+  "tables": {
+    "batches": {
+      "name": "batches",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "batch_number": {
+          "name": "batch_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "material_id": {
+          "name": "material_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "production_date": {
+          "name": "production_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "production_line": {
+          "name": "production_line",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "shift": {
+          "name": "shift",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "batches_batch_number_unique": {
+          "name": "batches_batch_number_unique",
+          "columns": [
+            "batch_number"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "batches_material_id_materials_id_fk": {
+          "name": "batches_material_id_materials_id_fk",
+          "tableFrom": "batches",
+          "tableTo": "materials",
+          "columnsFrom": [
+            "material_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "batches_production_line_check": {
+          "name": "batches_production_line_check",
+          "value": "\"batches\".\"production_line\" IN ('FF','SPECIALITY')"
+        },
+        "batches_shift_check": {
+          "name": "batches_shift_check",
+          "value": "\"batches\".\"shift\" IN ('A','B','C')"
+        },
+        "batches_batch_number_shape_check": {
+          "name": "batches_batch_number_shape_check",
+          "value": "(\"batches\".\"batch_number\" LIKE 'L%' AND length(\"batches\".\"batch_number\") >= 9)"
+        }
+      }
+    },
+    "hold_pallets": {
+      "name": "hold_pallets",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "hold_id": {
+          "name": "hold_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pallet_id": {
+          "name": "pallet_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "hold_pallets_hold_pallet_unique": {
+          "name": "hold_pallets_hold_pallet_unique",
+          "columns": [
+            "hold_id",
+            "pallet_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "hold_pallets_hold_id_hold_records_id_fk": {
+          "name": "hold_pallets_hold_id_hold_records_id_fk",
+          "tableFrom": "hold_pallets",
+          "tableTo": "hold_records",
+          "columnsFrom": [
+            "hold_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "hold_pallets_pallet_id_pallets_id_fk": {
+          "name": "hold_pallets_pallet_id_pallets_id_fk",
+          "tableFrom": "hold_pallets",
+          "tableTo": "pallets",
+          "columnsFrom": [
+            "pallet_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "hold_records": {
+      "name": "hold_records",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "hold_number": {
+          "name": "hold_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "material_id": {
+          "name": "material_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "hold_reason": {
+          "name": "hold_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "custom_reason": {
+          "name": "custom_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "placed_by_id": {
+          "name": "placed_by_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "placed_by_department": {
+          "name": "placed_by_department",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "placed_at": {
+          "name": "placed_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "released_by_id": {
+          "name": "released_by_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "released_at": {
+          "name": "released_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "release_remarks": {
+          "name": "release_remarks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'ACTIVE'"
+        },
+        "qc_followup_count": {
+          "name": "qc_followup_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "last_followup_at": {
+          "name": "last_followup_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "hold_records_hold_number_unique": {
+          "name": "hold_records_hold_number_unique",
+          "columns": [
+            "hold_number"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "hold_records_material_id_materials_id_fk": {
+          "name": "hold_records_material_id_materials_id_fk",
+          "tableFrom": "hold_records",
+          "tableTo": "materials",
+          "columnsFrom": [
+            "material_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "hold_records_batch_id_batches_id_fk": {
+          "name": "hold_records_batch_id_batches_id_fk",
+          "tableFrom": "hold_records",
+          "tableTo": "batches",
+          "columnsFrom": [
+            "batch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "hold_records_placed_by_id_users_id_fk": {
+          "name": "hold_records_placed_by_id_users_id_fk",
+          "tableFrom": "hold_records",
+          "tableTo": "users",
+          "columnsFrom": [
+            "placed_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "hold_records_released_by_id_users_id_fk": {
+          "name": "hold_records_released_by_id_users_id_fk",
+          "tableFrom": "hold_records",
+          "tableTo": "users",
+          "columnsFrom": [
+            "released_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "hold_records_status_check": {
+          "name": "hold_records_status_check",
+          "value": "\"hold_records\".\"status\" IN ('ACTIVE','RELEASED','REJECTED')"
+        },
+        "hold_records_hold_reason_check": {
+          "name": "hold_records_hold_reason_check",
+          "value": "\"hold_records\".\"hold_reason\" IN (\n        'High Temperature',\n        'Metal piece found (repass needed)',\n        'Thread contamination',\n        'Enzyme test positive',\n        'Uneven coating / Belt mark',\n        'High defects / Major defects',\n        'Dull appearance and color difference',\n        'Short length',\n        'Black particles',\n        'White patches on product surface',\n        'Wrong batch code printed',\n        'Batter bubbles',\n        'Product carton not available',\n        'Low retention time',\n        'Bad smell in product',\n        'Misshapes',\n        'Over-production (bulk)',\n        'Defective fries (bulk)',\n        'Trial / Sample',\n        'Other (requires supervisor approval)'\n      )"
+        }
+      }
+    },
+    "loading_sheet_pallets": {
+      "name": "loading_sheet_pallets",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "loading_sheet_id": {
+          "name": "loading_sheet_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pallet_id": {
+          "name": "pallet_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "material_id": {
+          "name": "material_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "carton_qty": {
+          "name": "carton_qty",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "weight_kg": {
+          "name": "weight_kg",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "loading_sequence": {
+          "name": "loading_sequence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fifo_override_reason": {
+          "name": "fifo_override_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "loading_sheet_pallets_sheet_pallet_unique": {
+          "name": "loading_sheet_pallets_sheet_pallet_unique",
+          "columns": [
+            "loading_sheet_id",
+            "pallet_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "loading_sheet_pallets_loading_sheet_id_loading_sheets_id_fk": {
+          "name": "loading_sheet_pallets_loading_sheet_id_loading_sheets_id_fk",
+          "tableFrom": "loading_sheet_pallets",
+          "tableTo": "loading_sheets",
+          "columnsFrom": [
+            "loading_sheet_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "loading_sheet_pallets_pallet_id_pallets_id_fk": {
+          "name": "loading_sheet_pallets_pallet_id_pallets_id_fk",
+          "tableFrom": "loading_sheet_pallets",
+          "tableTo": "pallets",
+          "columnsFrom": [
+            "pallet_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "loading_sheet_pallets_material_id_materials_id_fk": {
+          "name": "loading_sheet_pallets_material_id_materials_id_fk",
+          "tableFrom": "loading_sheet_pallets",
+          "tableTo": "materials",
+          "columnsFrom": [
+            "material_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "loading_sheet_pallets_batch_id_batches_id_fk": {
+          "name": "loading_sheet_pallets_batch_id_batches_id_fk",
+          "tableFrom": "loading_sheet_pallets",
+          "tableTo": "batches",
+          "columnsFrom": [
+            "batch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "loading_sheet_pallets_sequence_positive_check": {
+          "name": "loading_sheet_pallets_sequence_positive_check",
+          "value": "\"loading_sheet_pallets\".\"loading_sequence\" >= 1"
+        }
+      }
+    },
+    "loading_sheets": {
+      "name": "loading_sheets",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "loading_sheet_number": {
+          "name": "loading_sheet_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "date": {
+          "name": "date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "vehicle_number": {
+          "name": "vehicle_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "driver_name": {
+          "name": "driver_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "transporter": {
+          "name": "transporter",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "party_name": {
+          "name": "party_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "destination": {
+          "name": "destination",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "export_domestic": {
+          "name": "export_domestic",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "temperature_c": {
+          "name": "temperature_c",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "qc_approval_by_id": {
+          "name": "qc_approval_by_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "qc_approval_at": {
+          "name": "qc_approval_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "container_number": {
+          "name": "container_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "seal_number": {
+          "name": "seal_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "bolt_number": {
+          "name": "bolt_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "gate_pass_number": {
+          "name": "gate_pass_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "gate_pass_time": {
+          "name": "gate_pass_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "loaded_by_id": {
+          "name": "loaded_by_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "verified_by_id": {
+          "name": "verified_by_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'DRAFT'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "loading_sheets_loading_sheet_number_unique": {
+          "name": "loading_sheets_loading_sheet_number_unique",
+          "columns": [
+            "loading_sheet_number"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "loading_sheets_qc_approval_by_id_users_id_fk": {
+          "name": "loading_sheets_qc_approval_by_id_users_id_fk",
+          "tableFrom": "loading_sheets",
+          "tableTo": "users",
+          "columnsFrom": [
+            "qc_approval_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "loading_sheets_loaded_by_id_users_id_fk": {
+          "name": "loading_sheets_loaded_by_id_users_id_fk",
+          "tableFrom": "loading_sheets",
+          "tableTo": "users",
+          "columnsFrom": [
+            "loaded_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "loading_sheets_verified_by_id_users_id_fk": {
+          "name": "loading_sheets_verified_by_id_users_id_fk",
+          "tableFrom": "loading_sheets",
+          "tableTo": "users",
+          "columnsFrom": [
+            "verified_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "loading_sheets_export_domestic_check": {
+          "name": "loading_sheets_export_domestic_check",
+          "value": "\"loading_sheets\".\"export_domestic\" IN ('EXPORT','DOMESTIC')"
+        },
+        "loading_sheets_status_check": {
+          "name": "loading_sheets_status_check",
+          "value": "\"loading_sheets\".\"status\" IN ('DRAFT','STAGING','LOADED','VERIFIED','GATE_PASSED','DISPATCHED')"
+        }
+      }
+    },
+    "locations": {
+      "name": "locations",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "warehouse_id": {
+          "name": "warehouse_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "cold_room": {
+          "name": "cold_room",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "block": {
+          "name": "block",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "position": {
+          "name": "position",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "floor": {
+          "name": "floor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "full_code": {
+          "name": "full_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "capacity_pallets": {
+          "name": "capacity_pallets",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "current_pallet_id": {
+          "name": "current_pallet_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'EMPTY'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "locations_full_code_unique": {
+          "name": "locations_full_code_unique",
+          "columns": [
+            "full_code"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "locations_warehouse_id_warehouses_id_fk": {
+          "name": "locations_warehouse_id_warehouses_id_fk",
+          "tableFrom": "locations",
+          "tableTo": "warehouses",
+          "columnsFrom": [
+            "warehouse_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "locations_cold_room_check": {
+          "name": "locations_cold_room_check",
+          "value": "\"locations\".\"cold_room\" IN ('CR1','CR2','FLOOR','NA')"
+        },
+        "locations_status_check": {
+          "name": "locations_status_check",
+          "value": "\"locations\".\"status\" IN ('EMPTY','OCCUPIED','PARTIAL','BLOCKED')"
+        }
+      }
+    },
+    "maintenance_tickets": {
+      "name": "maintenance_tickets",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ticket_number": {
+          "name": "ticket_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "location": {
+          "name": "location",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "severity": {
+          "name": "severity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'OPEN'"
+        },
+        "raised_by_id": {
+          "name": "raised_by_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "acknowledged_by_id": {
+          "name": "acknowledged_by_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolved_by_id": {
+          "name": "resolved_by_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolution_notes": {
+          "name": "resolution_notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "parts_used": {
+          "name": "parts_used",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "acknowledged_at": {
+          "name": "acknowledged_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolved_at": {
+          "name": "resolved_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "closed_at": {
+          "name": "closed_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "maintenance_tickets_ticket_number_unique": {
+          "name": "maintenance_tickets_ticket_number_unique",
+          "columns": [
+            "ticket_number"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "maintenance_tickets_raised_by_id_users_id_fk": {
+          "name": "maintenance_tickets_raised_by_id_users_id_fk",
+          "tableFrom": "maintenance_tickets",
+          "tableTo": "users",
+          "columnsFrom": [
+            "raised_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "maintenance_tickets_acknowledged_by_id_users_id_fk": {
+          "name": "maintenance_tickets_acknowledged_by_id_users_id_fk",
+          "tableFrom": "maintenance_tickets",
+          "tableTo": "users",
+          "columnsFrom": [
+            "acknowledged_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "maintenance_tickets_resolved_by_id_users_id_fk": {
+          "name": "maintenance_tickets_resolved_by_id_users_id_fk",
+          "tableFrom": "maintenance_tickets",
+          "tableTo": "users",
+          "columnsFrom": [
+            "resolved_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "maintenance_tickets_category_check": {
+          "name": "maintenance_tickets_category_check",
+          "value": "\"maintenance_tickets\".\"category\" IN ('DOOR','FORKLIFT','RACKING','ELECTRICAL','REFRIGERATION','PPE','OTHER')"
+        },
+        "maintenance_tickets_severity_check": {
+          "name": "maintenance_tickets_severity_check",
+          "value": "\"maintenance_tickets\".\"severity\" IN ('LOW','MEDIUM','HIGH','CRITICAL')"
+        },
+        "maintenance_tickets_status_check": {
+          "name": "maintenance_tickets_status_check",
+          "value": "\"maintenance_tickets\".\"status\" IN ('OPEN','ACKNOWLEDGED','IN_PROGRESS','RESOLVED','CLOSED','REOPENED')"
+        }
+      }
+    },
+    "materials": {
+      "name": "materials",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "uom_kg_per_carton": {
+          "name": "uom_kg_per_carton",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pallet_weight_limit_kg": {
+          "name": "pallet_weight_limit_kg",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pallet_type": {
+          "name": "pallet_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "shelf_life_days": {
+          "name": "shelf_life_days",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "plant_origin": {
+          "name": "plant_origin",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "active": {
+          "name": "active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "materials_code_unique": {
+          "name": "materials_code_unique",
+          "columns": [
+            "code"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "materials_code_prefix_check": {
+          "name": "materials_code_prefix_check",
+          "value": "(\"materials\".\"code\" LIKE 'LFG%' OR \"materials\".\"code\" LIKE 'SFG%')"
+        },
+        "materials_pallet_type_check": {
+          "name": "materials_pallet_type_check",
+          "value": "\"materials\".\"pallet_type\" IN ('CARTON','ROLL','POUCH')"
+        },
+        "materials_plant_origin_check": {
+          "name": "materials_plant_origin_check",
+          "value": "\"materials\".\"plant_origin\" IN ('LIMBASI','SABARKANTHA')"
+        }
+      }
+    },
+    "pallet_batches": {
+      "name": "pallet_batches",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pallet_id": {
+          "name": "pallet_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "carton_qty": {
+          "name": "carton_qty",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "weight_kg": {
+          "name": "weight_kg",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "pallet_batches_pallet_id_pallets_id_fk": {
+          "name": "pallet_batches_pallet_id_pallets_id_fk",
+          "tableFrom": "pallet_batches",
+          "tableTo": "pallets",
+          "columnsFrom": [
+            "pallet_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pallet_batches_batch_id_batches_id_fk": {
+          "name": "pallet_batches_batch_id_batches_id_fk",
+          "tableFrom": "pallet_batches",
+          "tableTo": "batches",
+          "columnsFrom": [
+            "batch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "pallets": {
+      "name": "pallets",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pallet_number": {
+          "name": "pallet_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pallet_type": {
+          "name": "pallet_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "material_id": {
+          "name": "material_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "current_location_id": {
+          "name": "current_location_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status_code": {
+          "name": "status_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'QC_HOLD'"
+        },
+        "total_weight_kg": {
+          "name": "total_weight_kg",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "total_cartons": {
+          "name": "total_cartons",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "current_warehouse_id": {
+          "name": "current_warehouse_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "pallets_material_id_materials_id_fk": {
+          "name": "pallets_material_id_materials_id_fk",
+          "tableFrom": "pallets",
+          "tableTo": "materials",
+          "columnsFrom": [
+            "material_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pallets_current_location_id_locations_id_fk": {
+          "name": "pallets_current_location_id_locations_id_fk",
+          "tableFrom": "pallets",
+          "tableTo": "locations",
+          "columnsFrom": [
+            "current_location_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pallets_current_warehouse_id_warehouses_id_fk": {
+          "name": "pallets_current_warehouse_id_warehouses_id_fk",
+          "tableFrom": "pallets",
+          "tableTo": "warehouses",
+          "columnsFrom": [
+            "current_warehouse_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pallets_created_by_users_id_fk": {
+          "name": "pallets_created_by_users_id_fk",
+          "tableFrom": "pallets",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "pallets_pallet_type_check": {
+          "name": "pallets_pallet_type_check",
+          "value": "\"pallets\".\"pallet_type\" IN ('PLASTIC','WOODEN')"
+        },
+        "pallets_status_code_check": {
+          "name": "pallets_status_code_check",
+          "value": "\"pallets\".\"status_code\" IN ('QC_HOLD','OK','HOLD','BULK','DISPATCHED','IN_TRANSIT','CUSTOMER_SAMPLE','SAMPLE','REJECTED','SCRAP')"
+        }
+      }
+    },
+    "receiving_sheet_pallets": {
+      "name": "receiving_sheet_pallets",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "receiving_sheet_id": {
+          "name": "receiving_sheet_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sr_no": {
+          "name": "sr_no",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pallet_number": {
+          "name": "pallet_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "qty": {
+          "name": "qty",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "receiving_time": {
+          "name": "receiving_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "carton_condition": {
+          "name": "carton_condition",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'OK'"
+        },
+        "temperature_c": {
+          "name": "temperature_c",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "remarks": {
+          "name": "remarks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "receiving_sheet_pallets_sheet_sr_no_unique": {
+          "name": "receiving_sheet_pallets_sheet_sr_no_unique",
+          "columns": [
+            "receiving_sheet_id",
+            "sr_no"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "receiving_sheet_pallets_receiving_sheet_id_receiving_sheets_id_fk": {
+          "name": "receiving_sheet_pallets_receiving_sheet_id_receiving_sheets_id_fk",
+          "tableFrom": "receiving_sheet_pallets",
+          "tableTo": "receiving_sheets",
+          "columnsFrom": [
+            "receiving_sheet_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "receiving_sheet_pallets_carton_condition_check": {
+          "name": "receiving_sheet_pallets_carton_condition_check",
+          "value": "\"receiving_sheet_pallets\".\"carton_condition\" IN ('OK','BULGING','DAMAGED','WET','SHORT_QUANTITY','OTHER')"
+        },
+        "receiving_sheet_pallets_sr_no_positive_check": {
+          "name": "receiving_sheet_pallets_sr_no_positive_check",
+          "value": "\"receiving_sheet_pallets\".\"sr_no\" >= 1"
+        }
+      }
+    },
+    "receiving_sheets": {
+      "name": "receiving_sheets",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sheet_number": {
+          "name": "sheet_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "date": {
+          "name": "date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "shift": {
+          "name": "shift",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "line": {
+          "name": "line",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "material_id": {
+          "name": "material_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "batch_number": {
+          "name": "batch_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "total_qty": {
+          "name": "total_qty",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "total_boxes": {
+          "name": "total_boxes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "packing_supervisor_id": {
+          "name": "packing_supervisor_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "packing_operator_id": {
+          "name": "packing_operator_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "warehouse_executive_id": {
+          "name": "warehouse_executive_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "warehouse_operator_id": {
+          "name": "warehouse_operator_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "packing_confirmed_at": {
+          "name": "packing_confirmed_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "warehouse_confirmed_at": {
+          "name": "warehouse_confirmed_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'DRAFT'"
+        },
+        "default_pallet_status": {
+          "name": "default_pallet_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'QC_HOLD'"
+        },
+        "bulk_reason": {
+          "name": "bulk_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "original_bulk_pallet_id": {
+          "name": "original_bulk_pallet_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "receiving_sheets_sheet_number_unique": {
+          "name": "receiving_sheets_sheet_number_unique",
+          "columns": [
+            "sheet_number"
+          ],
+          "isUnique": true
+        },
+        "receiving_sheets_material_batch_shift_unique": {
+          "name": "receiving_sheets_material_batch_shift_unique",
+          "columns": [
+            "material_id",
+            "batch_number",
+            "shift"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "receiving_sheets_material_id_materials_id_fk": {
+          "name": "receiving_sheets_material_id_materials_id_fk",
+          "tableFrom": "receiving_sheets",
+          "tableTo": "materials",
+          "columnsFrom": [
+            "material_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "receiving_sheets_packing_supervisor_id_users_id_fk": {
+          "name": "receiving_sheets_packing_supervisor_id_users_id_fk",
+          "tableFrom": "receiving_sheets",
+          "tableTo": "users",
+          "columnsFrom": [
+            "packing_supervisor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "receiving_sheets_packing_operator_id_users_id_fk": {
+          "name": "receiving_sheets_packing_operator_id_users_id_fk",
+          "tableFrom": "receiving_sheets",
+          "tableTo": "users",
+          "columnsFrom": [
+            "packing_operator_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "receiving_sheets_warehouse_executive_id_users_id_fk": {
+          "name": "receiving_sheets_warehouse_executive_id_users_id_fk",
+          "tableFrom": "receiving_sheets",
+          "tableTo": "users",
+          "columnsFrom": [
+            "warehouse_executive_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "receiving_sheets_warehouse_operator_id_users_id_fk": {
+          "name": "receiving_sheets_warehouse_operator_id_users_id_fk",
+          "tableFrom": "receiving_sheets",
+          "tableTo": "users",
+          "columnsFrom": [
+            "warehouse_operator_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "receiving_sheets_original_bulk_pallet_id_pallets_id_fk": {
+          "name": "receiving_sheets_original_bulk_pallet_id_pallets_id_fk",
+          "tableFrom": "receiving_sheets",
+          "tableTo": "pallets",
+          "columnsFrom": [
+            "original_bulk_pallet_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "receiving_sheets_shift_check": {
+          "name": "receiving_sheets_shift_check",
+          "value": "\"receiving_sheets\".\"shift\" IN ('A','B','C')"
+        },
+        "receiving_sheets_line_check": {
+          "name": "receiving_sheets_line_check",
+          "value": "\"receiving_sheets\".\"line\" IN ('FF','SPECIALITY')"
+        },
+        "receiving_sheets_batch_number_shape_check": {
+          "name": "receiving_sheets_batch_number_shape_check",
+          "value": "(\"receiving_sheets\".\"batch_number\" LIKE 'L%' AND length(\"receiving_sheets\".\"batch_number\") >= 9)"
+        },
+        "receiving_sheets_status_check": {
+          "name": "receiving_sheets_status_check",
+          "value": "\"receiving_sheets\".\"status\" IN ('DRAFT','PENDING_PACKING','PENDING_WAREHOUSE','LOCKED','CANCELLED')"
+        },
+        "receiving_sheets_default_pallet_status_check": {
+          "name": "receiving_sheets_default_pallet_status_check",
+          "value": "\"receiving_sheets\".\"default_pallet_status\" IN ('QC_HOLD','BULK')"
+        },
+        "receiving_sheets_bulk_reason_check": {
+          "name": "receiving_sheets_bulk_reason_check",
+          "value": "(\"receiving_sheets\".\"bulk_reason\" IS NULL OR \"receiving_sheets\".\"bulk_reason\" IN ('Over-production (bulk)', 'Defective fries (bulk)'))"
+        }
+      }
+    },
+    "sap_codes": {
+      "name": "sap_codes",
+      "columns": {
+        "sap_code": {
+          "name": "sap_code",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sap_name": {
+          "name": "sap_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "plant": {
+          "name": "plant",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "module_status_mapping": {
+          "name": "module_status_mapping",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fg_relevant": {
+          "name": "fg_relevant",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "sap_codes_type_check": {
+          "name": "sap_codes_type_check",
+          "value": "\"sap_codes\".\"type\" IN ('STATUS','3PL','CROSS_PLANT','OTHER','SALES')"
+        }
+      }
+    },
+    "statuses": {
+      "name": "statuses",
+      "columns": {
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "dispatchable": {
+          "name": "dispatchable",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "transferable": {
+          "name": "transferable",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sap_limbasi": {
+          "name": "sap_limbasi",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sap_sabarkantha": {
+          "name": "sap_sabarkantha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "statuses_code_check": {
+          "name": "statuses_code_check",
+          "value": "\"statuses\".\"code\" IN ('QC_HOLD','OK','HOLD','BULK','DISPATCHED','IN_TRANSIT','CUSTOMER_SAMPLE','SAMPLE','REJECTED','SCRAP')"
+        }
+      }
+    },
+    "stock_ledger": {
+      "name": "stock_ledger",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "date": {
+          "name": "date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "shift": {
+          "name": "shift",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "transaction_type": {
+          "name": "transaction_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "material_id": {
+          "name": "material_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pallet_id": {
+          "name": "pallet_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "location_id": {
+          "name": "location_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "warehouse_id": {
+          "name": "warehouse_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "qty_change": {
+          "name": "qty_change",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "qty_after": {
+          "name": "qty_after",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "weight_change_kg": {
+          "name": "weight_change_kg",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "weight_after_kg": {
+          "name": "weight_after_kg",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status_before": {
+          "name": "status_before",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status_after": {
+          "name": "status_after",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "reference_type": {
+          "name": "reference_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reference_id": {
+          "name": "reference_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "remarks": {
+          "name": "remarks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "stock_ledger_material_id_materials_id_fk": {
+          "name": "stock_ledger_material_id_materials_id_fk",
+          "tableFrom": "stock_ledger",
+          "tableTo": "materials",
+          "columnsFrom": [
+            "material_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "stock_ledger_batch_id_batches_id_fk": {
+          "name": "stock_ledger_batch_id_batches_id_fk",
+          "tableFrom": "stock_ledger",
+          "tableTo": "batches",
+          "columnsFrom": [
+            "batch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "stock_ledger_pallet_id_pallets_id_fk": {
+          "name": "stock_ledger_pallet_id_pallets_id_fk",
+          "tableFrom": "stock_ledger",
+          "tableTo": "pallets",
+          "columnsFrom": [
+            "pallet_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "stock_ledger_location_id_locations_id_fk": {
+          "name": "stock_ledger_location_id_locations_id_fk",
+          "tableFrom": "stock_ledger",
+          "tableTo": "locations",
+          "columnsFrom": [
+            "location_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "stock_ledger_warehouse_id_warehouses_id_fk": {
+          "name": "stock_ledger_warehouse_id_warehouses_id_fk",
+          "tableFrom": "stock_ledger",
+          "tableTo": "warehouses",
+          "columnsFrom": [
+            "warehouse_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "stock_ledger_user_id_users_id_fk": {
+          "name": "stock_ledger_user_id_users_id_fk",
+          "tableFrom": "stock_ledger",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "stock_ledger_shift_check": {
+          "name": "stock_ledger_shift_check",
+          "value": "\"stock_ledger\".\"shift\" IN ('A','B','C','NA')"
+        },
+        "stock_ledger_transaction_type_check": {
+          "name": "stock_ledger_transaction_type_check",
+          "value": "\"stock_ledger\".\"transaction_type\" IN ('INWARD','MOVE','HOLD','RELEASE','DISPATCH','TRANSFER_IN','TRANSFER_OUT','ADJUSTMENT','BULK_SEND','BULK_RECEIVE')"
+        },
+        "stock_ledger_reference_type_check": {
+          "name": "stock_ledger_reference_type_check",
+          "value": "\"stock_ledger\".\"reference_type\" IN ('RECEIVING_SHEET','TRANSFER_ORDER','LOADING_SHEET','HOLD_RECORD','MANUAL_MOVE','CYCLE_COUNT')"
+        }
+      }
+    },
+    "transfer_order_pallets": {
+      "name": "transfer_order_pallets",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "transfer_order_id": {
+          "name": "transfer_order_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pallet_id": {
+          "name": "pallet_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "material_id": {
+          "name": "material_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "carton_qty": {
+          "name": "carton_qty",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "weight_kg": {
+          "name": "weight_kg",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "transfer_order_pallets_order_pallet_unique": {
+          "name": "transfer_order_pallets_order_pallet_unique",
+          "columns": [
+            "transfer_order_id",
+            "pallet_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "transfer_order_pallets_transfer_order_id_transfer_orders_id_fk": {
+          "name": "transfer_order_pallets_transfer_order_id_transfer_orders_id_fk",
+          "tableFrom": "transfer_order_pallets",
+          "tableTo": "transfer_orders",
+          "columnsFrom": [
+            "transfer_order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "transfer_order_pallets_pallet_id_pallets_id_fk": {
+          "name": "transfer_order_pallets_pallet_id_pallets_id_fk",
+          "tableFrom": "transfer_order_pallets",
+          "tableTo": "pallets",
+          "columnsFrom": [
+            "pallet_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "transfer_order_pallets_material_id_materials_id_fk": {
+          "name": "transfer_order_pallets_material_id_materials_id_fk",
+          "tableFrom": "transfer_order_pallets",
+          "tableTo": "materials",
+          "columnsFrom": [
+            "material_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "transfer_order_pallets_batch_id_batches_id_fk": {
+          "name": "transfer_order_pallets_batch_id_batches_id_fk",
+          "tableFrom": "transfer_order_pallets",
+          "tableTo": "batches",
+          "columnsFrom": [
+            "batch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "transfer_orders": {
+      "name": "transfer_orders",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "transfer_number": {
+          "name": "transfer_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_warehouse_id": {
+          "name": "source_warehouse_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "destination_warehouse_id": {
+          "name": "destination_warehouse_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "transfer_type": {
+          "name": "transfer_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "vehicle_number": {
+          "name": "vehicle_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "driver_name": {
+          "name": "driver_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "transporter": {
+          "name": "transporter",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "temperature_c": {
+          "name": "temperature_c",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "lr_number": {
+          "name": "lr_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'DRAFT'"
+        },
+        "initiated_by_id": {
+          "name": "initiated_by_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "received_by_id": {
+          "name": "received_by_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "dispatched_at": {
+          "name": "dispatched_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "received_at": {
+          "name": "received_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "transfer_orders_transfer_number_unique": {
+          "name": "transfer_orders_transfer_number_unique",
+          "columns": [
+            "transfer_number"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "transfer_orders_source_warehouse_id_warehouses_id_fk": {
+          "name": "transfer_orders_source_warehouse_id_warehouses_id_fk",
+          "tableFrom": "transfer_orders",
+          "tableTo": "warehouses",
+          "columnsFrom": [
+            "source_warehouse_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "transfer_orders_destination_warehouse_id_warehouses_id_fk": {
+          "name": "transfer_orders_destination_warehouse_id_warehouses_id_fk",
+          "tableFrom": "transfer_orders",
+          "tableTo": "warehouses",
+          "columnsFrom": [
+            "destination_warehouse_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "transfer_orders_initiated_by_id_users_id_fk": {
+          "name": "transfer_orders_initiated_by_id_users_id_fk",
+          "tableFrom": "transfer_orders",
+          "tableTo": "users",
+          "columnsFrom": [
+            "initiated_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "transfer_orders_received_by_id_users_id_fk": {
+          "name": "transfer_orders_received_by_id_users_id_fk",
+          "tableFrom": "transfer_orders",
+          "tableTo": "users",
+          "columnsFrom": [
+            "received_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "transfer_orders_transfer_type_check": {
+          "name": "transfer_orders_transfer_type_check",
+          "value": "\"transfer_orders\".\"transfer_type\" IN ('NORMAL','HOLD_TAG','BULK_TAG')"
+        },
+        "transfer_orders_status_check": {
+          "name": "transfer_orders_status_check",
+          "value": "\"transfer_orders\".\"status\" IN ('DRAFT','PICKED','LOADED','IN_TRANSIT','RECEIVED','COMPLETED','CANCELLED')"
+        },
+        "transfer_orders_source_dest_different_check": {
+          "name": "transfer_orders_source_dest_different_check",
+          "value": "\"transfer_orders\".\"source_warehouse_id\" != \"transfer_orders\".\"destination_warehouse_id\""
+        }
+      }
+    },
+    "users": {
+      "name": "users",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "clerk_user_id": {
+          "name": "clerk_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "role_id": {
+          "name": "role_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "department": {
+          "name": "department",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "plant": {
+          "name": "plant",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "active": {
+          "name": "active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "users_clerk_user_id_unique": {
+          "name": "users_clerk_user_id_unique",
+          "columns": [
+            "clerk_user_id"
+          ],
+          "isUnique": true
+        },
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "columns": [
+            "email"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "warehouses": {
+      "name": "warehouses",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "plant": {
+          "name": "plant",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sap_code": {
+          "name": "sap_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "address": {
+          "name": "address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "location_structure": {
+          "name": "location_structure",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "active": {
+          "name": "active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "warehouses_code_unique": {
+          "name": "warehouses_code_unique",
+          "columns": [
+            "code"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "warehouses_type_check": {
+          "name": "warehouses_type_check",
+          "value": "\"warehouses\".\"type\" IN ('OWN','3PL','CROSS_PLANT')"
+        },
+        "warehouses_plant_check": {
+          "name": "warehouses_plant_check",
+          "value": "\"warehouses\".\"plant\" IN ('LIMBASI','SABARKANTHA','PATAN')"
+        },
+        "warehouses_location_structure_check": {
+          "name": "warehouses_location_structure_check",
+          "value": "\"warehouses\".\"location_structure\" IN ('RACK','FLAT')"
+        }
+      }
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}
