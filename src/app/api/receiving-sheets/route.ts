@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, and, desc } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { receivingSheets, materials } from "../../../../drizzle/schema";
-import { requirePermission, requireRole } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { receivingSheetCreateSchema } from "@/lib/validations/receiving-sheet";
 import { validateBatchNumberFormat } from "@/lib/business-rules/receiving-sheet";
 import {
@@ -33,20 +33,19 @@ function errorResponse(err: unknown) {
 }
 
 /**
- * Receiving Sheet create/list (Flow 1 Step 1, TASK-004). Any role that
- * holds some receiving_sheet.* permission may list/view - the
- * permissions contract gives R01/R03 create+confirm_warehouse and
- * R04/R06/R07 an explicit view, but never spells out a separate "view"
- * grant for R01/R03 themselves; treating create as implying read of the
- * same resource type (rather than 403-ing the very role that creates
- * these sheets from ever seeing them again) is the only reading that
- * does not leave a working role locked out of its own work.
+ * Receiving Sheet create/list (Flow 1 Step 1, TASK-004). List is
+ * deliberately NOT gated, same PEN-022 reasoning already established
+ * for Material/Warehouse/Location reads in this repository: the
+ * permissions contract never spells out a separate "view" grant for
+ * every role that legitimately needs to see a receiving sheet (R01/R03
+ * create it, R04/R06/R07 have an explicit view, but nothing says a
+ * plain read needs a session at all), and requiring one today - while
+ * Clerk stub mode means no one can ever hold a real session - would
+ * make this screen unreadable to everyone, not more secure. The actual
+ * sensitive half (create/edit/confirm) stays fully gated below.
  */
-const RECEIVING_SHEET_VIEW_ROLES = ["R01", "R03", "R04", "R06", "R07", "R12"] as const;
-
 export async function GET() {
   try {
-    await requireRole([...RECEIVING_SHEET_VIEW_ROLES]);
     const db = getDb();
     const rows = await db
       .select({

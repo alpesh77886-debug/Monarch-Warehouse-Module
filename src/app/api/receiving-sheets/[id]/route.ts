@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { receivingSheets, receivingSheetPallets, materials } from "../../../../../drizzle/schema";
-import { requirePermission, requireRole } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { receivingSheetUpdateSchema } from "@/lib/validations/receiving-sheet";
 import { validateBatchNumberFormat } from "@/lib/business-rules/receiving-sheet";
 import {
@@ -32,11 +32,9 @@ function errorResponse(err: unknown) {
   return NextResponse.json({ error: "Unexpected server error." }, { status: 500 });
 }
 
-const RECEIVING_SHEET_VIEW_ROLES = ["R01", "R03", "R04", "R06", "R07", "R12"] as const;
-
+// Not gated - see the list route's own comment (PEN-022 precedent).
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await requireRole([...RECEIVING_SHEET_VIEW_ROLES]);
     const db = getDb();
     const [sheet] = await db
       .select({

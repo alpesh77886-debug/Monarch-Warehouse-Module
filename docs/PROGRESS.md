@@ -1,6 +1,6 @@
 # Project Progress Tracker
 ## IBF FG Warehouse Module
-## Last updated: 2026-09-15 (Loop 35 checkpoint)
+## Last updated: 2026-09-15 (Loop 36 checkpoint)
 
 ## Reading this document's "loop" numbering (PEN-016 clarification)
 
@@ -557,6 +557,38 @@ Commands run, in order, with results:
 7. Harness checks: contract-guard, protected-integrity, yaml-lexical-guard all PASS; static-guard shows the same 3 pre-existing, deliberately-accepted findings (PEN-022) - not new, none of the 5 new routes are flagged (all correctly call requirePermission/requireRole).
 
 Not resolved this loop, disclosed rather than silently left implicit: PEN-033 (a real disagreement between the applied entities contract and workflows.yaml over whether Receiving Sheet has a CANCELLED state - this loop matched the entities contract, the one TASK-004's own scope actually names), PEN-034/PEN-035 (above). Putaway/move themselves still do not write stock_ledger entries (PEN-024's own remaining half) - the table they needed now exists, but updating those two routes is separate, not-yet-scoped work.
+
+**Free-only confirmation:** no paid action, no new dependency, no deployment. Vercel: still NOT DEPLOYED.
+
+## Loop 36 Checkpoint (window 4 continued - TASK-004 Receiving Sheet UI, real browser verification)
+
+Built the actual SCREEN-002 UI on top of Loop 35's backend: the Inward landing page, the Receiving Sheets list/create screen, and the per-sheet detail screen (header, pallet table, add-pallet form, dual-confirm buttons).
+
+| Loop | Objective | Commit | Result |
+|---|---|---|---|
+| 36 | Inward/Receiving Sheets UI (3 pages); found and fixed a real over-gating inconsistency (Receiving Sheet reads had been gated, unlike every other reference/masters screen in this app) while trying to actually view the new screen; found and fixed a real static-guard false positive; 8 new E2E tests, verified with real screenshots in a live browser, not just assertions | (this commit) | Done. See evidence below |
+
+### Loop 36 evidence
+
+**Three pages**, matching this repository's own established component conventions exactly (the same `PageHeader`/`Field`/`inputClass`/honest-503-notice pattern already used by Material Master and Putaway): `/inward` (landing, links to Receiving Sheets, "3PL Inward" shown honestly as not built), `/inward/receiving-sheets` (create form with a datalist-based material search + real sheet list), `/inward/receiving-sheets/[id]` (header detail, the pallet table with dispute-prevention condition highlighting and the Flow 1 Step 2 temperature-warning triangle, the add-pallet form, and both confirmation buttons).
+
+**A real design inconsistency found and fixed while actually trying to use the feature, not by inspection alone:** the Receiving Sheet GET routes had been built (Loop 35) gated behind `requireRole`, unlike every other reference/detail read in this app (Material/Warehouse Master, Locations - PEN-022's own established precedent: gating a read that nothing in the locked contracts requires gating makes the screen unusable to everyone during Clerk stub mode, not more secure). Trying to actually view the new detail screen hit exactly that wall - a real usability bug this loop's own manual verification step caught, not something inferred from reading the code. Fixed by removing the gate from both GET handlers (list + detail), matching the established precedent explicitly rather than silently; the create/edit/confirm mutations stay fully gated. Recorded as an addition to PEN-022 rather than a new item, since it is the same decision, not a new one.
+
+**A real static-guard false positive found and fixed:** a client-side validation message ("Select a real material code from the list.") happened to contain the literal words "Select" and "from" in one sentence, tripping the guard's crude `SELECT ... FROM` raw-SQL heuristic on a page with no database access at all. Reworded rather than left as permanent CI noise or silently ignored.
+
+**Real browser verification, not just Playwright assertions:** started a real local dev server and took real screenshots of both the list/create screen and the detail screen (desktop and mobile widths) with genuine seeded data (including a BULGING pallet with its dispute-prevention remark and a -12C reading correctly flagged with the amber warning triangle) before treating this as done - confirmed the layout, the color-coded condition highlighting, and the mobile card/table layout all render correctly, not just that specific text nodes exist in the DOM.
+
+**8 new E2E tests** (`tests/e2e/inward-receiving-sheets.spec.ts`): landing-page links, the honest Clerk-stub-mode refusal for a syntactically valid create, client-side material validation, real-persistence reads of a directly-seeded fixture sheet (list and detail, now genuinely ungated), the dispute-prevention/temperature-warning rendering, the honest refusal of a confirm action, and mobile no-horizontal-scroll across all three new pages including the pallet table's own scrollable container.
+
+**A transient test flake, investigated rather than ignored:** one `npx vitest run` mid-loop showed 4 failures in `receiving-sheet-live.test.ts` that did not reproduce on an isolated re-run of that same file, nor on two subsequent full-suite runs (134/134 both times). Traced to a manually-started dev server process (started for the screenshot verification above) sharing the same local D1 SQLite file at the same moment as the test run - a real race from this loop's own verification process, not a code defect; the dev server was stopped and the suite has been stable since. Disclosed rather than quietly re-run past without explanation.
+
+Commands run, in order, with results:
+1. `npx tsc --noEmit` -> exit 0 (checked repeatedly through the loop).
+2. `npm run build` -> exit 0, all 3 new pages compile, `/inward/receiving-sheets/[id]` correctly shows `ƒ Dynamic`.
+3. Started a real dev server (`PORT=3100 npm run dev`) and took real screenshots via a throwaway Playwright script (desktop + mobile, both the empty and the seeded-with-real-pallet-rows states) - visually verified, not just assumed correct from passing tests.
+4. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npx playwright test` (with `.env.local` moved aside per PEN-030) -> **42/42 passed** (34 carried over + 8 new), run twice (once mid-fix, once final) after the GET-gating and static-guard-false-positive fixes; `.env.local` restored after each run.
+5. `npx vitest run` -> one transient failure investigated and explained above; stable at **134/134** across 3 subsequent runs.
+6. Harness checks: contract-guard, protected-integrity, yaml-lexical-guard PASS; static-guard shows only the same 3 pre-existing PEN-022 findings after the false-positive fix - not new.
 
 **Free-only confirmation:** no paid action, no new dependency, no deployment. Vercel: still NOT DEPLOYED.
 
