@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and } from "drizzle-orm";
-import { getDb } from "@/lib/db";
+import { getDb, runAtomicBatch, type UnrunStatement } from "@/lib/db";
 import { pallets, palletBatches, locations, stockLedger, receivingSheets } from "../../../../../../drizzle/schema";
 import { requireRole, requireCurrentUserId } from "@/lib/auth";
 import { bulkRepackCreateSchema } from "@/lib/validations/receiving-sheet";
@@ -108,58 +108,60 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const newSheetId = crypto.randomUUID();
     const now = new Date().toISOString();
-    db.transaction((tx) => {
-      const ledgerEntry = describeLedgerEntry(transition);
-      tx.insert(stockLedger)
-        .values({
-          id: crypto.randomUUID(),
-          date: now.slice(0, 10),
-          shift: "NA",
-          transactionType: ledgerEntry.transactionType,
-          materialId: pallet.materialId,
-          batchId: palletBatchRow.batchId,
-          palletId: pallet.id,
-          locationId: pallet.currentLocationId,
-          warehouseId: pallet.currentWarehouseId,
-          qtyChange: 0,
-          qtyAfter: pallet.totalCartons,
-          weightChangeKg: 0,
-          weightAfterKg: pallet.totalWeightKg,
-          statusBefore: ledgerEntry.statusBefore,
-          statusAfter: ledgerEntry.statusAfter,
-          referenceType: "MANUAL_MOVE",
-          referenceId: pallet.id,
-          userId: currentUserId,
-        })
-        .run();
+    // db.transaction() would crash on real D1 (no multi-statement
+    // BEGIN/COMMIT - see PEN-044 / src/lib/db.ts). None of these writes'
+    // values depend on another statement's result, so a plain atomic
+    // batch is the correct replacement.
+    const ledgerEntry = describeLedgerEntry(transition);
+    const stmts: UnrunStatement[] = [
+      db.insert(stockLedger).values({
+        id: crypto.randomUUID(),
+        date: now.slice(0, 10),
+        shift: "NA",
+        transactionType: ledgerEntry.transactionType,
+        materialId: pallet.materialId,
+        batchId: palletBatchRow.batchId,
+        palletId: pallet.id,
+        locationId: pallet.currentLocationId,
+        warehouseId: pallet.currentWarehouseId,
+        qtyChange: 0,
+        qtyAfter: pallet.totalCartons,
+        weightChangeKg: 0,
+        weightAfterKg: pallet.totalWeightKg,
+        statusBefore: ledgerEntry.statusBefore,
+        statusAfter: ledgerEntry.statusAfter,
+        referenceType: "MANUAL_MOVE",
+        referenceId: pallet.id,
+        userId: currentUserId,
+      }),
+    ];
 
-      if (pallet.currentLocationId) {
-        tx.update(locations)
+    if (pallet.currentLocationId) {
+      stmts.push(
+        db
+          .update(locations)
           .set({ status: "EMPTY", currentPalletId: null })
           .where(eq(locations.id, pallet.currentLocationId))
-          .run();
-      }
+      );
+    }
 
-      tx.update(pallets)
-        .set({ statusCode: "QC_HOLD", currentLocationId: null })
-        .where(eq(pallets.id, pallet.id))
-        .run();
+    stmts.push(
+      db.update(pallets).set({ statusCode: "QC_HOLD", currentLocationId: null }).where(eq(pallets.id, pallet.id)),
+      db.insert(receivingSheets).values({
+        id: newSheetId,
+        sheetNumber,
+        date: parsed.data.date,
+        shift: parsed.data.shift,
+        line: parsed.data.line,
+        materialId: pallet.materialId,
+        batchNumber: parsed.data.batchNumber,
+        defaultPalletStatus: "QC_HOLD",
+        originalBulkPalletId: pallet.id,
+        status: "DRAFT",
+      })
+    );
 
-      tx.insert(receivingSheets)
-        .values({
-          id: newSheetId,
-          sheetNumber,
-          date: parsed.data.date,
-          shift: parsed.data.shift,
-          line: parsed.data.line,
-          materialId: pallet.materialId,
-          batchNumber: parsed.data.batchNumber,
-          defaultPalletStatus: "QC_HOLD",
-          originalBulkPalletId: pallet.id,
-          status: "DRAFT",
-        })
-        .run();
-    });
+    await runAtomicBatch(db, [stmts[0], ...stmts.slice(1)]);
 
     const [createdSheet] = await db.select().from(receivingSheets).where(eq(receivingSheets.id, newSheetId));
     const [updatedPallet] = await db.select().from(pallets).where(eq(pallets.id, pallet.id));

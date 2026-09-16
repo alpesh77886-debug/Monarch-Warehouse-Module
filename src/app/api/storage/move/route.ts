@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { getDb } from "@/lib/db";
+import { getDb, runAtomicBatch, type UnrunStatement } from "@/lib/db";
 import { locations, pallets, materials, palletBatches, stockLedger } from "../../../../../drizzle/schema";
 import { requirePermission, requireCurrentUserId } from "@/lib/auth";
 import { movePalletSchema } from "@/lib/validations/putaway";
@@ -88,49 +88,55 @@ export async function POST(request: NextRequest) {
     );
 
     const today = new Date().toISOString().slice(0, 10);
-    db.transaction((tx) => {
-      if (previousLocation) {
-        tx.update(locations)
+    // This read pulls pallet_batches rows that none of the writes below
+    // touch or depend on - it can run before the write block rather
+    // than inside it, which turns this into a plain unconditional batch
+    // (db.transaction() would crash on real D1 - no multi-statement
+    // BEGIN/COMMIT, see PEN-044 / src/lib/db.ts).
+    const batchRows = await db.select().from(palletBatches).where(eq(palletBatches.palletId, pallet.id));
+
+    const stmts: UnrunStatement[] = [];
+    if (previousLocation) {
+      stmts.push(
+        db
+          .update(locations)
           .set({ status: "EMPTY", currentPalletId: null })
           .where(eq(locations.id, previousLocation.id))
-          .run();
-      }
-      tx.update(locations)
-        .set({ status: newStatus, currentPalletId: pallet.id })
-        .where(eq(locations.id, newLocation.id))
-        .run();
-      tx.update(pallets)
+      );
+    }
+    stmts.push(
+      db.update(locations).set({ status: newStatus, currentPalletId: pallet.id }).where(eq(locations.id, newLocation.id)),
+      db
+        .update(pallets)
         .set({ currentLocationId: newLocation.id, currentWarehouseId: newLocation.warehouseId })
         .where(eq(pallets.id, pallet.id))
-        .run();
-
-      const batchRows = tx.select().from(palletBatches).where(eq(palletBatches.palletId, pallet.id)).all();
-      for (const batchRow of batchRows) {
-        tx.insert(stockLedger)
-          .values({
-            id: crypto.randomUUID(),
-            date: today,
-            shift: "NA",
-            transactionType: "MOVE",
-            materialId: pallet.materialId,
-            batchId: batchRow.batchId,
-            palletId: pallet.id,
-            locationId: newLocation.id,
-            warehouseId: newLocation.warehouseId,
-            qtyChange: 0,
-            qtyAfter: batchRow.cartonQty,
-            weightChangeKg: 0,
-            weightAfterKg: batchRow.weightKg,
-            statusBefore: pallet.statusCode,
-            statusAfter: pallet.statusCode,
-            referenceType: "MANUAL_MOVE",
-            referenceId: pallet.id,
-            userId: currentUserId,
-            remarks: parsed.data.reason,
-          })
-          .run();
-      }
-    });
+    );
+    for (const batchRow of batchRows) {
+      stmts.push(
+        db.insert(stockLedger).values({
+          id: crypto.randomUUID(),
+          date: today,
+          shift: "NA",
+          transactionType: "MOVE",
+          materialId: pallet.materialId,
+          batchId: batchRow.batchId,
+          palletId: pallet.id,
+          locationId: newLocation.id,
+          warehouseId: newLocation.warehouseId,
+          qtyChange: 0,
+          qtyAfter: batchRow.cartonQty,
+          weightChangeKg: 0,
+          weightAfterKg: batchRow.weightKg,
+          statusBefore: pallet.statusCode,
+          statusAfter: pallet.statusCode,
+          referenceType: "MANUAL_MOVE",
+          referenceId: pallet.id,
+          userId: currentUserId,
+          remarks: parsed.data.reason,
+        })
+      );
+    }
+    await runAtomicBatch(db, [stmts[0], ...stmts.slice(1)]);
 
     const [updatedPallet] = await db.select().from(pallets).where(eq(pallets.id, pallet.id));
     const [updatedLocation] = await db.select().from(locations).where(eq(locations.id, newLocation.id));

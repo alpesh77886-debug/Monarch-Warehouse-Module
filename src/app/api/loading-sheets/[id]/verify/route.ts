@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and } from "drizzle-orm";
-import { getDb } from "@/lib/db";
+import { getDb, changesOf } from "@/lib/db";
 import { loadingSheets } from "../../../../../../drizzle/schema";
 import { requirePermission, requireCurrentUserId } from "@/lib/auth";
 import { nextLoadingSheetStatus, type LoadingSheetStatus } from "@/lib/business-rules/loading-sheet";
@@ -47,14 +47,15 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
     const nextStatus: LoadingSheetStatus = nextLoadingSheetStatus(sheet.status as LoadingSheetStatus, "verify");
 
-    const applied = db.transaction((tx) => {
-      const result = tx
-        .update(loadingSheets)
-        .set({ status: nextStatus, verifiedById: currentUserId })
-        .where(and(eq(loadingSheets.id, params.id), eq(loadingSheets.status, sheet.status)))
-        .run();
-      return result.changes;
-    });
+    // A single guarded UPDATE is already atomic as one statement - no
+    // wrapping transaction needed (D1 has no multi-statement
+    // BEGIN/COMMIT, see PEN-044 / src/lib/db.ts).
+    const result = await db
+      .update(loadingSheets)
+      .set({ status: nextStatus, verifiedById: currentUserId })
+      .where(and(eq(loadingSheets.id, params.id), eq(loadingSheets.status, sheet.status)))
+      .run();
+    const applied = changesOf(result);
     if (applied === 0) {
       throw new ConflictError("This loading sheet was changed by someone else - your verify action was not applied.");
     }

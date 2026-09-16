@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and, ne, count } from "drizzle-orm";
-import { getDb } from "@/lib/db";
+import { getDb, runAtomicBatch, type UnrunStatement } from "@/lib/db";
 import { loadingSheets, loadingSheetPallets, pallets, palletBatches, batches } from "../../../../../../drizzle/schema";
 import { requirePermission } from "@/lib/auth";
 import { loadingSheetPickSchema } from "@/lib/validations/loading-sheet";
@@ -114,24 +114,30 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const nextStatus: LoadingSheetStatus = sheet.status === "DRAFT" ? nextLoadingSheetStatus("DRAFT", "stage") : (sheet.status as LoadingSheetStatus);
 
     const rowId = crypto.randomUUID();
-    db.transaction((tx) => {
-      if (sheet.status === "DRAFT") {
-        tx.update(loadingSheets).set({ status: nextStatus }).where(eq(loadingSheets.id, params.id)).run();
-      }
-      tx.insert(loadingSheetPallets)
-        .values({
-          id: rowId,
-          loadingSheetId: params.id,
-          palletId: pallet.id,
-          materialId: pallet.materialId,
-          batchId: batch.id,
-          cartonQty: pallet.totalCartons,
-          weightKg: pallet.totalWeightKg,
-          loadingSequence: existingCount + 1,
-          fifoOverrideReason: parsed.data.overrideReason ?? null,
-        })
-        .run();
-    });
+    // db.transaction() would crash on real D1 (no multi-statement
+    // BEGIN/COMMIT - see PEN-044 / src/lib/db.ts). Neither statement's
+    // value depends on the other's result (the DRAFT->STAGING bump is
+    // decided from `sheet.status` read before this point, plain
+    // JS array-building, not a guard on a write result), so a plain
+    // atomic batch is the correct replacement.
+    const stmts: UnrunStatement[] = [];
+    if (sheet.status === "DRAFT") {
+      stmts.push(db.update(loadingSheets).set({ status: nextStatus }).where(eq(loadingSheets.id, params.id)));
+    }
+    stmts.push(
+      db.insert(loadingSheetPallets).values({
+        id: rowId,
+        loadingSheetId: params.id,
+        palletId: pallet.id,
+        materialId: pallet.materialId,
+        batchId: batch.id,
+        cartonQty: pallet.totalCartons,
+        weightKg: pallet.totalWeightKg,
+        loadingSequence: existingCount + 1,
+        fifoOverrideReason: parsed.data.overrideReason ?? null,
+      })
+    );
+    await runAtomicBatch(db, [stmts[0], ...stmts.slice(1)]);
 
     const [created] = await db.select().from(loadingSheetPallets).where(eq(loadingSheetPallets.id, rowId));
     return NextResponse.json({ pallet: created }, { status: 201 });

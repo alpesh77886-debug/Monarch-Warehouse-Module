@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, desc, count, sum } from "drizzle-orm";
-import { getDb } from "@/lib/db";
+import { getDb, runAtomicBatch, type UnrunStatement } from "@/lib/db";
 import { holdRecords, holdPallets, materials, batches, pallets, stockLedger } from "../../../../drizzle/schema";
 import { requirePermission, requireCurrentUserId } from "@/lib/auth";
 import { holdCreateSchema } from "@/lib/validations/hold";
@@ -177,56 +177,55 @@ export async function POST(request: NextRequest) {
     const holdId = crypto.randomUUID();
     const holdNumber = await nextHoldNumber(db, now.slice(0, 10));
 
-    db.transaction((tx) => {
-      tx.insert(holdRecords)
-        .values({
-          id: holdId,
-          holdNumber,
+    // db.transaction() would crash on real D1 (no multi-statement
+    // BEGIN/COMMIT - see PEN-044 / src/lib/db.ts). None of these writes'
+    // values depend on another statement's result, so a plain atomic
+    // batch is the correct replacement.
+    const holdInsertStmt = db.insert(holdRecords).values({
+      id: holdId,
+      holdNumber,
+      materialId: material.id,
+      batchId: batch.id,
+      holdReason: parsed.data.holdReason,
+      customReason: parsed.data.customReason ?? null,
+      placedById: currentUserId,
+      placedByDepartment: parsed.data.placedByDepartment,
+      placedAt: now,
+      status: "ACTIVE",
+    });
+
+    const palletStmts: UnrunStatement[] = holdPalletRows.flatMap(({ pallet, transition }) => {
+      // No quantity change on a status-only transition - see the
+      // putaway/move routes' own stock_ledger writes for the same
+      // qty/weight-unchanged reasoning.
+      const ledgerEntry = describeLedgerEntry(transition);
+      return [
+        db.insert(holdPallets).values({ id: crypto.randomUUID(), holdId, palletId: pallet.id }),
+        db.update(pallets).set({ statusCode: "HOLD" }).where(eq(pallets.id, pallet.id)),
+        db.insert(stockLedger).values({
+          id: crypto.randomUUID(),
+          date: now.slice(0, 10),
+          shift: "NA",
+          transactionType: ledgerEntry.transactionType,
           materialId: material.id,
           batchId: batch.id,
-          holdReason: parsed.data.holdReason,
-          customReason: parsed.data.customReason ?? null,
-          placedById: currentUserId,
-          placedByDepartment: parsed.data.placedByDepartment,
-          placedAt: now,
-          status: "ACTIVE",
-        })
-        .run();
-
-      for (const { pallet, transition } of holdPalletRows) {
-        tx.insert(holdPallets)
-          .values({ id: crypto.randomUUID(), holdId, palletId: pallet.id })
-          .run();
-        tx.update(pallets).set({ statusCode: "HOLD" }).where(eq(pallets.id, pallet.id)).run();
-
-        // No quantity change on a status-only transition - see the
-        // putaway/move routes' own stock_ledger writes for the same
-        // qty/weight-unchanged reasoning.
-        const ledgerEntry = describeLedgerEntry(transition);
-        tx.insert(stockLedger)
-          .values({
-            id: crypto.randomUUID(),
-            date: now.slice(0, 10),
-            shift: "NA",
-            transactionType: ledgerEntry.transactionType,
-            materialId: material.id,
-            batchId: batch.id,
-            palletId: pallet.id,
-            locationId: pallet.currentLocationId,
-            warehouseId: pallet.currentWarehouseId,
-            qtyChange: 0,
-            qtyAfter: pallet.totalCartons,
-            weightChangeKg: 0,
-            weightAfterKg: pallet.totalWeightKg,
-            statusBefore: ledgerEntry.statusBefore,
-            statusAfter: ledgerEntry.statusAfter,
-            referenceType: ledgerEntry.referenceType,
-            referenceId: holdId,
-            userId: currentUserId,
-          })
-          .run();
-      }
+          palletId: pallet.id,
+          locationId: pallet.currentLocationId,
+          warehouseId: pallet.currentWarehouseId,
+          qtyChange: 0,
+          qtyAfter: pallet.totalCartons,
+          weightChangeKg: 0,
+          weightAfterKg: pallet.totalWeightKg,
+          statusBefore: ledgerEntry.statusBefore,
+          statusAfter: ledgerEntry.statusAfter,
+          referenceType: ledgerEntry.referenceType,
+          referenceId: holdId,
+          userId: currentUserId,
+        }),
+      ];
     });
+
+    await runAtomicBatch(db, [holdInsertStmt, ...palletStmts]);
 
     const [created] = await db.select().from(holdRecords).where(eq(holdRecords.id, holdId));
     return NextResponse.json({ hold: created }, { status: 201 });

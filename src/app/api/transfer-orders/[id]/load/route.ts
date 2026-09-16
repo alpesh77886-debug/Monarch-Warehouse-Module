@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and, count } from "drizzle-orm";
-import { getDb } from "@/lib/db";
+import { getDb, changesOf } from "@/lib/db";
 import { transferOrders, transferOrderPallets } from "../../../../../../drizzle/schema";
 import { requirePermission } from "@/lib/auth";
 import { transferOrderLoadSchema } from "@/lib/validations/transfer-order";
@@ -64,21 +64,22 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     assertReadyToLoad({ vehicleNumber: parsed.data.vehicleNumber, driverName: parsed.data.driverName });
 
-    const applied = db.transaction((tx) => {
-      const result = tx
-        .update(transferOrders)
-        .set({
-          status: nextStatus,
-          vehicleNumber: parsed.data.vehicleNumber,
-          driverName: parsed.data.driverName,
-          transporter: parsed.data.transporter ?? null,
-          temperatureC: parsed.data.temperatureC ?? null,
-          lrNumber: parsed.data.lrNumber ?? null,
-        })
-        .where(and(eq(transferOrders.id, params.id), eq(transferOrders.status, order.status)))
-        .run();
-      return result.changes;
-    });
+    // A single guarded UPDATE is already atomic as one statement - no
+    // wrapping transaction needed (D1 has no multi-statement
+    // BEGIN/COMMIT, see PEN-044 / src/lib/db.ts).
+    const result = await db
+      .update(transferOrders)
+      .set({
+        status: nextStatus,
+        vehicleNumber: parsed.data.vehicleNumber,
+        driverName: parsed.data.driverName,
+        transporter: parsed.data.transporter ?? null,
+        temperatureC: parsed.data.temperatureC ?? null,
+        lrNumber: parsed.data.lrNumber ?? null,
+      })
+      .where(and(eq(transferOrders.id, params.id), eq(transferOrders.status, order.status)))
+      .run();
+    const applied = changesOf(result);
     if (applied === 0) {
       throw new ConflictError("This transfer order was changed by someone else - your load action was not applied.");
     }

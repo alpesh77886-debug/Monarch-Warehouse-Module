@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and } from "drizzle-orm";
-import { getDb } from "@/lib/db";
+import { getDb, changesOf } from "@/lib/db";
 import { maintenanceTickets } from "../../../../../../drizzle/schema";
 import { requirePermission, requireCurrentUserId } from "@/lib/auth";
 import { maintenanceResolveSchema } from "@/lib/validations/maintenance";
@@ -60,20 +60,21 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     );
 
     const now = new Date().toISOString();
-    const applied = db.transaction((tx) => {
-      const result = tx
-        .update(maintenanceTickets)
-        .set({
-          status: nextStatus,
-          resolvedById: currentUserId,
-          resolvedAt: now,
-          resolutionNotes: parsed.data.resolutionNotes,
-          partsUsed: parsed.data.partsUsed ?? null,
-        })
-        .where(and(eq(maintenanceTickets.id, params.id), eq(maintenanceTickets.status, ticket.status)))
-        .run();
-      return result.changes;
-    });
+    // A single guarded UPDATE is already atomic as one statement - no
+    // wrapping transaction needed (D1 has no multi-statement
+    // BEGIN/COMMIT, see PEN-044 / src/lib/db.ts).
+    const result = await db
+      .update(maintenanceTickets)
+      .set({
+        status: nextStatus,
+        resolvedById: currentUserId,
+        resolvedAt: now,
+        resolutionNotes: parsed.data.resolutionNotes,
+        partsUsed: parsed.data.partsUsed ?? null,
+      })
+      .where(and(eq(maintenanceTickets.id, params.id), eq(maintenanceTickets.status, ticket.status)))
+      .run();
+    const applied = changesOf(result);
     if (applied === 0) {
       throw new ConflictError("This ticket was changed by someone else - your resolve action was not applied.");
     }

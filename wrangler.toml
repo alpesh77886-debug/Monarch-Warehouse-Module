@@ -1,6 +1,23 @@
 name = "monarch-warehouse-module"
-compatibility_date = "2024-09-01"
+# Loop 45/46: bumped from 2024-09-01 - Cloudflare's own docs require
+# compatibility_date >= 2024-09-23 for nodejs_compat to actually enable
+# Node.js compatibility (AsyncLocalStorage etc.), which the OpenNext
+# Cloudflare adapter depends on. Deliberately NOT bumped to today's date -
+# that would pull in newer, untested runtime behavior changes this loop
+# has no way to verify against; only the documented minimum is taken.
+compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
+
+# Loop 45/46: OpenNext Cloudflare adapter build output (`npx
+# opennextjs-cloudflare build`) - the real Workers entrypoint that wraps
+# this Next.js app, and its static asset bundle. Neither existed before
+# this loop; `npm run build` alone (plain `next build`) does not produce
+# them - `opennextjs-cloudflare build` must run first.
+main = ".open-next/worker.js"
+
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
 
 # Real Cloudflare D1 database (Loop 27) - created via the Cloudflare
 # connector after Alpesh explicitly pointed out it was connected and

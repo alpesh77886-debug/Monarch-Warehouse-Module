@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and } from "drizzle-orm";
-import { getDb } from "@/lib/db";
+import { getDb, changesOf } from "@/lib/db";
 import { transferOrders } from "../../../../../../drizzle/schema";
 import { requireRole } from "@/lib/auth";
 import { nextTransferOrderStatus, type TransferOrderStatus } from "@/lib/business-rules/transfer-order";
@@ -51,14 +51,15 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
     const nextStatus: TransferOrderStatus = nextTransferOrderStatus(order.status as TransferOrderStatus, "complete");
 
-    const applied = db.transaction((tx) => {
-      const result = tx
-        .update(transferOrders)
-        .set({ status: nextStatus })
-        .where(and(eq(transferOrders.id, params.id), eq(transferOrders.status, order.status)))
-        .run();
-      return result.changes;
-    });
+    // A single guarded UPDATE is already atomic as one statement - no
+    // wrapping transaction needed (D1 has no multi-statement
+    // BEGIN/COMMIT, see PEN-044 / src/lib/db.ts).
+    const result = await db
+      .update(transferOrders)
+      .set({ status: nextStatus })
+      .where(and(eq(transferOrders.id, params.id), eq(transferOrders.status, order.status)))
+      .run();
+    const applied = changesOf(result);
     if (applied === 0) {
       throw new ConflictError("This transfer order was changed by someone else - your complete action was not applied.");
     }

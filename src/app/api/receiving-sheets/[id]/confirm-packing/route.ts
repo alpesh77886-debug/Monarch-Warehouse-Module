@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and } from "drizzle-orm";
-import { getDb } from "@/lib/db";
+import { getDb, changesOf, runAtomicBatch } from "@/lib/db";
 import { receivingSheets } from "../../../../../../drizzle/schema";
 import { requirePermission, requireCurrentUserId } from "@/lib/auth";
 import { confirmPackingSchema } from "@/lib/validations/receiving-sheet";
@@ -8,7 +8,7 @@ import {
   nextReceivingSheetStatus,
   type ReceivingSheetStatus,
 } from "@/lib/business-rules/receiving-sheet";
-import { materializeReceivingSheetLock } from "@/lib/receiving-sheet-lock";
+import { planReceivingSheetLock } from "@/lib/receiving-sheet-lock";
 import {
   UnauthorizedError,
   ForbiddenError,
@@ -68,31 +68,40 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     // status this handler just read - a conditional UPDATE guarantees
     // that only one of two concurrent requests can actually apply its
     // transition; the loser's affected-row count comes back 0.
-    let materialized: ReturnType<typeof materializeReceivingSheetLock> | null = null;
-    const applied = db.transaction((tx) => {
-      if (nextStatus === "LOCKED") {
-        materialized = materializeReceivingSheetLock(tx, sheet.id, currentUserId);
-      }
-      const result = tx
-        .update(receivingSheets)
-        .set({
-          status: nextStatus,
-          packingConfirmedAt: now,
-          ...(parsed.data.supervisorId ? { packingSupervisorId: parsed.data.supervisorId } : {}),
-          ...(parsed.data.operatorId ? { packingOperatorId: parsed.data.operatorId } : {}),
-          ...(materialized
-            ? { totalQty: materialized.totalQty, totalBoxes: materialized.totalBoxes }
-            : {}),
-        })
-        .where(and(eq(receivingSheets.id, sheet.id), eq(receivingSheets.status, currentStatus)))
-        .run();
-      return result.changes;
-    });
+    //
+    // db.transaction() would crash on real D1 (no multi-statement
+    // BEGIN/COMMIT - see PEN-044 / src/lib/db.ts). The guarded closing
+    // UPDATE decides whether this confirmation is even allowed to
+    // proceed, so it runs alone first, and the lock-time materialization
+    // writes (if any) only run, as one atomic batch, once that guard is
+    // confirmed to have matched - see planReceivingSheetLock's own doc
+    // comment for why this ordering also closes a latent
+    // double-materialization race the old code had.
+    const materialized = nextStatus === "LOCKED" ? planReceivingSheetLock(db, sheet.id, currentUserId) : null;
+
+    const guardResult = await db
+      .update(receivingSheets)
+      .set({
+        status: nextStatus,
+        packingConfirmedAt: now,
+        ...(parsed.data.supervisorId ? { packingSupervisorId: parsed.data.supervisorId } : {}),
+        ...(parsed.data.operatorId ? { packingOperatorId: parsed.data.operatorId } : {}),
+        ...(materialized
+          ? { totalQty: materialized.totalQty, totalBoxes: materialized.totalBoxes }
+          : {}),
+      })
+      .where(and(eq(receivingSheets.id, sheet.id), eq(receivingSheets.status, currentStatus)))
+      .run();
+    const applied = changesOf(guardResult);
 
     if (applied === 0) {
       throw new ConflictError(
         "This sheet was already confirmed or changed by someone else - your confirmation was not applied."
       );
+    }
+
+    if (materialized && materialized.statements.length > 0) {
+      await runAtomicBatch(db, [materialized.statements[0], ...materialized.statements.slice(1)]);
     }
 
     const [updated] = await db.select().from(receivingSheets).where(eq(receivingSheets.id, sheet.id));

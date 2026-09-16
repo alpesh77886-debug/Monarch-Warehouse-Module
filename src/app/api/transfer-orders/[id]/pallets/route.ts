@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { getDb } from "@/lib/db";
+import { getDb, runAtomicBatch, type UnrunStatement } from "@/lib/db";
 import { transferOrders, transferOrderPallets, pallets, palletBatches } from "../../../../../../drizzle/schema";
 import { requirePermission } from "@/lib/auth";
 import { transferOrderPickSchema } from "@/lib/validations/transfer-order";
@@ -82,23 +82,29 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       order.status === "DRAFT" ? nextTransferOrderStatus("DRAFT", "pick") : (order.status as TransferOrderStatus);
 
     const rowId = crypto.randomUUID();
+    // db.transaction() would crash on real D1 (no multi-statement
+    // BEGIN/COMMIT - see PEN-044 / src/lib/db.ts). Neither statement's
+    // value depends on the other's result (the DRAFT->PICKED bump is
+    // decided from `order.status` read before this point, plain
+    // JS array-building, not a guard on a write result), so a plain
+    // atomic batch is the correct replacement.
+    const stmts: UnrunStatement[] = [];
+    if (order.status === "DRAFT") {
+      stmts.push(db.update(transferOrders).set({ status: nextStatus }).where(eq(transferOrders.id, params.id)));
+    }
+    stmts.push(
+      db.insert(transferOrderPallets).values({
+        id: rowId,
+        transferOrderId: params.id,
+        palletId: pallet.id,
+        materialId: pallet.materialId,
+        batchId: palletBatchRow.batchId,
+        cartonQty: pallet.totalCartons,
+        weightKg: pallet.totalWeightKg,
+      })
+    );
     try {
-      db.transaction((tx) => {
-        if (order.status === "DRAFT") {
-          tx.update(transferOrders).set({ status: nextStatus }).where(eq(transferOrders.id, params.id)).run();
-        }
-        tx.insert(transferOrderPallets)
-          .values({
-            id: rowId,
-            transferOrderId: params.id,
-            palletId: pallet.id,
-            materialId: pallet.materialId,
-            batchId: palletBatchRow.batchId,
-            cartonQty: pallet.totalCartons,
-            weightKg: pallet.totalWeightKg,
-          })
-          .run();
-      });
+      await runAtomicBatch(db, [stmts[0], ...stmts.slice(1)]);
     } catch (e) {
       if (e instanceof Error && /UNIQUE constraint failed/i.test(e.message)) {
         throw new ConflictError("This pallet is already picked onto this transfer order.");

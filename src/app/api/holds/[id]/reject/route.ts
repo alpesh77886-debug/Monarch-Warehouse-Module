@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { getDb } from "@/lib/db";
+import { getDb, runAtomicBatch } from "@/lib/db";
 import { holdRecords, holdPallets, pallets, stockLedger } from "../../../../../../drizzle/schema";
 import { requirePermission, requireCurrentUserId } from "@/lib/auth";
 import { holdRejectSchema } from "@/lib/validations/hold";
@@ -70,46 +70,49 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }));
 
     const now = new Date().toISOString();
-    db.transaction((tx) => {
-      tx.update(holdRecords)
-        .set({
-          status: "REJECTED",
-          releasedById: currentUserId,
-          releasedAt: now,
-          releaseRemarks: parsed.data.releaseRemarks,
-        })
-        .where(eq(holdRecords.id, params.id))
-        .run();
+    // db.transaction() would crash on real D1 (no multi-statement
+    // BEGIN/COMMIT - see PEN-044 / src/lib/db.ts). None of these writes'
+    // values depend on another statement's result, so a plain atomic
+    // batch is the correct replacement.
+    const holdUpdateStmt = db
+      .update(holdRecords)
+      .set({
+        status: "REJECTED",
+        releasedById: currentUserId,
+        releasedAt: now,
+        releaseRemarks: parsed.data.releaseRemarks,
+      })
+      .where(eq(holdRecords.id, params.id));
 
-      for (const { pallet, transition } of transitions) {
-        tx.update(pallets).set({ statusCode: "REJECTED" }).where(eq(pallets.id, pallet.id)).run();
-
-        const ledgerEntry = describeLedgerEntry(transition);
-        tx.insert(stockLedger)
-          .values({
-            id: crypto.randomUUID(),
-            date: now.slice(0, 10),
-            shift: "NA",
-            transactionType: ledgerEntry.transactionType,
-            materialId: hold.materialId,
-            batchId: hold.batchId,
-            palletId: pallet.id,
-            locationId: pallet.currentLocationId,
-            warehouseId: pallet.currentWarehouseId,
-            qtyChange: 0,
-            qtyAfter: pallet.totalCartons,
-            weightChangeKg: 0,
-            weightAfterKg: pallet.totalWeightKg,
-            statusBefore: ledgerEntry.statusBefore,
-            statusAfter: ledgerEntry.statusAfter,
-            referenceType: ledgerEntry.referenceType,
-            referenceId: hold.id,
-            userId: currentUserId,
-            remarks: parsed.data.releaseRemarks,
-          })
-          .run();
-      }
+    const palletStmts = transitions.flatMap(({ pallet, transition }) => {
+      const ledgerEntry = describeLedgerEntry(transition);
+      return [
+        db.update(pallets).set({ statusCode: "REJECTED" }).where(eq(pallets.id, pallet.id)),
+        db.insert(stockLedger).values({
+          id: crypto.randomUUID(),
+          date: now.slice(0, 10),
+          shift: "NA",
+          transactionType: ledgerEntry.transactionType,
+          materialId: hold.materialId,
+          batchId: hold.batchId,
+          palletId: pallet.id,
+          locationId: pallet.currentLocationId,
+          warehouseId: pallet.currentWarehouseId,
+          qtyChange: 0,
+          qtyAfter: pallet.totalCartons,
+          weightChangeKg: 0,
+          weightAfterKg: pallet.totalWeightKg,
+          statusBefore: ledgerEntry.statusBefore,
+          statusAfter: ledgerEntry.statusAfter,
+          referenceType: ledgerEntry.referenceType,
+          referenceId: hold.id,
+          userId: currentUserId,
+          remarks: parsed.data.releaseRemarks,
+        }),
+      ];
     });
+
+    await runAtomicBatch(db, [holdUpdateStmt, ...palletStmts]);
 
     const [updated] = await db.select().from(holdRecords).where(eq(holdRecords.id, params.id));
     return NextResponse.json({ hold: updated });

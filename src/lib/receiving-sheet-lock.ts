@@ -1,5 +1,5 @@
 import { eq, and } from "drizzle-orm";
-import { getDb } from "./db";
+import { getDb, type UnrunStatement } from "./db";
 import {
   receivingSheets,
   receivingSheetPallets,
@@ -13,15 +13,29 @@ import {
 import { ValidationError } from "./errors";
 import { productionDateFromBatchNumber } from "./business-rules/receiving-sheet";
 
-// The exact type of the `tx` callback parameter from `db.transaction((tx)
-// => {...})` - narrower than `ReturnType<typeof getDb>` itself (no nested
-// transaction/session methods), but this function is only ever called
-// from inside such a callback, so that is the type it actually needs.
-type DbOrTx = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
-
 /**
- * Lock-time materialization (Flow 1 Step 3/4), run inside the same
- * transaction as the confirm action that brings a sheet to LOCKED.
+ * Lock-time materialization plan (Flow 1 Step 3/4) - Loop 46 rewrite,
+ * see PEN-044: this used to run its writes directly inside the same
+ * `db.transaction((tx) => {...})` as the confirm action's closing
+ * UPDATE, which Cloudflare D1 cannot support at all (no multi-statement
+ * BEGIN/COMMIT). Every value this function's writes need - the batch to
+ * reuse or create, each new pallet's id and computed weight, the
+ * aggregate totals - is fully decided by data already read here, none of
+ * it depends on a write actually having happened yet. So instead of
+ * writing anything, this now does only the reads/validation and returns
+ * an unrun statement plan (still built off the caller's own `db`, never
+ * executed here) plus the aggregates, for the caller to run atomically
+ * together with its own guarded closing UPDATE via `runAtomicBatch` -
+ * see confirm-warehouse/confirm-packing's route handlers. This also
+ * closes a latent double-materialization race the old code had: because
+ * the old code always ran these writes before checking whether the
+ * closing UPDATE's optimistic-concurrency guard actually matched a row,
+ * a lost race could leave orphaned pallets/batches/ledger rows behind
+ * even though the sheet was reported as not confirmed. The new
+ * plan-then-batch-with-the-guard-first shape given to callers makes that
+ * no longer possible: the materialization statements only run at all
+ * once the guard is confirmed to have matched.
+ *
  * Turns the sheet's own draft data into the real, permanent rows the
  * rest of the app depends on: a real `batches` row (find-or-create, by
  * the sheet's own batch_number - ENTITY-002 says production_date is
@@ -51,12 +65,16 @@ type DbOrTx = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>
  *     seeded, see PEN-008), this throws a clear, honest error rather
  *     than inventing a warehouse row or guessing which one to use.
  */
-export function materializeReceivingSheetLock(db: DbOrTx, sheetId: string, confirmingUserId: string) {
-  const [sheet] = db.select().from(receivingSheets).where(eq(receivingSheets.id, sheetId)).all();
+export function planReceivingSheetLock(
+  database: ReturnType<typeof getDb>,
+  sheetId: string,
+  confirmingUserId: string
+) {
+  const [sheet] = database.select().from(receivingSheets).where(eq(receivingSheets.id, sheetId)).all();
   if (!sheet) {
     throw new ValidationError(`Receiving sheet "${sheetId}" not found during lock.`);
   }
-  const rows = db
+  const rows = database
     .select()
     .from(receivingSheetPallets)
     .where(eq(receivingSheetPallets.receivingSheetId, sheetId))
@@ -65,12 +83,12 @@ export function materializeReceivingSheetLock(db: DbOrTx, sheetId: string, confi
     throw new ValidationError("Cannot lock a receiving sheet with no pallet rows.");
   }
 
-  const [material] = db.select().from(materials).where(eq(materials.id, sheet.materialId)).all();
+  const [material] = database.select().from(materials).where(eq(materials.id, sheet.materialId)).all();
   if (!material) {
     throw new ValidationError(`Material "${sheet.materialId}" not found during lock.`);
   }
 
-  const [warehouse] = db
+  const [warehouse] = database
     .select()
     .from(warehouses)
     .where(and(eq(warehouses.plant, material.plantOrigin), eq(warehouses.active, 1)))
@@ -82,11 +100,13 @@ export function materializeReceivingSheetLock(db: DbOrTx, sheetId: string, confi
     );
   }
 
-  let [batch] = db.select().from(batches).where(eq(batches.batchNumber, sheet.batchNumber)).all();
-  if (!batch) {
-    const batchId = crypto.randomUUID();
-    db.insert(batches)
-      .values({
+  const [existingBatch] = database.select().from(batches).where(eq(batches.batchNumber, sheet.batchNumber)).all();
+  let batchId: string;
+  const statements: UnrunStatement[] = [];
+  if (!existingBatch) {
+    batchId = crypto.randomUUID();
+    statements.push(
+      database.insert(batches).values({
         id: batchId,
         batchNumber: sheet.batchNumber,
         materialId: sheet.materialId,
@@ -94,12 +114,13 @@ export function materializeReceivingSheetLock(db: DbOrTx, sheetId: string, confi
         productionLine: sheet.line,
         shift: sheet.shift,
       })
-      .run();
-    [batch] = db.select().from(batches).where(eq(batches.id, batchId)).all();
-  } else if (batch.materialId !== sheet.materialId) {
+    );
+  } else if (existingBatch.materialId !== sheet.materialId) {
     throw new ValidationError(
       `Batch "${sheet.batchNumber}" already exists for a different material - cannot reuse it here.`
     );
+  } else {
+    batchId = existingBatch.id;
   }
 
   let totalQty = 0;
@@ -108,8 +129,8 @@ export function materializeReceivingSheetLock(db: DbOrTx, sheetId: string, confi
   for (const row of rows) {
     const weightKg = row.qty * material.uomKgPerCarton;
     const palletId = crypto.randomUUID();
-    db.insert(pallets)
-      .values({
+    statements.push(
+      database.insert(pallets).values({
         id: palletId,
         palletNumber: row.palletNumber,
         palletType: "PLASTIC",
@@ -119,27 +140,21 @@ export function materializeReceivingSheetLock(db: DbOrTx, sheetId: string, confi
         totalCartons: row.qty,
         currentWarehouseId: warehouse.id,
         createdBy: confirmingUserId,
-      })
-      .run();
-
-    db.insert(palletBatches)
-      .values({
+      }),
+      database.insert(palletBatches).values({
         id: crypto.randomUUID(),
         palletId,
-        batchId: batch.id,
+        batchId,
         cartonQty: row.qty,
         weightKg,
-      })
-      .run();
-
-    db.insert(stockLedger)
-      .values({
+      }),
+      database.insert(stockLedger).values({
         id: crypto.randomUUID(),
         date: sheet.date,
         shift: sheet.shift,
         transactionType: "INWARD",
         materialId: sheet.materialId,
-        batchId: batch.id,
+        batchId,
         palletId,
         locationId: null,
         warehouseId: warehouse.id,
@@ -153,16 +168,23 @@ export function materializeReceivingSheetLock(db: DbOrTx, sheetId: string, confi
         referenceId: sheet.id,
         userId: confirmingUserId,
       })
-      .run();
+    );
 
     totalQty += row.qty;
     totalWeightKg += weightKg;
   }
 
-  // Does NOT update the receiving_sheets row itself - the caller folds
-  // totalQty/totalBoxes into the same single UPDATE that sets
-  // status='LOCKED', because the receiving_sheets_locked_immutable
-  // trigger (INV-008) aborts any UPDATE once OLD.status is already
-  // 'LOCKED', so a second, later write here would fail.
-  return { totalQty, totalBoxes: rows.length, totalWeightKg, warehouseId: warehouse.id, batchId: batch.id };
+  // Deliberately does NOT touch the receiving_sheets row itself - the
+  // caller folds totalQty/totalBoxes into its own guarded closing UPDATE
+  // that sets status='LOCKED', which must run and be confirmed to have
+  // matched BEFORE these `statements` are run at all (see this
+  // function's own doc comment above).
+  return {
+    statements,
+    totalQty,
+    totalBoxes: rows.length,
+    totalWeightKg,
+    warehouseId: warehouse.id,
+    batchId,
+  };
 }

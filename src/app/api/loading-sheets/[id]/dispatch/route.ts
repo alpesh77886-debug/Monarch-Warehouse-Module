@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and } from "drizzle-orm";
-import { getDb } from "@/lib/db";
+import { getDb, changesOf, runAtomicBatch, type UnrunStatement } from "@/lib/db";
 import { loadingSheets, loadingSheetPallets, pallets, locations, stockLedger } from "../../../../../../drizzle/schema";
 import { requireRole, requireCurrentUserId } from "@/lib/auth";
 import { nextLoadingSheetStatus, type LoadingSheetStatus } from "@/lib/business-rules/loading-sheet";
@@ -68,55 +68,68 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }));
 
     const now = new Date().toISOString();
-    const applied = db.transaction((tx) => {
-      const result = tx
-        .update(loadingSheets)
-        .set({ status: nextStatus })
-        .where(and(eq(loadingSheets.id, params.id), eq(loadingSheets.status, sheet.status)))
-        .run();
-      if (result.changes === 0) return 0;
-
-      for (const { pallet, line, transition } of transitions) {
-        if (pallet.currentLocationId) {
-          tx.update(locations)
-            .set({ status: "EMPTY", currentPalletId: null })
-            .where(eq(locations.id, pallet.currentLocationId))
-            .run();
-        }
-
-        const ledgerEntry = describeLedgerEntry(transition);
-        tx.insert(stockLedger)
-          .values({
-            id: crypto.randomUUID(),
-            date: now.slice(0, 10),
-            shift: "NA",
-            transactionType: ledgerEntry.transactionType,
-            materialId: pallet.materialId,
-            batchId: line.batchId,
-            palletId: pallet.id,
-            locationId: pallet.currentLocationId,
-            warehouseId: pallet.currentWarehouseId,
-            qtyChange: -pallet.totalCartons,
-            qtyAfter: 0,
-            weightChangeKg: -pallet.totalWeightKg,
-            weightAfterKg: 0,
-            statusBefore: ledgerEntry.statusBefore,
-            statusAfter: ledgerEntry.statusAfter,
-            referenceType: "LOADING_SHEET",
-            referenceId: sheet.id,
-            userId: currentUserId,
-          })
-          .run();
-
-        tx.update(pallets)
-          .set({ statusCode: "DISPATCHED", currentLocationId: null })
-          .where(eq(pallets.id, pallet.id))
-          .run();
-      }
-      return result.changes;
-    });
+    // db.transaction() would crash on real D1 (no multi-statement
+    // BEGIN/COMMIT - see PEN-044 / src/lib/db.ts). The guarded UPDATE
+    // below decides whether this dispatch is even allowed to proceed
+    // (optimistic concurrency), so it runs alone first - a single
+    // statement is already atomic - and only if it actually matched a
+    // row do the per-pallet writes run, together, as one atomic batch.
+    // Residual risk (PEN-045): a crash between these two calls could
+    // leave the loading sheet marked DISPATCHED with its pallets not yet
+    // moved - narrower than, but not identical to, the single real ACID
+    // transaction this replaced (D1 has no such primitive to fall back
+    // to - see PEN-044).
+    const guardResult = await db
+      .update(loadingSheets)
+      .set({ status: nextStatus })
+      .where(and(eq(loadingSheets.id, params.id), eq(loadingSheets.status, sheet.status)))
+      .run();
+    const applied = changesOf(guardResult);
     if (applied === 0) {
       throw new ConflictError("This loading sheet was changed by someone else - your dispatch action was not applied.");
+    }
+
+    const palletStmts = transitions.flatMap(({ pallet, line, transition }) => {
+      const ledgerEntry = describeLedgerEntry(transition);
+      const stmts: UnrunStatement[] = [];
+      if (pallet.currentLocationId) {
+        stmts.push(
+          db
+            .update(locations)
+            .set({ status: "EMPTY", currentPalletId: null })
+            .where(eq(locations.id, pallet.currentLocationId))
+        );
+      }
+      stmts.push(
+        db.insert(stockLedger).values({
+          id: crypto.randomUUID(),
+          date: now.slice(0, 10),
+          shift: "NA",
+          transactionType: ledgerEntry.transactionType,
+          materialId: pallet.materialId,
+          batchId: line.batchId,
+          palletId: pallet.id,
+          locationId: pallet.currentLocationId,
+          warehouseId: pallet.currentWarehouseId,
+          qtyChange: -pallet.totalCartons,
+          qtyAfter: 0,
+          weightChangeKg: -pallet.totalWeightKg,
+          weightAfterKg: 0,
+          statusBefore: ledgerEntry.statusBefore,
+          statusAfter: ledgerEntry.statusAfter,
+          referenceType: "LOADING_SHEET",
+          referenceId: sheet.id,
+          userId: currentUserId,
+        }),
+        db
+          .update(pallets)
+          .set({ statusCode: "DISPATCHED", currentLocationId: null })
+          .where(eq(pallets.id, pallet.id))
+      );
+      return stmts;
+    });
+    if (palletStmts.length > 0) {
+      await runAtomicBatch(db, [palletStmts[0], ...palletStmts.slice(1)]);
     }
 
     const [updated] = await db.select().from(loadingSheets).where(eq(loadingSheets.id, params.id));

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and } from "drizzle-orm";
-import { getDb } from "@/lib/db";
+import { getDb, changesOf } from "@/lib/db";
 import { maintenanceTickets } from "../../../../../../drizzle/schema";
 import { requireRole } from "@/lib/auth";
 import { nextMaintenanceTicketStatus, type MaintenanceTicketStatus } from "@/lib/business-rules/maintenance";
@@ -53,14 +53,15 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       "start_work"
     );
 
-    const applied = db.transaction((tx) => {
-      const result = tx
-        .update(maintenanceTickets)
-        .set({ status: nextStatus })
-        .where(and(eq(maintenanceTickets.id, params.id), eq(maintenanceTickets.status, ticket.status)))
-        .run();
-      return result.changes;
-    });
+    // A single guarded UPDATE is already atomic as one statement - no
+    // wrapping transaction needed (D1 has no multi-statement
+    // BEGIN/COMMIT, see PEN-044 / src/lib/db.ts).
+    const result = await db
+      .update(maintenanceTickets)
+      .set({ status: nextStatus })
+      .where(and(eq(maintenanceTickets.id, params.id), eq(maintenanceTickets.status, ticket.status)))
+      .run();
+    const applied = changesOf(result);
     if (applied === 0) {
       throw new ConflictError("This ticket was changed by someone else - your start-work action was not applied.");
     }

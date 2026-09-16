@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and } from "drizzle-orm";
-import { getDb } from "@/lib/db";
+import { getDb, changesOf, runAtomicBatch, type UnrunStatement } from "@/lib/db";
 import { transferOrders, transferOrderPallets, pallets, locations, stockLedger } from "../../../../../../drizzle/schema";
 import { requirePermission, requireCurrentUserId } from "@/lib/auth";
 import { nextTransferOrderStatus, type TransferOrderStatus, type TransferType } from "@/lib/business-rules/transfer-order";
@@ -79,65 +79,77 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     });
 
     const now = new Date().toISOString();
-    const applied = db.transaction((tx) => {
-      const result = tx
-        .update(transferOrders)
-        .set({ status: nextStatus, dispatchedAt: now })
-        .where(and(eq(transferOrders.id, params.id), eq(transferOrders.status, order.status)))
-        .run();
-      if (result.changes === 0) return 0;
+    // db.transaction() would crash on real D1 (no multi-statement
+    // BEGIN/COMMIT - see PEN-044 / src/lib/db.ts). The guarded UPDATE
+    // below decides whether this dispatch is even allowed to proceed
+    // (optimistic concurrency), so it runs alone first - a single
+    // statement is already atomic - and only if it actually matched a
+    // row do the per-pallet writes run, together, as one atomic batch.
+    // Residual risk (PEN-045): a crash between these two calls could
+    // leave the order marked IN_TRANSIT with its pallets not yet moved -
+    // narrower than, but not identical to, the single real ACID
+    // transaction this replaced (D1 has no such primitive to fall back
+    // to - see PEN-044).
+    const guardResult = await db
+      .update(transferOrders)
+      .set({ status: nextStatus, dispatchedAt: now })
+      .where(and(eq(transferOrders.id, params.id), eq(transferOrders.status, order.status)))
+      .run();
+    const applied = changesOf(guardResult);
+    if (applied === 0) {
+      throw new ConflictError("This transfer order was changed by someone else - your dispatch action was not applied.");
+    }
 
-      for (const { pallet, line, transition } of plans) {
-        if (pallet.currentLocationId) {
-          tx.update(locations)
-            .set({ status: "EMPTY", currentPalletId: null })
-            .where(eq(locations.id, pallet.currentLocationId))
-            .run();
-        }
+    const palletStmts = plans.flatMap(({ pallet, line, transition }) => {
+      const ledgerEntry = transition
+        ? describeLedgerEntry(transition)
+        : {
+            transactionType: "TRANSFER_OUT" as const,
+            statusBefore: pallet.statusCode as PalletStatus,
+            statusAfter: pallet.statusCode as PalletStatus,
+          };
 
-        const ledgerEntry = transition
-          ? describeLedgerEntry(transition)
-          : {
-              transactionType: "TRANSFER_OUT" as const,
-              statusBefore: pallet.statusCode as PalletStatus,
-              statusAfter: pallet.statusCode as PalletStatus,
-            };
-
-        tx.insert(stockLedger)
-          .values({
-            id: crypto.randomUUID(),
-            date: now.slice(0, 10),
-            shift: "NA",
-            transactionType: ledgerEntry.transactionType,
-            materialId: pallet.materialId,
-            batchId: line.batchId,
-            palletId: pallet.id,
-            locationId: pallet.currentLocationId,
-            warehouseId: pallet.currentWarehouseId,
-            qtyChange: 0,
-            qtyAfter: pallet.totalCartons,
-            weightChangeKg: 0,
-            weightAfterKg: pallet.totalWeightKg,
-            statusBefore: ledgerEntry.statusBefore,
-            statusAfter: ledgerEntry.statusAfter,
-            referenceType: "TRANSFER_ORDER",
-            referenceId: order.id,
-            userId: currentUserId,
-          })
-          .run();
-
-        tx.update(pallets)
+      const stmts: UnrunStatement[] = [
+        db.insert(stockLedger).values({
+          id: crypto.randomUUID(),
+          date: now.slice(0, 10),
+          shift: "NA",
+          transactionType: ledgerEntry.transactionType,
+          materialId: pallet.materialId,
+          batchId: line.batchId,
+          palletId: pallet.id,
+          locationId: pallet.currentLocationId,
+          warehouseId: pallet.currentWarehouseId,
+          qtyChange: 0,
+          qtyAfter: pallet.totalCartons,
+          weightChangeKg: 0,
+          weightAfterKg: pallet.totalWeightKg,
+          statusBefore: ledgerEntry.statusBefore,
+          statusAfter: ledgerEntry.statusAfter,
+          referenceType: "TRANSFER_ORDER",
+          referenceId: order.id,
+          userId: currentUserId,
+        }),
+        db
+          .update(pallets)
           .set({
             statusCode: transition ? "IN_TRANSIT" : pallet.statusCode,
             currentLocationId: null,
           })
-          .where(eq(pallets.id, pallet.id))
-          .run();
+          .where(eq(pallets.id, pallet.id)),
+      ];
+      if (pallet.currentLocationId) {
+        stmts.push(
+          db
+            .update(locations)
+            .set({ status: "EMPTY", currentPalletId: null })
+            .where(eq(locations.id, pallet.currentLocationId))
+        );
       }
-      return result.changes;
+      return stmts;
     });
-    if (applied === 0) {
-      throw new ConflictError("This transfer order was changed by someone else - your dispatch action was not applied.");
+    if (palletStmts.length > 0) {
+      await runAtomicBatch(db, [palletStmts[0], ...palletStmts.slice(1)]);
     }
 
     const [updated] = await db.select().from(transferOrders).where(eq(transferOrders.id, params.id));
