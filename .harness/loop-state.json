@@ -1,6 +1,6 @@
 {
-  "completed_loops": 8,
+  "completed_loops": 10,
   "max_loops": 10,
-  "permission_required": false,
+  "permission_required": true,
   "window": 7
 }
