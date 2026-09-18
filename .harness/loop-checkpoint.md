@@ -1,6 +1,6 @@
 # MONARCH 10-Loop Checkpoint
 
-Generated: 2026-09-16T12:33:50.035Z
+Generated: 2026-09-16T12:45:07.692Z
 
 **Completed loops in current window:** 10 / 10
 
@@ -872,6 +872,22 @@ Commands run, in order, with results:
 **A process note, not a product one**: partway through the route rewrite, an automated process (not something this session invoked deliberately) stashed all uncommitted working-tree changes; recovered cleanly via `git stash` (nothing was lost, `git status`/`tsc`/the full test suite all confirmed the restored tree matched what had been built) - flagged here for transparency, not silently absorbed.
 
 **Free-only confirmation:** no paid action taken. The Cloudflare API token Alpesh provided is stored only in the gitignored `.env.local`, used only for the MCP-tool-mediated D1 schema sync above (the same read/write scope Alpesh already granted by connecting Cloudflare to this session) - not for any billing action, and R2's card-entry screen Alpesh flagged was explicitly left untouched, as already instructed. Still NOT DEPLOYED - the actual `wrangler deploy`/`opennextjs-cloudflare deploy` must be run by Alpesh himself from a machine with real internet access, per this sandbox's own confirmed network-policy limitation.
+
+## Loop 46 addendum - first real production deploy (Alpesh's own device)
+
+**DEPLOYED.** Alpesh is mobile-only (no laptop/computer), so the deploy itself could not be handed off as a plain CLI command sequence as originally planned - three real environment obstacles were hit and worked through, in order, before landing on one that worked:
+
+1. **Cloudflare dashboard's own Git-integration wizard** (`dash.cloudflare.com` -> Workers & Pages -> Create -> Import a repository) - the GitHub App installation completed correctly (repo access granted to `Monarch-Warehouse-Module`, confirmed via screenshot), but the dashboard's own "Connect GitHub" step never recognized it, looping indefinitely on a mobile browser. Not resolved - abandoned in favor of a real CLI path instead of continuing to fight a mobile SPA's OAuth handshake.
+2. **GitHub Codespaces' web IDE** - two codespaces were created successfully (confirming GitHub's side works fine), but the heavy VS Code Web bundle never finished loading over Alpesh's mobile connection (observed as low as 3-4.5 KB/s at points), stuck indefinitely on "Setting up your codespace." Repo-side was checked and ruled out as the cause (no `.devcontainer` config exists, so Codespaces uses GitHub's plain default image).
+3. **Termux** (a real Linux userspace app for Android) - genuinely worked for `git clone` and, after two real Termux-specific fixes (`pkg install python clang make` for `better-sqlite3`'s native build, then `export GYP_DEFINES="android_ndk_path=''"` for a documented Termux/node-gyp Android-NDK detection bug - found via a targeted web search of Termux's and Cloudflare's own issue trackers, not guessed), `npm install` got past `better-sqlite3`. It then hit a real, currently-unfixable wall: Cloudflare's `workerd` runtime has no published Android build at all (`Error: Unsupported platform: android arm64 LE` - confirmed as a still-open upstream feature request in `cloudflare/workerd`, not a config issue), so `wrangler`/`opennextjs-cloudflare` can never fully install on Termux itself.
+
+**What actually worked**: used Termux not to run the build locally, but as a lightweight SSH client into one of the already-created (real x86_64 Linux) Codespaces - `pkg install gh`, `gh auth login` (+ `gh auth refresh -h github.com -s codespace` for the missing OAuth scope), then `gh codespace ssh` into the codespace already on this branch. Every later command (`npm install`, `npx opennextjs-cloudflare build`, `npx wrangler secret put CLERK_SECRET_KEY`, `npx wrangler deploy`) then ran inside that Codespace's real Ubuntu 24.04 container - avoiding both the heavy web-IDE load (SSH is a thin terminal protocol) and the Android/workerd platform gap (the Codespace itself is real Linux, not Android) at the same time. `npm install` completed clean with zero errors on this path. `.env.local` (Clerk keys) and `CLOUDFLARE_API_TOKEN` were provided directly by Alpesh to be typed into his own Termux session - see PEN-029's established secret-handling precedent, same reasoning applied again here since these were already his own known values, not newly disclosed ones.
+
+**Real deploy output**: `npx opennextjs-cloudflare build` -> "Worker saved in `.open-next/worker.js`", OpenNext build complete. `npx wrangler deploy` -> "Success! Uploaded 52 files", real bindings confirmed in the deploy output itself (`env.DB -> D1 Database -> monarch-warehouse-module`, `env.ASSETS -> Assets`), "Deployed monarch-warehouse-module triggers".
+
+**Live URL: https://monarch-warehouse-module.alpesh77886.workers.dev** - genuinely running on Cloudflare Workers with the real D1 binding this entire Loop 45/46 window's rearchitecture (PEN-044/045) was built to make safe.
+
+**Free-only confirmation:** no paid action - deployed to Cloudflare's free Workers tier via Alpesh's own account, using credentials and a device he already owns.
 
 ## Architecture Decisions Log
 | Date | Decision | Status |
