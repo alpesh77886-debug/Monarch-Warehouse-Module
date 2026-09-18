@@ -35,7 +35,7 @@ test.describe("dashboard shell page", () => {
     expect(response?.ok()).toBe(true);
     await expect(page.getByText("Home / Dashboard")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Warehouse Overview" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "+ New Receiving Sheet" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "+ New Receiving Sheet" })).toBeVisible();
   });
 });
 

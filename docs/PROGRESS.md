@@ -879,6 +879,18 @@ Commands run, in order, with results:
 
 **Free-only confirmation:** no paid action - deployed to Cloudflare's free Workers tier via Alpesh's own account, using credentials and a device he already owns.
 
+## Loop 47 Checkpoint - TASK-012 Dashboard (SCREEN-001, Flow 10)
+
+Built per the implementation spec's own recommended task sequence (TASK-011 confirmed complete), following Alpesh's "Aage konse task pending hai vo start karo" instruction.
+
+**Built:** src/lib/business-rules/dashboard.ts (stock aging buckets 0-30/31-60/61-90/90+, buildStockSnapshot, buildRackMiniSummary - pure, DB-free, unit-tested), src/app/api/dashboard/route.ts (all 10 panels D-01 through D-10 in one aggregation GET, per-panel soft-restriction on Hold Tracking/Stock Ledger recent/In-Out Summary via getCurrentUser()+hasPermission()), src/app/(app)/dashboard/page.tsx (replaces the Loop 4 placeholder shell with real panels, 30s client poll, skeleton/empty/error states, "+ New Receiving Sheet" now a real working link instead of decorative). Five design readings, none invented beyond the locked sources - and a real getCurrentUser() bug found and fixed at its source, plus one pre-existing unrelated E2E flake disclosed - see PEN-046 for full detail on all of it.
+
+**Tests:** tests/unit/dashboard-live.test.ts (11 new live-DB tests), tests/e2e/dashboard.spec.ts (5 new browser tests - real ungated-panel data, honest restricted-panel notices in stub mode, the New Receiving Sheet nav link, mobile no-horizontal-scroll). tests/e2e/app-shell.spec.ts line 38 updated from getByRole("button", ...) to getByRole("link", ...) for the same "+ New Receiving Sheet" element - a real semantic correction (it is now genuine navigation to an existing route, not a stale placeholder), not a regression papered over.
+
+**Full regression, all green:** npx tsc --noEmit clean; unit suite 301/301 passing (28 files); E2E suite 79/80 passing (1 pre-existing, unrelated storage-putaway.spec.ts timeout, see PEN-046) - run with Clerk temporarily reverted to stub mode per PEN-030's own already-established precedent for local E2E runs, restored immediately after the run finished. Harness checks: contract-guard PASS, protected-integrity PASS, yaml-lexical-guard PASS, static-guard 1 new (already-precedented, see PEN-022's Loop 47 addition) + 2 pre-existing findings, package-integrity 1 pre-existing mismatch (PEN-032's own already-documented expected state) - no new, undisclosed harness regressions.
+
+**Free-only confirmation:** no paid action, no infrastructure change - local code/test/docs work only.
+
 ## Architecture Decisions Log
 | Date | Decision | Status |
 |------|----------|--------|

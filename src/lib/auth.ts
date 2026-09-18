@@ -57,8 +57,18 @@ type SessionMetadata = {
  * Reads the current user's role/department/plant from Clerk session
  * claims. Returns all-undefined when there is no session (never
  * throws) - callers that require a session use requireRole below.
+ *
+ * Calling Clerk's real auth() when clerkMiddleware() never ran (stub
+ * or partial config - see clerk-config.ts) throws Clerk's own internal
+ * error, the exact opaque failure requireRole/requirePermission were
+ * already hardened against (Loop 21). Guard the same way here so this
+ * function's own "never throws" contract actually holds in every
+ * config state, not only "configured".
  */
 export async function getCurrentUser() {
+  if (getClerkConfigStatus() !== "configured") {
+    return { role: undefined, department: undefined, plant: undefined } as SessionMetadata;
+  }
   const { sessionClaims } = await auth();
   const metadata = (sessionClaims?.metadata ?? {}) as SessionMetadata;
   return {
