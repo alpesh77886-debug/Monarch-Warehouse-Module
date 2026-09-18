@@ -891,6 +891,20 @@ Built per the implementation spec's own recommended task sequence (TASK-011 conf
 
 **Free-only confirmation:** no paid action, no infrastructure change - local code/test/docs work only.
 
+## Loop 48 Checkpoint - TASK-013 FIFO Stock Maintenance (SCREEN-013, Flow 7)
+
+Built per the implementation spec's own recommended task sequence (TASK-012 confirmed complete).
+
+**Found already built (Loop 41/TASK-008), re-verified not re-built:** FIFO pick suggestion (oldest-first select) and FIFO violation warning with override (assertFifoOrderOrOverride, INV-010) both already exist and pass GS-007/NS-008.
+
+**Built:** src/lib/business-rules/fifo.ts (buildAgingByBatch, calculateFifoCompliance - pure, DB-free, unit-tested, reuses dashboard.ts's own age-bucket boundaries rather than duplicating them), src/app/api/stock/aging/route.ts (GET, gated stock.view_ledger), src/app/(app)/stock/aging/page.tsx (SCREEN-013 - aging-by-batch table + FIFO compliance summary tiles), replaces the Stock landing page's old "Not built yet" placeholder card with a real link. Six design readings, none invented beyond the locked sources, and one real permission-matrix tension found and deliberately left unresolved rather than guessed (a code fix was written, then reverted before commit once it was confirmed to silently break the existing, passing GS-007 test) - see PEN-047 for full detail on all of it.
+
+**Tests:** tests/unit/fifo.test.ts (8 new pure-function tests), tests/unit/fifo-aging-live.test.ts (4 new live-DB tests), tests/e2e/stock-aging.spec.ts (3 new browser tests - nav link, honest permission-denied state in stub mode, mobile no-horizontal-scroll).
+
+**Full regression, all green:** npx tsc --noEmit clean; unit suite 313/313 passing (30 files); E2E suite 81/83 passing (2 not-run following 1 pre-existing, unrelated storage-putaway.spec.ts timeout - a DIFFERENT test in that same file than Loop 47 hit, further confirming the general-slowness diagnosis in PEN-046 over a logic defect) - run with Clerk temporarily reverted to stub mode per PEN-030's own established precedent, restored immediately after. Harness checks: contract-guard PASS, protected-integrity PASS, yaml-lexical-guard PASS, static-guard 1 new false positive (already-precedented, see PEN-042's Loop 48 addition) + 8 pre-existing findings, package-integrity 1 pre-existing mismatch (PEN-032's own already-documented expected state) - no new, undisclosed harness regressions.
+
+**Free-only confirmation:** no paid action, no infrastructure change - local code/test/docs work only.
+
 ## Architecture Decisions Log
 | Date | Decision | Status |
 |------|----------|--------|
