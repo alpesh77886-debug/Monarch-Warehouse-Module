@@ -128,6 +128,20 @@ export function planReceivingSheetLock(
 
   for (const row of rows) {
     const weightKg = row.qty * material.uomKgPerCarton;
+    // INV-007 ("Pallet weight must not exceed limit") - TASK-014's own
+    // audit found this was never actually enforced anywhere: the
+    // material master's own palletWeightLimitKg field (PEN-007) was
+    // stored and editable but never compared against anything. Each
+    // receiving-sheet row becomes exactly one new pallet here (never an
+    // existing one being added to - see this function's own doc comment),
+    // so the real, unambiguous check is this row's own resulting pallet
+    // weight against its material's real limit, at the one point a
+    // pallet's weight is actually decided.
+    if (weightKg > material.palletWeightLimitKg) {
+      throw new ValidationError(
+        `Pallet "${row.palletNumber}" would weigh ${weightKg}kg, over the ${material.palletWeightLimitKg}kg limit for ${material.code}.`
+      );
+    }
     const palletId = crypto.randomUUID();
     statements.push(
       database.insert(pallets).values({

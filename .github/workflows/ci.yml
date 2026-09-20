@@ -46,12 +46,15 @@ jobs:
         run: npm ci
       - name: Contract re-check after install
         run: node scripts/harness/contract-guard.mjs
+      # A fresh checkout has no local D1 file - unit tests that touch
+      # the real database need migrations applied and seed data present
+      # first.
+      - name: Migrate local D1
+        run: npx wrangler d1 migrations apply DB --local
+      - name: Seed local D1
+        run: npm run db:seed
       - name: Unit tests
         run: npm run test
-      - name: Invariant tests
-        run: npm run test:invariants
-      - name: Negative tests
-        run: npm run test:negative
       - name: Build
         run: npm run build
 
@@ -67,6 +70,12 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Migrate local D1
+        run: npx wrangler d1 migrations apply DB --local
+      - name: Seed local D1
+        run: npm run db:seed
+      - name: Install Playwright's own Chromium
+        run: npx playwright install --with-deps chromium
       - name: Start test app
         run: npm run dev:test > /tmp/monarch-warehouse.log 2>&1 &
       - name: Wait for app
@@ -77,9 +86,6 @@ jobs:
             sleep 1
           done
           echo 'Application did not become ready within 60 seconds.'
-          tail -n 200 /tmp/monarch-warehouse.log || true
           exit 1
-      - name: Golden E2E scenarios
+      - name: E2E tests
         run: npm run test:e2e
-      - name: Negative E2E scenarios
-        run: npm run test:e2e:negative

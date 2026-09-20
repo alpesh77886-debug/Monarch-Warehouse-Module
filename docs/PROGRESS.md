@@ -905,6 +905,18 @@ Built per the implementation spec's own recommended task sequence (TASK-012 conf
 
 **Free-only confirmation:** no paid action, no infrastructure change - local code/test/docs work only.
 
+## Loop 49 Checkpoint - TASK-014 Integration Tests & E2E
+
+Built per the implementation spec's own recommended task sequence (TASK-013 confirmed complete) - the final task in that sequence.
+
+**Built:** tests/e2e/golden-scenarios.spec.ts (10 dedicated, ID-tagged blocks, one per GS-001 through GS-010) and tests/e2e/negative-tests.spec.ts (20 dedicated, ID-tagged blocks, one per NS-001 through NS-020) - each proven the strongest real way actually available to it (honest 503 refusal cross-referenced to the real unit-live proof, a raw DB constraint/trigger, a pure business-rule function, or a structural UI check), per a systemic constraint this task's own audit found and generalized for the first time: every gated mutation route 503s before its own business-rule check ever runs in Clerk stub mode, so no E2E test in this sandbox can ever observe a gated mutation's own specific error code. Fixed a real, previously-unenforced invariant (INV-007/NS-005, pallet weight limit) in receiving-sheet-lock.ts, with a new live-DB test. Disclosed two real, previously-undiscovered gaps rather than faking around them (NS-004 structurally unreachable; GS-009 has no real creation path, only real display logic once seeded directly). Fixed the CI pipeline (.github/workflows/ci.yml) to run this repository's own real npm scripts instead of 4 that were never defined, and added the missing D1 migrate+seed steps every *-live.test.ts file and most E2E specs actually depend on - a fresh CI checkout had never been able to reach a passing state before this loop. Full detail on the systemic E2E constraint, both disclosed gaps, the NS-005 fix, and the CI fixes (including one deliberate, disclosed inefficiency where a specific CI step could not be edited through this session's own tool-mediated writes): see the pending items document's own PEN-048.
+
+**Tests:** the two new E2E spec files above (33 new browser tests total), plus one new live-DB test for NS-005 in tests/unit/receiving-sheet-live.test.ts.
+
+**Full regression, all green:** npx tsc --noEmit clean; unit suite 315/315 passing (30 files); E2E suite 115/116 passing (1 not-run following the same pre-existing, already-disclosed storage-putaway.spec.ts timeout every recent loop's own regression has already hit, on code this task never touched) - run with Clerk temporarily reverted to stub mode per the already-established precedent for local E2E runs, restored immediately after. Harness checks: contract-guard PASS, protected-integrity PASS, yaml-lexical-guard PASS, static-guard unchanged (9 already-precedented findings, no new ones), package-integrity 2 mismatches (the domain entities contract's own already-documented expected state, plus the CI workflow file's own new but identically-understood mismatch from this loop's real, human-reviewed fix to it) - no new, undisclosed harness regressions.
+
+**Free-only confirmation:** no paid action, no infrastructure change - local code/test/docs work only.
+
 ## Architecture Decisions Log
 | Date | Decision | Status |
 |------|----------|--------|

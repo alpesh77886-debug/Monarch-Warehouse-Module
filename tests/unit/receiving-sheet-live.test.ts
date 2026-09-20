@@ -42,6 +42,7 @@ const db = getDb();
 const FIXTURE_MATERIAL_CODE = "LFG00006";
 const FIXTURE_BATCH_NUMBER = "L26I070006";
 const CANCEL_BATCH_NUMBER = "L26I070060";
+const OVERWEIGHT_BATCH_NUMBER = "L26I070099";
 
 let materialId: string;
 let warehouseId: string;
@@ -60,7 +61,7 @@ let warehouseId: string;
  * live-mutation test file in this repository.
  */
 async function cleanup() {
-  for (const batchNumber of [FIXTURE_BATCH_NUMBER, CANCEL_BATCH_NUMBER]) {
+  for (const batchNumber of [FIXTURE_BATCH_NUMBER, CANCEL_BATCH_NUMBER, OVERWEIGHT_BATCH_NUMBER]) {
     const rows = await db.select().from(receivingSheets).where(eq(receivingSheets.batchNumber, batchNumber));
     for (const r of rows) {
       await db.delete(receivingSheetPallets).where(eq(receivingSheetPallets.receivingSheetId, r.id));
@@ -382,5 +383,62 @@ describe("Receiving Sheet - cancel a DRAFT sheet (PEN-033)", () => {
       { params: { id: cancelSheetId } }
     );
     expect(res.status).toBe(422);
+  });
+});
+
+// TASK-014 (Loop 49): INV-007 / NS-005 - "Pallet weight exceeds limit".
+// This project's own audit for TASK-014 found this was never actually
+// enforced anywhere until this loop's own fix to receiving-sheet-lock.ts
+// - covered here with its own fresh sheet/batch, not folded into the
+// file's shared `sheetId` fixture above.
+describe("Receiving Sheet - lock refuses an over-limit pallet (NS-005)", () => {
+  let overweightSheetId: string;
+
+  it("creates a fresh DRAFT sheet and pallet row that would weigh over the material's own limit", async () => {
+    const createRes = await createSheet(
+      jsonRequest("/api/receiving-sheets", "POST", {
+        date: "2026-09-07",
+        shift: "B",
+        line: "FF",
+        materialId,
+        batchNumber: OVERWEIGHT_BATCH_NUMBER,
+      })
+    );
+    const createBody = await createRes.json();
+    expect(createRes.status, JSON.stringify(createBody)).toBe(201);
+    overweightSheetId = createBody.receivingSheet.id;
+
+    // Fixture material: uomKgPerCarton=10, palletWeightLimitKg=1000 - 101
+    // cartons resolves to 1010kg, 10kg over the real limit.
+    const addRes = await addPallet(
+      jsonRequest(`/api/receiving-sheets/${overweightSheetId}/pallets`, "POST", {
+        palletNumber: "OVERWEIGHT-1",
+        qty: 101,
+        receivingTime: "11:00",
+        cartonCondition: "OK",
+      }),
+      { params: { id: overweightSheetId } }
+    );
+    expect(addRes.status).toBe(201);
+  });
+
+  it("refuses to lock - 422, and writes nothing (NS-005)", async () => {
+    await confirmPacking(jsonRequest(`/api/receiving-sheets/${overweightSheetId}/confirm-packing`, "POST", {}), {
+      params: { id: overweightSheetId },
+    });
+    const res = await confirmWarehouse(
+      jsonRequest(`/api/receiving-sheets/${overweightSheetId}/confirm-warehouse`, "POST", {}),
+      { params: { id: overweightSheetId } }
+    );
+    const body = await res.json();
+    expect(res.status, JSON.stringify(body)).toBe(422);
+    expect(body.error).toMatch(/1010kg.*1000kg limit/);
+
+    // The guarded closing UPDATE runs the materialization plan check
+    // BEFORE it, so a refused lock must leave the sheet un-transitioned.
+    const [row] = await db.select().from(receivingSheets).where(eq(receivingSheets.id, overweightSheetId));
+    expect(row.status).toBe("PENDING_WAREHOUSE");
+    const createdPallet = await db.select().from(pallets).where(eq(pallets.palletNumber, "OVERWEIGHT-1"));
+    expect(createdPallet).toHaveLength(0);
   });
 });
