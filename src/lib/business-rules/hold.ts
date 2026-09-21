@@ -38,7 +38,8 @@ export type HoldReason = (typeof HOLD_REASONS)[number];
 
 export const OTHER_HOLD_REASON: HoldReason = "Other (requires supervisor approval)";
 
-export type HoldStatus = "ACTIVE" | "RELEASED" | "REJECTED";
+export type HoldStatus = "ACTIVE" | "RELEASED" | "REJECTED" | "PARTIALLY_RELEASED";
+export type HoldPalletStatus = "ACTIVE" | "RELEASED" | "REJECTED";
 
 /**
  * NS-015 ("Free-text hold reason" -> 422): rejects anything not in the
@@ -84,4 +85,30 @@ export function holdAgeBucket(days: number): HoldAgeBucket {
 export function holdNumberPrefix(date: string): string {
   const [y, m, d] = date.split("-");
   return `HOLD-${y}-${m}${d}-`;
+}
+
+/**
+ * Loop 50 / PEN-037 (Alpesh: "Hold release Partial bhi kar lo") - the
+ * hold_record's own status is a pure rollup of its hold_pallets rows'
+ * own per-pallet statuses, never set directly by a release/reject route.
+ * ACTIVE only while every pallet is still ACTIVE; once every pallet
+ * shares the SAME terminal status, the record finalizes to that exact
+ * value (byte-for-byte the same outcome a full, non-partial release/
+ * reject already produced before this loop, so every already-passing
+ * test for the whole-hold case keeps passing unchanged); anything else
+ * (a real mix - some released, some rejected, some still active) is
+ * PARTIALLY_RELEASED, a real, distinct state, not silently folded into
+ * one of the other three and not left as a stale ACTIVE that would
+ * hide real progress.
+ */
+export function rollupHoldStatus(palletStatuses: HoldPalletStatus[]): HoldStatus {
+  if (palletStatuses.length === 0) {
+    throw new ValidationError("A hold with zero pallets has no status to roll up.");
+  }
+  const distinct = new Set(palletStatuses);
+  if (distinct.size === 1) {
+    const only = palletStatuses[0];
+    return only; // "ACTIVE" | "RELEASED" | "REJECTED" - all identical
+  }
+  return "PARTIALLY_RELEASED";
 }

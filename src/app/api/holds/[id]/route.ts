@@ -68,6 +68,13 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       throw new NotFoundError(`Hold "${params.id}" not found.`);
     }
 
+    // Loop 50 / PEN-037: holdPalletStatus (this hold's own real per-pallet
+    // status - ACTIVE/RELEASED/REJECTED) is exposed alongside the
+    // pallet's own statusCode (its real, app-wide warehouse status) so
+    // the UI can offer release/reject only on still-ACTIVE rows and show
+    // the real outcome for ones already resolved by an earlier partial
+    // action - these can legitimately differ in wording (a RELEASED
+    // hold_pallets row's pallet.statusCode is "OK", not "RELEASED").
     const heldPallets = await db
       .select({
         id: pallets.id,
@@ -76,14 +83,16 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
         totalCartons: pallets.totalCartons,
         totalWeightKg: pallets.totalWeightKg,
         currentLocationId: pallets.currentLocationId,
+        holdPalletStatus: holdPallets.status,
       })
       .from(holdPallets)
       .innerJoin(pallets, eq(holdPallets.palletId, pallets.id))
       .where(eq(holdPallets.holdId, params.id));
 
     const ageDays = holdAgeDays(hold.placedAt);
+    const stillOpen = hold.status === "ACTIVE" || hold.status === "PARTIALLY_RELEASED";
     return NextResponse.json({
-      hold: { ...hold, ageDays, ageBucket: hold.status === "ACTIVE" ? holdAgeBucket(ageDays) : null },
+      hold: { ...hold, ageDays, ageBucket: stillOpen ? holdAgeBucket(ageDays) : null },
       pallets: heldPallets,
     });
   } catch (err) {

@@ -51,8 +51,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (!hold) {
       throw new NotFoundError(`Hold "${params.id}" not found.`);
     }
-    if (hold.status !== "ACTIVE") {
-      throw new ValidationError(`Only an ACTIVE hold can get a follow-up nudge - this hold is ${hold.status}.`);
+    // Loop 50 / PEN-037: a PARTIALLY_RELEASED hold still has real ACTIVE
+    // pallets waiting on QC, same reasoning as the release/reject routes.
+    if (hold.status !== "ACTIVE" && hold.status !== "PARTIALLY_RELEASED") {
+      throw new ValidationError(`Only a hold with pallets still ACTIVE can get a follow-up nudge - this hold is ${hold.status}.`);
     }
 
     const now = new Date().toISOString();

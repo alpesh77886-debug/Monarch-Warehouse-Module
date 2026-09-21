@@ -85,6 +85,13 @@
       "when": 1789476567504,
       "tag": "0011_fixed_dagger",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1789981217632,
+      "tag": "0012_green_miss_america",
+      "breakpoints": true
     }
   ]
 }

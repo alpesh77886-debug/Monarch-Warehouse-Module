@@ -462,6 +462,10 @@ export const holdRecords = sqliteTable(
       .references(() => users.id),
     placedByDepartment: text("placed_by_department").notNull(),
     placedAt: text("placed_at").notNull(),
+    // Loop 50 / PEN-037: on a hold with a partial release/reject, these
+    // three record the MOST RECENT such action, not a full history -
+    // hold_pallets' own new per-row columns (below) carry the real
+    // per-pallet detail; a disclosed simplification, not a lost signal.
     releasedById: text("released_by_id").references(() => users.id),
     releasedAt: text("released_at"),
     releaseRemarks: text("release_remarks"),
@@ -471,7 +475,16 @@ export const holdRecords = sqliteTable(
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => ({
-    statusCheck: check("hold_records_status_check", sql`${table.status} IN ('ACTIVE','RELEASED','REJECTED')`),
+    // PARTIALLY_RELEASED (Loop 50 / PEN-037, Alpesh: "Hold release
+    // Partial bhi kar lo") - a real rollup state, not a guess: this
+    // record reads PARTIALLY_RELEASED whenever its own hold_pallets rows
+    // are not all the same terminal status yet (e.g. some pallets
+    // released, others still ACTIVE or REJECTED) - see
+    // src/lib/business-rules/hold.ts's own rollupHoldStatus.
+    statusCheck: check(
+      "hold_records_status_check",
+      sql`${table.status} IN ('ACTIVE','RELEASED','REJECTED','PARTIALLY_RELEASED')`
+    ),
     holdReasonCheck: check(
       "hold_records_hold_reason_check",
       sql`${table.holdReason} IN (
@@ -515,6 +528,27 @@ export const holdPallets = sqliteTable(
     palletId: text("pallet_id")
       .notNull()
       .references(() => pallets.id),
+    // Loop 50 / PEN-037: per-pallet release/reject granularity (Alpesh:
+    // "Hold release Partial bhi kar lo...1200 boxes hold ho usme se 300
+    // ya 400 Release karna pade"). The real, schema-groundable reading of
+    // Flow 3 Step 4's own "full batch, specific pallets, partial
+    // quantity" wording is the "specific pallets" granularity - each
+    // pallet on a hold now carries its own status, independent of the
+    // parent hold_record's own rollup status (see that table's own doc
+    // comment). Sub-pallet quantity splitting (dividing ONE pallet's own
+    // cartons across two different statuses) is deliberately NOT built -
+    // no locked schema or contract anywhere supports splitting a single
+    // pallet's real total_cartons/total_weight_kg between two states,
+    // and inventing that mechanism would be exactly the guess the STOP
+    // RULE exists to prevent. Where a hold's own pallets don't already
+    // divide into the exact quantity a user wants released, the honest
+    // answer today is "hold pallets at a finer grain up front" (Flow 3
+    // Step 3 already lets QC select which specific pallets to place on
+    // hold), not a fabricated within-pallet split.
+    status: text("status").notNull().default("ACTIVE"),
+    releasedById: text("released_by_id").references(() => users.id),
+    releasedAt: text("released_at"),
+    releaseRemarks: text("release_remarks"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => ({
@@ -525,6 +559,7 @@ export const holdPallets = sqliteTable(
     // index only prevents the same pallet being added twice to the SAME
         // hold record, not across different ones.
     holdPalletUnique: uniqueIndex("hold_pallets_hold_pallet_unique").on(table.holdId, table.palletId),
+    statusCheck: check("hold_pallets_status_check", sql`${table.status} IN ('ACTIVE','RELEASED','REJECTED')`),
   })
 );
 

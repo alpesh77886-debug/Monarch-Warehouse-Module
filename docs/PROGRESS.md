@@ -931,6 +931,22 @@ No bounded task remained in the implementation spec's own list (TASK-001 through
 
 **Free-only confirmation:** no paid action, no infrastructure change - local code/test/docs work only.
 
+## Loop 50 Checkpoint, part 2 - PEN-037 closure: partial hold release
+
+Same session, next approved item from the same 4-item list: "Hold release Partial bhi kar lo...kyuki aisa ho sakta hai ke 1200 boxes hold ho usme se 300 ya 400 Release karna pade" - building exactly the path PEN-037's own Loop 38 finding already identified as needed (a per-hold-pallet status column).
+
+**Built:** `hold_pallets` gained its own `status`/`released_by_id`/`released_at`/`release_remarks` columns (migration `0012_green_miss_america.sql`), and `hold_records.status` gained a new real `PARTIALLY_RELEASED` value. `POST /api/holds/[id]/release` and `.../reject` take an optional `palletIds` array - omitted, they act on every still-ACTIVE pallet (byte-for-byte the same whole-hold behavior these routes already had, so every pre-existing test kept passing unmodified); given, they act only on that real subset. `hold_records.status` is no longer set directly - `rollupHoldStatus` (`src/lib/business-rules/hold.ts`) derives it from every hold_pallets row's own real status: ACTIVE while all are ACTIVE, the same RELEASED/REJECTED as before once all share one terminal status, PARTIALLY_RELEASED for any real mix (including an all-resolved hold split between RELEASED and REJECTED, which correctly never collapses into either). `GET /api/holds/[id]` now also returns each pallet's own `holdPalletStatus`. The Hold Management screen's Release/Reject actions now fetch the hold's real ACTIVE pallets on open, default every one of them selected (one click still does a full release), and let the user uncheck specific pallets before confirming.
+
+**Deliberately not built, disclosed not guessed:** true sub-pallet quantity splitting (dividing one pallet's own cartons between two statuses) - no locked schema supports it, and inventing that mechanism would be exactly the guess the STOP RULE exists to prevent.
+
+**Real, unrelated migration bug found and hand-fixed:** drizzle-kit's own generated table-recreate tried to `DROP TABLE hold_records` while `hold_pallets` still had a live foreign key pointing at it - `PRAGMA foreign_keys=OFF` does not help inside an already-open multi-statement transaction (SQLite treats it as a no-op there, and this whole migration file runs as one transaction via D1's own batch() primitive, PEN-044), a real interaction this project had not hit before since every earlier CHECK-constraint recreate happened to touch a table nothing else referenced. Fixed by hand-reordering the migration so the child table is fully dropped and rebuilt around the parent's own recreate, never the reverse - verified with a dry-run against the real local D1 file (wrapped in an explicit rolled-back transaction) before actually applying it. Also fixed the same generated-migration column-backfill bug PEN-039/040 already documented (a generated `INSERT ... SELECT` naming brand-new column names against the OLD table, which never had them) - the real fix backfills every pre-existing `hold_pallets` row's new per-pallet status from its own hold_record's already-known status, not a blanket guessed default.
+
+**Tests:** `tests/unit/hold-guard.test.ts` (7 new pure tests for `rollupHoldStatus`), `tests/unit/hold-live.test.ts`'s new "Partial release/reject" block (6 new tests - a 3-pallet hold released/rejected one pallet at a time against real local D1, proving PARTIALLY_RELEASED, the per-pallet status rows, the detail route's own `holdPalletStatus`, the "not ACTIVE on this hold" refusal, and the all-resolved-but-mixed terminal state).
+
+**Full regression, all green:** `npx tsc --noEmit` clean; unit suite 331/331 passing (30 files); E2E suite 114/115 passing (the same 1 pre-existing, already-disclosed `storage-putaway.spec.ts` timeout, unrelated). Harness checks: same as part 1 above, no new findings.
+
+**Free-only confirmation:** no paid action, no infrastructure change - local code/test/docs work only.
+
 ## Architecture Decisions Log
 | Date | Decision | Status |
 |------|----------|--------|

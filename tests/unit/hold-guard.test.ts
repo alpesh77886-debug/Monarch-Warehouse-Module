@@ -6,6 +6,7 @@ import {
   holdAgeDays,
   holdAgeBucket,
   holdNumberPrefix,
+  rollupHoldStatus,
 } from "../../src/lib/business-rules/hold";
 import { ValidationError } from "../../src/lib/errors";
 
@@ -85,5 +86,35 @@ describe("holdAgeDays / holdAgeBucket (SCREEN-004 aging legend: amber >3d, red >
 describe("holdNumberPrefix (generated_format HOLD-YYYY-MMDD-NNN)", () => {
   it("builds the HOLD-YYYY-MMDD- prefix from a YYYY-MM-DD date", () => {
     expect(holdNumberPrefix("2026-09-15")).toBe("HOLD-2026-0915-");
+  });
+});
+
+describe("rollupHoldStatus (Loop 50 / PEN-037: partial hold release)", () => {
+  it("all ACTIVE -> ACTIVE", () => {
+    expect(rollupHoldStatus(["ACTIVE", "ACTIVE", "ACTIVE"])).toBe("ACTIVE");
+  });
+
+  it("all RELEASED -> RELEASED (same outcome as a pre-Loop-50 full release)", () => {
+    expect(rollupHoldStatus(["RELEASED", "RELEASED"])).toBe("RELEASED");
+  });
+
+  it("all REJECTED -> REJECTED (same outcome as a pre-Loop-50 full reject)", () => {
+    expect(rollupHoldStatus(["REJECTED"])).toBe("REJECTED");
+  });
+
+  it("a real mix (some released, some still active) -> PARTIALLY_RELEASED", () => {
+    expect(rollupHoldStatus(["RELEASED", "ACTIVE"])).toBe("PARTIALLY_RELEASED");
+  });
+
+  it("a real mix (released and rejected, none active) -> PARTIALLY_RELEASED", () => {
+    expect(rollupHoldStatus(["RELEASED", "REJECTED"])).toBe("PARTIALLY_RELEASED");
+  });
+
+  it("a real mix of all three -> PARTIALLY_RELEASED", () => {
+    expect(rollupHoldStatus(["ACTIVE", "RELEASED", "REJECTED"])).toBe("PARTIALLY_RELEASED");
+  });
+
+  it("refuses an empty pallet list - a hold with zero pallets has no status to roll up", () => {
+    expect(() => rollupHoldStatus([])).toThrow(ValidationError);
   });
 });

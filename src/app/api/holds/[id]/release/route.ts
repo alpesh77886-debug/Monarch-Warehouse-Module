@@ -4,6 +4,7 @@ import { getDb, runAtomicBatch } from "@/lib/db";
 import { holdRecords, holdPallets, pallets, stockLedger } from "../../../../../../drizzle/schema";
 import { requirePermission, requireCurrentUserId } from "@/lib/auth";
 import { holdReleaseSchema } from "@/lib/validations/hold";
+import { rollupHoldStatus, type HoldPalletStatus } from "@/lib/business-rules/hold";
 import { validatePalletStatusTransition, describeLedgerEntry, type PalletStatus } from "@/lib/workflows/pallet-status";
 import {
   UnauthorizedError,
@@ -40,6 +41,18 @@ function errorResponse(err: unknown) {
  * carry that exact phrase, so it is caught and rethrown with the
  * contract's own wording; the underlying authorization decision (only
  * R04/R05, from the real permission matrix) is unchanged.
+ *
+ * Loop 50 / PEN-037 (Alpesh: "Hold release Partial bhi kar lo...1200
+ * boxes hold ho usme se 300 ya 400 Release karna pade"): an optional
+ * `palletIds` body field now names a real subset of the hold's own
+ * still-ACTIVE pallets to release, instead of always acting on every
+ * pallet - omitting it releases everything still ACTIVE, the exact
+ * same whole-hold behavior this route already had (every existing
+ * caller keeps working unchanged). The hold_record's own `status` is
+ * never set directly here - it is rolled up from every hold_pallets
+ * row's own real status (see rollupHoldStatus), so a hold that still
+ * has other ACTIVE pallets after this action correctly reads
+ * PARTIALLY_RELEASED, not RELEASED.
  */
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -65,22 +78,48 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (!hold) {
       throw new NotFoundError(`Hold "${params.id}" not found.`);
     }
-    if (hold.status !== "ACTIVE") {
-      throw new ValidationError(`Only an ACTIVE hold can be released - this hold is ${hold.status}.`);
+    if (hold.status !== "ACTIVE" && hold.status !== "PARTIALLY_RELEASED") {
+      throw new ValidationError(
+        `Only a hold with pallets still ACTIVE can be released - this hold is ${hold.status}.`
+      );
     }
 
-    const heldPallets = await db
-      .select({ pallet: pallets })
+    const allHoldPallets = await db
+      .select({ holdPallet: holdPallets, pallet: pallets })
       .from(holdPallets)
       .innerJoin(pallets, eq(holdPallets.palletId, pallets.id))
       .where(eq(holdPallets.holdId, params.id));
 
-    const transitions = heldPallets.map(({ pallet }) => ({
+    const activeRows = allHoldPallets.filter((r) => r.holdPallet.status === "ACTIVE");
+    if (activeRows.length === 0) {
+      throw new ValidationError(`Hold "${params.id}" has no ACTIVE pallets left to release.`);
+    }
+
+    let targets = activeRows;
+    if (parsed.data.palletIds) {
+      const requested = new Set(parsed.data.palletIds);
+      targets = activeRows.filter((r) => requested.has(r.pallet.id));
+      const foundIds = new Set(targets.map((r) => r.pallet.id));
+      const missing = parsed.data.palletIds.filter((id) => !foundIds.has(id));
+      if (missing.length > 0) {
+        throw new ValidationError(
+          `Pallet(s) not ACTIVE on this hold (already released/rejected, or not part of it): ${missing.join(", ")}.`
+        );
+      }
+    }
+
+    const transitions = targets.map(({ pallet }) => ({
       pallet,
       transition: validatePalletStatusTransition(pallet.statusCode as PalletStatus, "OK", role),
     }));
 
     const now = new Date().toISOString();
+    const targetIds = new Set(targets.map((r) => r.holdPallet.id));
+    const finalStatuses: HoldPalletStatus[] = allHoldPallets.map((r) =>
+      targetIds.has(r.holdPallet.id) ? "RELEASED" : (r.holdPallet.status as HoldPalletStatus)
+    );
+    const newHoldStatus = rollupHoldStatus(finalStatuses);
+
     // db.transaction() would crash on real D1 (no multi-statement
     // BEGIN/COMMIT - see PEN-044 / src/lib/db.ts). None of these writes'
     // values depend on another statement's result, so a plain atomic
@@ -88,7 +127,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const holdUpdateStmt = db
       .update(holdRecords)
       .set({
-        status: "RELEASED",
+        status: newHoldStatus,
         releasedById: currentUserId,
         releasedAt: now,
         releaseRemarks: parsed.data.releaseRemarks ?? null,
@@ -96,9 +135,19 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       .where(eq(holdRecords.id, params.id));
 
     const palletStmts = transitions.flatMap(({ pallet, transition }) => {
+      const holdPalletRow = targets.find((r) => r.pallet.id === pallet.id)!.holdPallet;
       const ledgerEntry = describeLedgerEntry(transition);
       return [
         db.update(pallets).set({ statusCode: "OK" }).where(eq(pallets.id, pallet.id)),
+        db
+          .update(holdPallets)
+          .set({
+            status: "RELEASED",
+            releasedById: currentUserId,
+            releasedAt: now,
+            releaseRemarks: parsed.data.releaseRemarks ?? null,
+          })
+          .where(eq(holdPallets.id, holdPalletRow.id)),
         db.insert(stockLedger).values({
           id: crypto.randomUUID(),
           date: now.slice(0, 10),

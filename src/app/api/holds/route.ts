@@ -103,7 +103,9 @@ export async function GET() {
         totalWeightKg: Number(aggregate?.totalWeightKg ?? 0),
         palletNumbers: palletNumbersByHoldId.get(r.id) ?? [],
         ageDays,
-        ageBucket: r.status === "ACTIVE" ? holdAgeBucket(ageDays) : null,
+        // Loop 50 / PEN-037: a PARTIALLY_RELEASED hold still has real
+        // ACTIVE pallets aging, same reasoning as the detail route.
+        ageBucket: r.status === "ACTIVE" || r.status === "PARTIALLY_RELEASED" ? holdAgeBucket(ageDays) : null,
       };
     });
 

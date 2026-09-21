@@ -61,6 +61,9 @@ const FIXTURE_BATCH_NUMBER = "L26I010010";
 const FIXTURE_PALLET_A = "TEST-HOLD-PALLET-A";
 const FIXTURE_PALLET_B = "TEST-HOLD-PALLET-B";
 const FIXTURE_PALLET_C = "TEST-HOLD-PALLET-C";
+const FIXTURE_PALLET_D = "TEST-HOLD-PALLET-D";
+const FIXTURE_PALLET_E = "TEST-HOLD-PALLET-E";
+const FIXTURE_PALLET_F = "TEST-HOLD-PALLET-F";
 
 let materialId: string;
 let warehouseId: string;
@@ -68,6 +71,9 @@ let batchId: string;
 let palletAId: string;
 let palletBId: string;
 let palletCId: string;
+let palletDId: string;
+let palletEId: string;
+let palletFId: string;
 
 beforeAll(async () => {
   currentRole.value = "R04";
@@ -167,6 +173,9 @@ beforeAll(async () => {
   palletAId = await findOrCreateQcHoldPallet(FIXTURE_PALLET_A);
   palletBId = await findOrCreateQcHoldPallet(FIXTURE_PALLET_B);
   palletCId = await findOrCreateQcHoldPallet(FIXTURE_PALLET_C);
+  palletDId = await findOrCreateQcHoldPallet(FIXTURE_PALLET_D);
+  palletEId = await findOrCreateQcHoldPallet(FIXTURE_PALLET_E);
+  palletFId = await findOrCreateQcHoldPallet(FIXTURE_PALLET_F);
 });
 
 let holdId: string;
@@ -379,5 +388,112 @@ describe("Reject (R04) really updates local D1", () => {
     // fail (QC_HOLD -> HOLD only) - confirms it, then moves on without
     // needing yet another fixture pallet just for this validation check.
     expect(createRes.status).toBe(422);
+  });
+});
+
+// Loop 50 / PEN-037 (Alpesh: "Hold release Partial bhi kar lo...1200
+// boxes hold ho usme se 300 ya 400 Release karna pade") - a 3-pallet
+// hold, released/rejected one pallet at a time, proving the real
+// per-pallet granularity and the hold_record's own rollup status.
+describe("Partial release/reject (Loop 50 / PEN-037) really updates local D1", () => {
+  let partialHoldId: string;
+
+  it("places one hold on 3 QC_HOLD pallets", async () => {
+    const res = await createHold(
+      jsonRequest("/api/holds", {
+        materialId,
+        batchId,
+        palletIds: [palletDId, palletEId, palletFId],
+        holdReason: "Misshapes",
+        placedByDepartment: "QC Lab",
+      })
+    );
+    const body = await res.json();
+    expect(res.status, JSON.stringify(body)).toBe(201);
+    partialHoldId = body.hold.id;
+    expect(body.hold.status).toBe("ACTIVE");
+  });
+
+  it("releasing only pallet D leaves the hold PARTIALLY_RELEASED, D->OK, E/F untouched", async () => {
+    const res = await releaseHold(
+      jsonRequest(`/api/holds/${partialHoldId}/release`, {
+        releaseRemarks: "D re-inspected OK",
+        palletIds: [palletDId],
+      }),
+      { params: { id: partialHoldId } }
+    );
+    const body = await res.json();
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.hold.status).toBe("PARTIALLY_RELEASED");
+
+    const [palletD] = await db.select().from(pallets).where(eq(pallets.id, palletDId));
+    const [palletE] = await db.select().from(pallets).where(eq(pallets.id, palletEId));
+    const [palletF] = await db.select().from(pallets).where(eq(pallets.id, palletFId));
+    expect(palletD.statusCode).toBe("OK");
+    expect(palletE.statusCode).toBe("HOLD");
+    expect(palletF.statusCode).toBe("HOLD");
+
+    const rows = await db.select().from(holdPallets).where(eq(holdPallets.holdId, partialHoldId));
+    const byPalletId = new Map(rows.map((r) => [r.palletId, r]));
+    expect(byPalletId.get(palletDId)!.status).toBe("RELEASED");
+    expect(byPalletId.get(palletEId)!.status).toBe("ACTIVE");
+    expect(byPalletId.get(palletFId)!.status).toBe("ACTIVE");
+
+    const detailRes = await getHold(getRequest(`/api/holds/${partialHoldId}`), { params: { id: partialHoldId } });
+    const detailBody = await detailRes.json();
+    const detailByPalletId = new Map(
+      (detailBody.pallets as { id: string; holdPalletStatus: string }[]).map((p) => [p.id, p.holdPalletStatus])
+    );
+    expect(detailByPalletId.get(palletDId)).toBe("RELEASED");
+    expect(detailByPalletId.get(palletEId)).toBe("ACTIVE");
+  });
+
+  it("refuses to act on a pallet that is no longer ACTIVE on this hold", async () => {
+    const res = await releaseHold(jsonRequest(`/api/holds/${partialHoldId}/release`, { palletIds: [palletDId] }), {
+      params: { id: partialHoldId },
+    });
+    expect(res.status).toBe(422);
+    const body = await res.json();
+    expect(body.error).toMatch(/not ACTIVE on this hold/);
+  });
+
+  it("rejecting pallet E (a second, independent partial action) keeps the hold PARTIALLY_RELEASED (F still ACTIVE)", async () => {
+    const res = await rejectHold(
+      jsonRequest(`/api/holds/${partialHoldId}/reject`, {
+        releaseRemarks: "E confirmed defective",
+        palletIds: [palletEId],
+      }),
+      { params: { id: partialHoldId } }
+    );
+    const body = await res.json();
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.hold.status).toBe("PARTIALLY_RELEASED");
+
+    const [palletE] = await db.select().from(pallets).where(eq(pallets.id, palletEId));
+    expect(palletE.statusCode).toBe("REJECTED");
+  });
+
+  it("releasing the last ACTIVE pallet (F) finalizes to PARTIALLY_RELEASED (a real mix of RELEASED+REJECTED, not a uniform terminal state)", async () => {
+    const res = await releaseHold(jsonRequest(`/api/holds/${partialHoldId}/release`, {}), {
+      params: { id: partialHoldId },
+    });
+    const body = await res.json();
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    // D=RELEASED, E=REJECTED, F=RELEASED - no single terminal status
+    // covers all three, so this correctly stays PARTIALLY_RELEASED
+    // forever, not silently collapsed into RELEASED or REJECTED.
+    expect(body.hold.status).toBe("PARTIALLY_RELEASED");
+
+    const [palletF] = await db.select().from(pallets).where(eq(pallets.id, palletFId));
+    expect(palletF.statusCode).toBe("OK");
+  });
+
+  it("refuses any further action once every pallet is resolved", async () => {
+    const res = await releaseHold(jsonRequest(`/api/holds/${partialHoldId}/release`, {}), {
+      params: { id: partialHoldId },
+    });
+    expect(res.status).toBe(422);
+    const body = await res.json();
+    expect(body.error).toMatch(/no ACTIVE pallets left/);
   });
 });
