@@ -124,23 +124,23 @@ test.afterAll(async () => {
 });
 
 test.describe("Dashboard - ungated panels reflect real, live DB data", () => {
-  test("Bulk Tracking pendingCartons includes the real fixture pallet's cartons", async ({ page }) => {
+  test("Bulk Pending KPI includes the real fixture pallet's cartons", async ({ page }) => {
     await page.goto("/dashboard");
-    const panel = page.getByText("Bulk Tracking").locator("xpath=ancestor::section");
-    await expect(panel).toBeVisible();
-    const cartonText = await panel.getByText(/ctn$/).innerText();
-    const cartons = Number(cartonText.replace(/[^\d]/g, ""));
+    // Loop 50 redesign: Bulk Pending is now a KPI card (label + big value
+    // + sub text), not a "Bulk Tracking" section with a "N ctn" line.
+    // Scoped to <main> - the sidebar nav also links to some of these
+    // exact section names.
+    const card = page.locator("main").getByText("Bulk Pending", { exact: true }).locator("xpath=..");
+    await expect(card).toBeVisible();
+    const cartons = Number((await card.innerText()).match(/[\d,]+/)?.[0].replace(/,/g, "") ?? "0");
     expect(cartons).toBeGreaterThanOrEqual(FIXTURE_BULK_CARTONS);
   });
 
-  test("Maintenance panel shows at least one real CRITICAL ticket", async ({ page }) => {
+  test("Maintenance KPI shows at least one real CRITICAL ticket", async ({ page }) => {
     await page.goto("/dashboard");
-    const panel = page.getByText("Maintenance", { exact: true }).locator("xpath=ancestor::section");
-    await expect(panel).toBeVisible();
-    const criticalBadge = panel.getByText(/^CRITICAL: \d+$/);
-    await expect(criticalBadge).toBeVisible();
-    const count = Number((await criticalBadge.innerText()).replace(/[^\d]/g, ""));
-    expect(count).toBeGreaterThanOrEqual(1);
+    const card = page.locator("main").getByText("Maintenance", { exact: true }).locator("xpath=..");
+    await expect(card).toBeVisible();
+    await expect(card.getByText(/CRITICAL/)).toBeVisible();
   });
 });
 

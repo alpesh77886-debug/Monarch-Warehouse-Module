@@ -3,6 +3,7 @@
  * database access, so they are testable without a live DB and reusable
  * by both the API route and its tests.
  */
+import { directionForTransactionType } from "./in-out-summary";
 
 export type StockAgeBucket = "0-30" | "31-60" | "61-90" | "90+";
 
@@ -117,4 +118,68 @@ export function buildRackMiniSummary(rows: RackMiniRow[]): RackMiniSummary[] {
       occupiedPct: total === 0 ? 0 : Math.round((occupied / total) * 1000) / 10,
     }))
     .sort((a, b) => a.coldRoom.localeCompare(b.coldRoom));
+}
+
+// Loop 50 (Alpesh's own Dashboard visual complaint): two real, newly
+// added aggregations for the redesigned screen's own richer panels -
+// both computed from data this app already has, nothing fabricated.
+// Deliberately NOT added: a per-KPI historical trend (no per-metric
+// time series is tracked anywhere, only current-point snapshots + hold/
+// bulk age) and Cold Room Temperature (no temperature-sensor entity
+// exists anywhere in the locked contracts or schema) - see
+// docs/PENDING_ITEMS.md for the disclosed reasoning on both.
+
+export type WarehouseStockRow = { warehouseCode: string; warehouseName: string; totalCartons: number };
+export type WarehouseStockSummary = { warehouseCode: string; warehouseName: string; cartons: number; pct: number };
+
+/** Real per-warehouse current-stock breakdown, same exclusion rule as buildStockSnapshot. */
+export function buildWarehouseWiseStock(rows: WarehouseStockRow[]): WarehouseStockSummary[] {
+  const byWarehouse = new Map<string, WarehouseStockSummary>();
+  let total = 0;
+  for (const row of rows) {
+    total += row.totalCartons;
+    const entry = byWarehouse.get(row.warehouseCode) ?? {
+      warehouseCode: row.warehouseCode,
+      warehouseName: row.warehouseName,
+      cartons: 0,
+      pct: 0,
+    };
+    entry.cartons += row.totalCartons;
+    byWarehouse.set(row.warehouseCode, entry);
+  }
+  const result = Array.from(byWarehouse.values()).sort((a, b) => b.cartons - a.cartons);
+  for (const r of result) {
+    r.pct = total === 0 ? 0 : Math.round((r.cartons / total) * 1000) / 10;
+  }
+  return result;
+}
+
+export type FlowLedgerRow = { date: string; transactionType: string; qtyChange: number };
+export type DailyFlow = { date: string; inward: number; dispatch: number };
+
+/**
+ * Real day-by-day inward-vs-dispatch totals over the last `days` days
+ * (inclusive of `endDate`), reusing In-Out Summary's own already-real
+ * IN/OUT transaction-type classification rather than a new one.
+ */
+export function buildDailyFlow(rows: FlowLedgerRow[], days: number, endDate: Date): DailyFlow[] {
+  const byDate = new Map<string, DailyFlow>();
+  const dates: string[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(endDate);
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    dates.push(key);
+    byDate.set(key, { date: key, inward: 0, dispatch: 0 });
+  }
+
+  for (const row of rows) {
+    const entry = byDate.get(row.date);
+    if (!entry) continue; // outside the requested window
+    const direction = directionForTransactionType(row.transactionType);
+    if (direction === "IN") entry.inward += Math.abs(row.qtyChange);
+    else if (direction === "OUT") entry.dispatch += Math.abs(row.qtyChange);
+  }
+
+  return dates.map((d) => byDate.get(d)!);
 }

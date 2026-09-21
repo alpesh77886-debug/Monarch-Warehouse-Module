@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq, desc, count, sum, inArray } from "drizzle-orm";
+import { eq, desc, count, sum, inArray, notInArray, gte } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import {
   pallets,
@@ -9,15 +9,23 @@ import {
   batches,
   locations,
   loadingSheets,
+  loadingSheetPallets,
   transferOrders,
   maintenanceTickets,
   stockLedger,
+  warehouses,
 } from "../../../../drizzle/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { holdAgeDays, holdAgeBucket } from "@/lib/business-rules/hold";
 import { bulkAgeDays } from "@/lib/business-rules/bulk";
-import { buildStockSnapshot, buildRackMiniSummary } from "@/lib/business-rules/dashboard";
+import {
+  buildStockSnapshot,
+  buildRackMiniSummary,
+  buildWarehouseWiseStock,
+  buildDailyFlow,
+  STOCK_SNAPSHOT_EXCLUDED_STATUSES,
+} from "@/lib/business-rules/dashboard";
 import { aggregateInOut, type InOutLedgerRow } from "@/lib/business-rules/in-out-summary";
 
 export const runtime = "nodejs";
@@ -175,6 +183,128 @@ export async function GET() {
     const locationRows = await db.select({ coldRoom: locations.coldRoom, status: locations.status }).from(locations);
     const rackMapMini = buildRackMiniSummary(locationRows);
 
+    // Loop 50 (Alpesh's own Dashboard visual complaint) - real per-
+    // warehouse stock, same "current stock" exclusion as Stock Snapshot.
+    const warehouseStockRows = await db
+      .select({
+        warehouseCode: warehouses.code,
+        warehouseName: warehouses.name,
+        totalCartons: pallets.totalCartons,
+      })
+      .from(pallets)
+      .innerJoin(warehouses, eq(pallets.currentWarehouseId, warehouses.id))
+      .where(notInArray(pallets.statusCode, [...STOCK_SNAPSHOT_EXCLUDED_STATUSES]));
+    const warehouseWiseStock = buildWarehouseWiseStock(warehouseStockRows);
+
+    // Loop 50 - real 14-day inward vs dispatch flow, reusing In-Out
+    // Summary's own already-real IN/OUT transaction-type classification.
+    const fourteenDaysAgo = new Date(now);
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 13);
+    const flowRows = await db
+      .select({ date: stockLedger.date, transactionType: stockLedger.transactionType, qtyChange: stockLedger.qtyChange })
+      .from(stockLedger)
+      .where(gte(stockLedger.date, fourteenDaysAgo.toISOString().slice(0, 10)));
+    const dailyFlow = buildDailyFlow(flowRows, 14, now);
+
+    // Loop 50 - top 5 real aged ACTIVE holds (the reference design's own
+    // "Hold Aging - Action Required" panel), same holds.view restriction
+    // as D-02's own aggregate above - not a separate, ungated leak of
+    // the same data.
+    let topAgedHolds:
+      | { restricted: true }
+      | {
+          restricted: false;
+          rows: { id: string; materialCode: string; holdReason: string; totalCartons: number; placedAt: string; ageDays: number; ageBucket: string }[];
+        };
+    if (!canViewHolds) {
+      topAgedHolds = { restricted: true };
+    } else {
+      const activeHoldRows = await db
+        .select({
+          id: holdRecords.id,
+          materialCode: materials.code,
+          holdReason: holdRecords.holdReason,
+          placedAt: holdRecords.placedAt,
+        })
+        .from(holdRecords)
+        .innerJoin(materials, eq(holdRecords.materialId, materials.id))
+        .where(eq(holdRecords.status, "ACTIVE"));
+      const cartonTotalsByHold =
+        activeHoldRows.length === 0
+          ? new Map<string, number>()
+          : new Map(
+              (
+                await db
+                  .select({ holdId: holdPallets.holdId, totalCartons: sum(pallets.totalCartons) })
+                  .from(holdPallets)
+                  .innerJoin(pallets, eq(holdPallets.palletId, pallets.id))
+                  .where(
+                    inArray(
+                      holdPallets.holdId,
+                      activeHoldRows.map((h) => h.id)
+                    )
+                  )
+                  .groupBy(holdPallets.holdId)
+              ).map((r) => [r.holdId, Number(r.totalCartons ?? 0)])
+            );
+      const withAge = activeHoldRows
+        .map((h) => {
+          const ageDays = holdAgeDays(h.placedAt, now);
+          return {
+            id: h.id,
+            materialCode: h.materialCode,
+            holdReason: h.holdReason,
+            totalCartons: cartonTotalsByHold.get(h.id) ?? 0,
+            placedAt: h.placedAt,
+            ageDays,
+            ageBucket: holdAgeBucket(ageDays),
+          };
+        })
+        .sort((a, b) => b.ageDays - a.ageDays)
+        .slice(0, 5);
+      topAgedHolds = { restricted: false, rows: withAge };
+    }
+
+    // Loop 50 - today's real dispatch activity (the reference design's
+    // own "Today's Dispatch" panel): loading sheets dated today, whether
+    // already DISPATCHED or still moving through the real, contracted
+    // pipeline (STAGING/LOADED/VERIFIED/GATE_PASSED).
+    const todaysDispatchSheets = await db
+      .select({
+        id: loadingSheets.id,
+        vehicleNumber: loadingSheets.vehicleNumber,
+        partyName: loadingSheets.partyName,
+        status: loadingSheets.status,
+      })
+      .from(loadingSheets)
+      .where(eq(loadingSheets.date, today))
+      .orderBy(desc(loadingSheets.createdAt))
+      .limit(5);
+    const todaysDispatchQty =
+      todaysDispatchSheets.length === 0
+        ? new Map<string, number>()
+        : new Map(
+            (
+              await db
+                .select({ loadingSheetId: loadingSheetPallets.loadingSheetId, qty: sum(loadingSheetPallets.cartonQty) })
+                .from(loadingSheetPallets)
+                .where(
+                  inArray(
+                    loadingSheetPallets.loadingSheetId,
+                    todaysDispatchSheets.map((s) => s.id)
+                  )
+                )
+                .groupBy(loadingSheetPallets.loadingSheetId)
+            ).map((r) => [r.loadingSheetId, Number(r.qty ?? 0)])
+          );
+    const todaysDispatch = todaysDispatchSheets.map((s) => ({
+      id: s.id,
+      vehicleNumber: s.vehicleNumber,
+      partyName: s.partyName,
+      status: s.status,
+      totalCartons: todaysDispatchQty.get(s.id) ?? 0,
+    }));
+
     // D-09 Stock Ledger (recent 10) - restricted to stock.view_ledger
     let stockLedgerRecent: { restricted: true } | { restricted: false; rows: unknown[] };
     if (!canViewLedger) {
@@ -229,6 +359,10 @@ export async function GET() {
       rackMapMini,
       stockLedgerRecent,
       inOutSummary,
+      warehouseWiseStock,
+      dailyFlow,
+      topAgedHolds,
+      todaysDispatch,
     });
   } catch (err) {
     // eslint-disable-next-line no-console
