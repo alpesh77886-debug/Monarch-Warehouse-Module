@@ -43,9 +43,24 @@ const FIXTURE_MATERIAL_CODE = "LFG00006";
 const FIXTURE_BATCH_NUMBER = "L26I070006";
 const CANCEL_BATCH_NUMBER = "L26I070060";
 const OVERWEIGHT_BATCH_NUMBER = "L26I070099";
+const REUSE_BATCH_A = "L26I070071";
+const REUSE_BATCH_B = "L26I070072";
+const REUSE_MISMATCH_BATCH = "L26I070073";
+const OTHER_MATERIAL_CODE = "LFG00007";
+// GS-009's new reuse-by-pallet-number logic (this loop) means a pallet
+// number, once locked, is never safely reusable across a SEPARATE test
+// run in this shared, ever-growing local D1 file (PEN-026) - reusing a
+// fixed string would silently accumulate cartons onto the same real
+// pallet run after run until it broke the material's own weight limit
+// (found and fixed this loop, not a hypothetical). Every pallet-number
+// fixture below is suffixed with a fresh per-process id instead, the
+// same uniqueness-not-deletion answer PEN-026 already established for
+// undeletable ledger-referenced rows.
+const RUN_ID = crypto.randomUUID().slice(0, 8);
 
 let materialId: string;
 let warehouseId: string;
+let otherMaterialId: string;
 
 /**
  * Only receiving_sheets/receiving_sheet_pallets are ever deleted here.
@@ -61,7 +76,14 @@ let warehouseId: string;
  * live-mutation test file in this repository.
  */
 async function cleanup() {
-  for (const batchNumber of [FIXTURE_BATCH_NUMBER, CANCEL_BATCH_NUMBER, OVERWEIGHT_BATCH_NUMBER]) {
+  for (const batchNumber of [
+    FIXTURE_BATCH_NUMBER,
+    CANCEL_BATCH_NUMBER,
+    OVERWEIGHT_BATCH_NUMBER,
+    REUSE_BATCH_A,
+    REUSE_BATCH_B,
+    REUSE_MISMATCH_BATCH,
+  ]) {
     const rows = await db.select().from(receivingSheets).where(eq(receivingSheets.batchNumber, batchNumber));
     for (const r of rows) {
       await db.delete(receivingSheetPallets).where(eq(receivingSheetPallets.receivingSheetId, r.id));
@@ -112,6 +134,24 @@ beforeAll(async () => {
     throw new Error("No LIMBASI warehouse seeded - run npm run db:seed before this test.");
   }
   warehouseId = wh.id;
+
+  const [existingOtherMaterial] = await db.select().from(materials).where(eq(materials.code, OTHER_MATERIAL_CODE));
+  if (existingOtherMaterial) {
+    otherMaterialId = existingOtherMaterial.id;
+  } else {
+    const id = crypto.randomUUID();
+    await db.insert(materials).values({
+      id,
+      code: OTHER_MATERIAL_CODE,
+      description: "GS-009 mismatch-material fixture",
+      uomKgPerCarton: 10,
+      category: "TEST",
+      palletWeightLimitKg: 1000,
+      palletType: "CARTON",
+      plantOrigin: "LIMBASI",
+    });
+    otherMaterialId = id;
+  }
 });
 
 afterAll(async () => {
@@ -182,7 +222,7 @@ describe("Receiving Sheet - pallet rows (Flow 1 Step 2)", () => {
   it("adds a real pallet row with a running total", async () => {
     const res = await addPallet(
       jsonRequest(`/api/receiving-sheets/${sheetId}/pallets`, "POST", {
-        palletNumber: "30673",
+        palletNumber: `RSLIVE-30673-${RUN_ID}`,
         qty: 60,
         receivingTime: "09:40",
         cartonCondition: "OK",
@@ -201,7 +241,7 @@ describe("Receiving Sheet - pallet rows (Flow 1 Step 2)", () => {
   it("requires remarks for a non-OK carton condition (GS-008)", async () => {
     const res = await addPallet(
       jsonRequest(`/api/receiving-sheets/${sheetId}/pallets`, "POST", {
-        palletNumber: "30676",
+        palletNumber: `RSLIVE-30676-${RUN_ID}`,
         qty: 60,
         receivingTime: "10:10",
         cartonCondition: "BULGING",
@@ -214,7 +254,7 @@ describe("Receiving Sheet - pallet rows (Flow 1 Step 2)", () => {
   it("adds a second real pallet row with the dispute-prevention remark", async () => {
     const res = await addPallet(
       jsonRequest(`/api/receiving-sheets/${sheetId}/pallets`, "POST", {
-        palletNumber: "30676",
+        palletNumber: `RSLIVE-30676-${RUN_ID}`,
         qty: 60,
         receivingTime: "10:10",
         cartonCondition: "BULGING",
@@ -440,5 +480,148 @@ describe("Receiving Sheet - lock refuses an over-limit pallet (NS-005)", () => {
     expect(row.status).toBe("PENDING_WAREHOUSE");
     const createdPallet = await db.select().from(pallets).where(eq(pallets.palletNumber, "OVERWEIGHT-1"));
     expect(createdPallet).toHaveLength(0);
+  });
+});
+
+// GS-009 / PEN-048 closure (Alpesh: "Ek pallet pe 2 batches ek hi
+// material ki rakh sakte hai") - proves the real creation path, not just
+// the already-existing display logic (tests/e2e/golden-scenarios.spec.ts
+// used to only seed this state directly). Two sheets, two different
+// batches, same pallet number, same material.
+describe("Receiving Sheet - reusing an existing pallet number adds a second batch (GS-009)", () => {
+  const REUSE_PALLET_NUMBER = `GS009-LIVE-PALLET-${RUN_ID}`;
+
+  it("first sheet (batch A) locks and creates the pallet fresh", async () => {
+    const createRes = await createSheet(
+      jsonRequest("/api/receiving-sheets", "POST", {
+        date: "2026-09-07",
+        shift: "C",
+        line: "FF",
+        materialId,
+        batchNumber: REUSE_BATCH_A,
+      })
+    );
+    const createBody = await createRes.json();
+    expect(createRes.status, JSON.stringify(createBody)).toBe(201);
+    const sheetAId = createBody.receivingSheet.id;
+
+    await addPallet(
+      jsonRequest(`/api/receiving-sheets/${sheetAId}/pallets`, "POST", {
+        palletNumber: REUSE_PALLET_NUMBER,
+        qty: 50,
+        receivingTime: "08:00",
+        cartonCondition: "OK",
+      }),
+      { params: { id: sheetAId } }
+    );
+    await confirmPacking(jsonRequest(`/api/receiving-sheets/${sheetAId}/confirm-packing`, "POST", {}), {
+      params: { id: sheetAId },
+    });
+    const res = await confirmWarehouse(jsonRequest(`/api/receiving-sheets/${sheetAId}/confirm-warehouse`, "POST", {}), {
+      params: { id: sheetAId },
+    });
+    expect(res.status).toBe(200);
+
+    const [pallet] = await db.select().from(pallets).where(eq(pallets.palletNumber, REUSE_PALLET_NUMBER));
+    expect(pallet).toBeDefined();
+    expect(pallet.totalCartons).toBe(50);
+    expect(pallet.totalWeightKg).toBe(500);
+    const batchRows = await db.select().from(palletBatches).where(eq(palletBatches.palletId, pallet.id));
+    expect(batchRows).toHaveLength(1);
+  });
+
+  it("second sheet (batch B, same material, same pallet number) adds a real second pallet_batches row - not a new pallet", async () => {
+    const [firstPallet] = await db.select().from(pallets).where(eq(pallets.palletNumber, REUSE_PALLET_NUMBER));
+
+    const createRes = await createSheet(
+      jsonRequest("/api/receiving-sheets", "POST", {
+        date: "2026-09-08",
+        shift: "C",
+        line: "FF",
+        materialId,
+        batchNumber: REUSE_BATCH_B,
+      })
+    );
+    const createBody = await createRes.json();
+    expect(createRes.status, JSON.stringify(createBody)).toBe(201);
+    const sheetBId = createBody.receivingSheet.id;
+
+    await addPallet(
+      jsonRequest(`/api/receiving-sheets/${sheetBId}/pallets`, "POST", {
+        palletNumber: REUSE_PALLET_NUMBER,
+        qty: 30,
+        receivingTime: "09:00",
+        cartonCondition: "OK",
+      }),
+      { params: { id: sheetBId } }
+    );
+    await confirmPacking(jsonRequest(`/api/receiving-sheets/${sheetBId}/confirm-packing`, "POST", {}), {
+      params: { id: sheetBId },
+    });
+    const res = await confirmWarehouse(jsonRequest(`/api/receiving-sheets/${sheetBId}/confirm-warehouse`, "POST", {}), {
+      params: { id: sheetBId },
+    });
+    expect(res.status).toBe(200);
+
+    // Exactly one pallet row still exists for this number - not a second,
+    // colliding one.
+    const allWithThisNumber = await db.select().from(pallets).where(eq(pallets.palletNumber, REUSE_PALLET_NUMBER));
+    expect(allWithThisNumber).toHaveLength(1);
+    expect(allWithThisNumber[0].id).toBe(firstPallet.id);
+    expect(allWithThisNumber[0].totalCartons).toBe(80); // 50 + 30
+    expect(allWithThisNumber[0].totalWeightKg).toBe(800);
+
+    const batchRows = await db.select().from(palletBatches).where(eq(palletBatches.palletId, firstPallet.id));
+    expect(batchRows).toHaveLength(2);
+    const totalFromBatches = batchRows.reduce((sum, r) => sum + r.cartonQty, 0);
+    expect(totalFromBatches).toBe(80);
+
+    // Running balance, not a fresh-pallet balance (NS/GS-009 own bug this
+    // loop fixed - see receiving-sheet-lock.ts's own doc comment).
+    const [ledgerRow] = await db
+      .select()
+      .from(stockLedger)
+      .where(eq(stockLedger.referenceId, sheetBId));
+    expect(ledgerRow.qtyAfter).toBe(80);
+    expect(ledgerRow.weightAfterKg).toBe(800);
+    expect(ledgerRow.statusBefore).toBe("QC_HOLD"); // the existing pallet's own unchanged status
+    expect(ledgerRow.statusAfter).toBe("QC_HOLD");
+  });
+
+  it("refuses to reuse the pallet number for a DIFFERENT material (INV-006)", async () => {
+    const createRes = await createSheet(
+      jsonRequest("/api/receiving-sheets", "POST", {
+        date: "2026-09-09",
+        shift: "C",
+        line: "FF",
+        materialId: otherMaterialId,
+        batchNumber: REUSE_MISMATCH_BATCH,
+      })
+    );
+    const createBody = await createRes.json();
+    const sheetId3 = createBody.receivingSheet.id;
+
+    await addPallet(
+      jsonRequest(`/api/receiving-sheets/${sheetId3}/pallets`, "POST", {
+        palletNumber: REUSE_PALLET_NUMBER,
+        qty: 10,
+        receivingTime: "10:00",
+        cartonCondition: "OK",
+      }),
+      { params: { id: sheetId3 } }
+    );
+    await confirmPacking(jsonRequest(`/api/receiving-sheets/${sheetId3}/confirm-packing`, "POST", {}), {
+      params: { id: sheetId3 },
+    });
+    const res = await confirmWarehouse(jsonRequest(`/api/receiving-sheets/${sheetId3}/confirm-warehouse`, "POST", {}), {
+      params: { id: sheetId3 },
+    });
+    const body = await res.json();
+    expect(res.status, JSON.stringify(body)).toBe(422);
+    expect(body.error).toMatch(/INV-006/);
+
+    // Nothing about the real, existing pallet changed.
+    const [pallet] = await db.select().from(pallets).where(eq(pallets.palletNumber, REUSE_PALLET_NUMBER));
+    expect(pallet.totalCartons).toBe(80);
   });
 });

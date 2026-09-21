@@ -917,6 +917,20 @@ Built per the implementation spec's own recommended task sequence (TASK-013 conf
 
 **Free-only confirmation:** no paid action, no infrastructure change - local code/test/docs work only.
 
+## Loop 50 Checkpoint - GS-009 closure: multi-batch-same-material pallet
+
+No bounded task remained in the implementation spec's own list (TASK-001 through TASK-014 all complete, per Loop 49). Alpesh directed specific follow-up work on the project's own remaining pending items: "Number 3 add karo...Ek pallet pe 2 batches ek hi material ki rakh sakte hai" (build item #3 of a 4-item list from the Loop 49 status report) - approved building the real creation path for GS-009/PEN-048's own already-disclosed gap.
+
+**Built:** `src/lib/receiving-sheet-lock.ts` now detects, per receiving-sheet row, whether its `pallet_number` matches an already-real pallet in the same resolved warehouse - if so it adds a `pallet_batches` row (or increments the existing one, if the same batch is reused again) instead of always creating a new pallet, gated by two real signals: INV-006 (one pallet = one material - mismatch throws) and a real-receivability check on the existing pallet's own status (QC_HOLD/OK/HOLD/BULK only). INV-007's own weight-limit check (NS-005) now checks the pallet's real cumulative total for a reused pallet, not just one row's own weight. Multiple rows on one lock targeting the same existing pallet are accumulated in-memory first, so exactly one pallet UPDATE and one pallet_batches write result - see the file's own doc comment for the full design (including the deliberate warehouse-scoping choice and why a cross-warehouse pallet-number collision is left exactly as it already behaved before this change).
+
+**Real, unrelated bug found and fixed:** building real reuse-detection surfaced that `tests/unit/receiving-sheet-live.test.ts`'s own long-lived fixture pallet numbers ("30673"/"30676") were never actually collision-safe in this shared, ever-growing local D1 file (PEN-026) - a real cross-file collision (another test's own real pallet, different material) and then a same-file re-run collision both reproduced on the very first run of this loop's own work, not hypothetical. Fixed by giving every pallet-number fixture in that file a fresh per-process-run suffix.
+
+**Tests:** `tests/unit/receiving-sheet-live.test.ts`'s new "reusing an existing pallet number adds a second batch (GS-009)" block (3 new tests) locks two real Receiving Sheets through the real API routes against real local D1, proving the real creation path at the strongest level this project proves a mutation - not just the seeded-display proof `tests/e2e/golden-scenarios.spec.ts`'s own GS-009 block already had (that block's own comment is updated to reflect the gap is now closed, keeping its direct-seed technique for what it actually still proves: the Rack Map's own display logic).
+
+**Full regression, all green:** `npx tsc --noEmit` clean; unit suite 318/318 passing (30 files); E2E suite 114/115 passing (1 pre-existing, already-disclosed `storage-putaway.spec.ts` timeout, unrelated to this loop's own change, per PEN-046/048) - run in real Clerk stub mode via a command-level env override, no local secrets file was touched. Harness checks: contract-guard PASS, protected-integrity PASS, yaml-lexical-guard PASS, static-guard unchanged (9 already-precedented findings, no new ones), package-integrity 2 pre-existing mismatches (unchanged from Loop 49's own documented state) - no new, undisclosed harness regressions.
+
+**Free-only confirmation:** no paid action, no infrastructure change - local code/test/docs work only.
+
 ## Architecture Decisions Log
 | Date | Decision | Status |
 |------|----------|--------|

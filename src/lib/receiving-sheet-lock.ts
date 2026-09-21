@@ -64,6 +64,29 @@ import { productionDateFromBatchNumber } from "./business-rules/receiving-sheet"
  *     that plant (true for SABARKANTHA today - no such warehouse is
  *     seeded, see PEN-008), this throws a clear, honest error rather
  *     than inventing a warehouse row or guessing which one to use.
+ *
+ * GS-009 / PEN-048 closure (Alpesh: "Ek pallet pe 2 batches ek hi
+ * material ki rakh sakte hai"): a row whose pallet_number matches an
+ * already-real pallet in this same resolved warehouse now ADDS a
+ * pallet_batches row onto that existing pallet instead of always
+ * creating a new one - the one real gap TASK-014's own audit found
+ * (pallet_batches structurally supports >1 row, nothing ever wrote a
+ * second). Reuse only fires when both real, already-locked signals
+ * agree it is safe: INV-006 ("one pallet = one material") means a
+ * material mismatch throws rather than silently swaps the pallet's
+ * material; and the existing pallet's own status_code must still be one
+ * this app considers "physically in the warehouse, still receivable"
+ * (QC_HOLD/OK/HOLD/BULK - not DISPATCHED/IN_TRANSIT/REJECTED/SCRAP/
+ * CUSTOMER_SAMPLE/SAMPLE, none of which describe a pallet still sitting
+ * in inventory to add cartons onto). A same-numbered pallet in a
+ * DIFFERENT warehouse is deliberately NOT treated as a match (no field
+ * anywhere scopes pallet numbers to a warehouse, so cross-warehouse
+ * collision handling is left exactly as it already behaved before this
+ * change, not newly decided here). Multiple rows on the same lock
+ * targeting the same existing pallet (and, since a sheet has one
+ * batch_number, always the same batch) are accumulated in-memory first
+ * so only one pallet UPDATE and one pallet_batches row result, not one
+ * per row - see palletTargets below.
  */
 export function planReceivingSheetLock(
   database: ReturnType<typeof getDb>,
@@ -126,42 +149,166 @@ export function planReceivingSheetLock(
   let totalQty = 0;
   let totalWeightKg = 0;
 
+  // GS-009: first pass decides, per row, whether it reuses an already-real
+  // pallet (same pallet_number, same warehouse) or creates a new one - and
+  // validates INV-006/reusability once per row, not once per statement.
+  // Rows are read here, not written - matching this function's own
+  // plan-then-batch contract (PEN-044's own doc comment above).
+  const REUSABLE_STATUSES = new Set(["QC_HOLD", "OK", "HOLD", "BULK"]);
+  type ExistingPallet = typeof pallets.$inferSelect;
+  const rowPlans: Array<{ row: (typeof rows)[number]; weightKg: number; existing: ExistingPallet | null }> = [];
+  const palletTargets = new Map<
+    string,
+    { existing: ExistingPallet; addedQty: number; addedWeightKg: number; existingBatchRow: (typeof palletBatches.$inferSelect) | undefined }
+  >();
+
   for (const row of rows) {
     const weightKg = row.qty * material.uomKgPerCarton;
-    // INV-007 ("Pallet weight must not exceed limit") - TASK-014's own
-    // audit found this was never actually enforced anywhere: the
-    // material master's own palletWeightLimitKg field (PEN-007) was
-    // stored and editable but never compared against anything. Each
-    // receiving-sheet row becomes exactly one new pallet here (never an
-    // existing one being added to - see this function's own doc comment),
-    // so the real, unambiguous check is this row's own resulting pallet
-    // weight against its material's real limit, at the one point a
-    // pallet's weight is actually decided.
-    if (weightKg > material.palletWeightLimitKg) {
+    const [samePallet] = database
+      .select()
+      .from(pallets)
+      .where(and(eq(pallets.palletNumber, row.palletNumber), eq(pallets.currentWarehouseId, warehouse.id)))
+      .all();
+
+    if (samePallet) {
+      if (samePallet.materialId !== sheet.materialId) {
+        throw new ValidationError(
+          `Pallet "${row.palletNumber}" already holds material "${samePallet.materialId}" - cannot add material "${sheet.materialId}" to it (INV-006: one pallet = one material).`
+        );
+      }
+      if (!REUSABLE_STATUSES.has(samePallet.statusCode)) {
+        throw new ValidationError(
+          `Pallet "${row.palletNumber}" already exists with status "${samePallet.statusCode}" - not receivable, cannot add more cartons onto it.`
+        );
+      }
+      const target = palletTargets.get(samePallet.id);
+      if (target) {
+        target.addedQty += row.qty;
+        target.addedWeightKg += weightKg;
+      } else {
+        const [existingBatchRow] = database
+          .select()
+          .from(palletBatches)
+          .where(and(eq(palletBatches.palletId, samePallet.id), eq(palletBatches.batchId, batchId)))
+          .all();
+        palletTargets.set(samePallet.id, {
+          existing: samePallet,
+          addedQty: row.qty,
+          addedWeightKg: weightKg,
+          existingBatchRow,
+        });
+      }
+    } else {
+      // INV-007 ("Pallet weight must not exceed limit") - TASK-014's own
+      // audit found this was never actually enforced anywhere: the
+      // material master's own palletWeightLimitKg field (PEN-007) was
+      // stored and editable but never compared against anything.
+      if (weightKg > material.palletWeightLimitKg) {
+        throw new ValidationError(
+          `Pallet "${row.palletNumber}" would weigh ${weightKg}kg, over the ${material.palletWeightLimitKg}kg limit for ${material.code}.`
+        );
+      }
+    }
+    rowPlans.push({ row, weightKg, existing: samePallet ?? null });
+  }
+
+  // INV-007 for every existing pallet being added to: against its real
+  // cumulative new total (existing + every row on this lock targeting it),
+  // not just one row's own weight - and queue its one pallet_batches
+  // write and one pallet UPDATE (not one per row - see rowPlans above).
+  for (const [, target] of palletTargets) {
+    const newTotal = target.existing.totalWeightKg + target.addedWeightKg;
+    if (newTotal > material.palletWeightLimitKg) {
       throw new ValidationError(
-        `Pallet "${row.palletNumber}" would weigh ${weightKg}kg, over the ${material.palletWeightLimitKg}kg limit for ${material.code}.`
+        `Pallet "${target.existing.palletNumber}" would weigh ${newTotal}kg after this addition, over the ${material.palletWeightLimitKg}kg limit for ${material.code}.`
       );
     }
-    const palletId = crypto.randomUUID();
+    if (target.existingBatchRow) {
+      statements.push(
+        database
+          .update(palletBatches)
+          .set({
+            cartonQty: target.existingBatchRow.cartonQty + target.addedQty,
+            weightKg: target.existingBatchRow.weightKg + target.addedWeightKg,
+          })
+          .where(eq(palletBatches.id, target.existingBatchRow.id))
+      );
+    } else {
+      statements.push(
+        database.insert(palletBatches).values({
+          id: crypto.randomUUID(),
+          palletId: target.existing.id,
+          batchId,
+          cartonQty: target.addedQty,
+          weightKg: target.addedWeightKg,
+        })
+      );
+    }
     statements.push(
-      database.insert(pallets).values({
-        id: palletId,
-        palletNumber: row.palletNumber,
-        palletType: "PLASTIC",
-        materialId: sheet.materialId,
-        statusCode: sheet.defaultPalletStatus,
-        totalWeightKg: weightKg,
-        totalCartons: row.qty,
-        currentWarehouseId: warehouse.id,
-        createdBy: confirmingUserId,
-      }),
-      database.insert(palletBatches).values({
-        id: crypto.randomUUID(),
-        palletId,
-        batchId,
-        cartonQty: row.qty,
-        weightKg,
-      }),
+      database
+        .update(pallets)
+        .set({
+          totalCartons: target.existing.totalCartons + target.addedQty,
+          totalWeightKg: target.existing.totalWeightKg + target.addedWeightKg,
+        })
+        .where(eq(pallets.id, target.existing.id))
+    );
+  }
+
+  // Running per-pallet balance for reused pallets' own ledger rows, seeded
+  // from each existing pallet's real pre-lock total (a brand-new pallet's
+  // first ledger row is simply its own row.qty, the running balance for a
+  // pallet that never existed before this transaction).
+  const runningBalance = new Map<string, { qty: number; weightKg: number }>();
+  for (const [id, target] of palletTargets) {
+    runningBalance.set(id, { qty: target.existing.totalCartons, weightKg: target.existing.totalWeightKg });
+  }
+
+  for (const { row, weightKg, existing } of rowPlans) {
+    let palletId: string;
+    let statusAfter: string;
+    let statusBefore: string | null;
+    let qtyAfter: number;
+    let weightAfterKg: number;
+
+    if (existing) {
+      palletId = existing.id;
+      statusBefore = existing.statusCode;
+      statusAfter = existing.statusCode;
+      const running = runningBalance.get(existing.id)!;
+      running.qty += row.qty;
+      running.weightKg += weightKg;
+      qtyAfter = running.qty;
+      weightAfterKg = running.weightKg;
+    } else {
+      palletId = crypto.randomUUID();
+      statusBefore = null;
+      statusAfter = sheet.defaultPalletStatus;
+      qtyAfter = row.qty;
+      weightAfterKg = weightKg;
+      statements.push(
+        database.insert(pallets).values({
+          id: palletId,
+          palletNumber: row.palletNumber,
+          palletType: "PLASTIC",
+          materialId: sheet.materialId,
+          statusCode: sheet.defaultPalletStatus,
+          totalWeightKg: weightKg,
+          totalCartons: row.qty,
+          currentWarehouseId: warehouse.id,
+          createdBy: confirmingUserId,
+        }),
+        database.insert(palletBatches).values({
+          id: crypto.randomUUID(),
+          palletId,
+          batchId,
+          cartonQty: row.qty,
+          weightKg,
+        })
+      );
+    }
+
+    statements.push(
       database.insert(stockLedger).values({
         id: crypto.randomUUID(),
         date: sheet.date,
@@ -173,11 +320,11 @@ export function planReceivingSheetLock(
         locationId: null,
         warehouseId: warehouse.id,
         qtyChange: row.qty,
-        qtyAfter: row.qty,
+        qtyAfter,
         weightChangeKg: weightKg,
-        weightAfterKg: weightKg,
-        statusBefore: null,
-        statusAfter: sheet.defaultPalletStatus,
+        weightAfterKg,
+        statusBefore,
+        statusAfter,
         referenceType: "RECEIVING_SHEET",
         referenceId: sheet.id,
         userId: confirmingUserId,

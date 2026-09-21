@@ -39,9 +39,12 @@ import {
  * handlers (auth mocked, everything else real) - that is where "this
  * scenario's business logic genuinely works" is actually proven: this
  * file proves "and the real UI shows it correctly, honestly, to a real
- * browser." Two scenarios (GS-007, GS-009) also surface real findings
- * from this task's own audit - see each block's own comment and the
- * pending items document's own PEN-048.
+ * browser." GS-007 surfaces a real, still-open finding from this task's
+ * own audit - see its own block comment and the pending items document's
+ * own PEN-048. GS-009's own real creation gap (no route ever wrote a
+ * second pallet_batches row) is now closed - see this block's own
+ * comment below and tests/unit/receiving-sheet-live.test.ts's own
+ * "reusing an existing pallet number" block for the real creation proof.
  */
 
 function hasNoHorizontalScroll(page: Page) {
@@ -717,16 +720,23 @@ test.describe("GS-008: Receiving Dispute Prevention", () => {
 test.describe("GS-009: Multiple Batches on Same Pallet", () => {
   // TASK-014's own audit found a real, previously undisclosed gap here
   // (see the pending items document's own PEN-048): no route or UI flow
-  // anywhere in this app ever creates a pallet with more than one
+  // anywhere in this app ever created a pallet with more than one
   // pallet_batches row - every real pallet-creation path
-  // (receiving-sheet-lock.ts) always writes exactly one. The
-  // pallet_batches junction table itself (an already-disclosed
-  // translation) and the Rack Map's own "Mix of N batches" display
-  // logic (an already-disclosed color rule, tests/unit/rack-map.test.ts)
-  // both genuinely support this state once it exists - proven here by
-  // seeding it directly, the same honest technique this whole file
-  // uses - but no user-facing action can produce it today. This test
-  // proves the real DISPLAY logic, not a fabricated creation flow.
+  // (receiving-sheet-lock.ts) always wrote exactly one. Closed this
+  // loop (Alpesh: "Ek pallet pe 2 batches ek hi material ki rakh sakte
+  // hai") - receiving-sheet-lock.ts now adds a second pallet_batches row
+  // when a receiving-sheet row's pallet_number matches an already-real,
+  // still-receivable pallet of the SAME material (INV-006); see that
+  // file's own doc comment and tests/unit/receiving-sheet-live.test.ts's
+  // "reusing an existing pallet number" block for the real creation
+  // proof, at the strongest level this project proves a mutation at
+  // (a real API route against a real local D1 write). This block
+  // deliberately keeps its own direct-seed technique below rather than
+  // switching to driving two real Receiving Sheets through the UI - it
+  // is proving a different, still-real thing (the Rack Map's own
+  // "Mix of N batches" DISPLAY logic renders this state correctly to a
+  // real browser), and the live-DB test above already owns the
+  // strongest proof of the creation path itself.
   const LOCATION_CODE = "GS009-LOC";
   const PALLET_NUMBER = "GS009-PALLET";
 
