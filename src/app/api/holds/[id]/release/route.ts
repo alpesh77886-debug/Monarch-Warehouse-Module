@@ -6,6 +6,7 @@ import { requirePermission, requireCurrentUserId } from "@/lib/auth";
 import { holdReleaseSchema } from "@/lib/validations/hold";
 import { rollupHoldStatus, type HoldPalletStatus } from "@/lib/business-rules/hold";
 import { validatePalletStatusTransition, describeLedgerEntry, type PalletStatus } from "@/lib/workflows/pallet-status";
+import { buildWarehouseNotificationInserts, type NotificationEventType } from "@/lib/notify";
 import {
   UnauthorizedError,
   ForbiddenError,
@@ -172,7 +173,24 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       ];
     });
 
-    await runAtomicBatch(db, [holdUpdateStmt, ...palletStmts]);
+    // Loop 50 / PEN-038: notify the real Warehouse role graph - see
+    // src/lib/notify.ts's own doc comment for the real R01/R02/R03
+    // reading. The event type reflects the hold's own real rollup
+    // status after this action, not just "released" - a genuinely
+    // partial release is a distinct, real event, not folded into the
+    // full-release wording.
+    const notifyEventType: NotificationEventType =
+      newHoldStatus === "PARTIALLY_RELEASED" ? "HOLD_PARTIALLY_RELEASED" : "HOLD_RELEASED";
+    const notifyStmts = await buildWarehouseNotificationInserts(db, {
+      eventType: notifyEventType,
+      title: `Hold ${newHoldStatus === "PARTIALLY_RELEASED" ? "partially released" : "released"}: ${hold.holdNumber}`,
+      body: `${hold.holdNumber} - ${targets.length} of ${allHoldPallets.length} pallet(s) released${parsed.data.releaseRemarks ? `: ${parsed.data.releaseRemarks}` : "."}`,
+      referenceType: "HOLD_RECORD",
+      referenceId: hold.id,
+      createdByUserId: currentUserId,
+    });
+
+    await runAtomicBatch(db, [holdUpdateStmt, ...palletStmts, ...notifyStmts]);
 
     const [updated] = await db.select().from(holdRecords).where(eq(holdRecords.id, params.id));
     return NextResponse.json({ hold: updated });

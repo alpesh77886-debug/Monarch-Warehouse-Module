@@ -947,6 +947,22 @@ Same session, next approved item from the same 4-item list: "Hold release Partia
 
 **Free-only confirmation:** no paid action, no infrastructure change - local code/test/docs work only.
 
+## Loop 50 Checkpoint, part 3 - PEN-038 closure: in-app notifications
+
+Same session, the last item of the same 4-item list: "Application Notification chahiye whatsapp ki jarurat nahi hai...Pop-up and Notification dono aane chahiye...other department se abhi humne link nahi kiya lekin Inter department rakho...Means Manager to Operators and Executives, Executives to Operators and Managers, Operators to executives and managers."
+
+**Design decision, disclosed not guessed:** "Manager/Executive/Operator" is read literally against the real 12-role matrix - R01 Warehouse Executive, R02 Warehouse Operator, R03 Warehouse Incharge ("Full dashboard, approvals, overrides") are the ONLY three roles whose own titles literally contain "Executive"/"Operator" plus a manager-equivalent; no other department has this 3-tier shape. So the notification graph is real R01/R02/R03 only, matching "other department se abhi link nahi kiya" exactly (no other role is ever a sender or recipient).
+
+**Built:** a new `notifications` table (migration `0013_red_mac_gargan.sql` - a plain new table, no FK-drop risk like part 2's migration). `src/lib/notify.ts`'s `buildWarehouseNotificationInserts` reads the real R01/R02/R03 users, excludes the acting user when they are one of the three, and returns real unrun INSERT statements batched atomically with the triggering event's own writes (PEN-044's own pattern). Wired into all four real Hold Management events - place/release/reject/follow-up nudge - with a distinct event type per real outcome, including a genuinely separate `HOLD_PARTIALLY_RELEASED`. Since no Hold event is ever actually triggered by an R01/R02/R03 actor today (place/release/reject are R04/R05-only in the real permission matrix; only follow-up is R03), every event notifies all three about their own inventory's real status change - not an invented per-event asymmetric rule. `GET /api/notifications`, `POST .../[id]/read`, `POST .../read-all` - hard-gated by `requireCurrentUserId()` (503 in stub mode, the same honest refusal this app already gives everywhere a route needs a real session) and scoped to the caller's own rows in the query itself. UI: `NotificationBell` (bell + unread badge + dropdown + a transient toast on a genuinely new arrival, 30s poll matching the Dashboard's own established cadence) mounted once in the shared app shell - real on every page. Renders nothing at all in stub mode, the same honest-absence choice this project already makes everywhere.
+
+**Deliberately not built, disclosed not guessed:** cross-department linking (Alpesh's own words say this is deliberately not yet wanted) and any external channel (explicitly declined - "whatsapp ki jarurat nahi hai").
+
+**Tests:** `tests/unit/hold-live.test.ts` gained real R01/R02/R03 fixture users and notification assertions on every one of its own hold create/release/reject/follow-up/partial-release tests (proving the real fan-out against real local D1, not a mock). `tests/unit/notifications-live.test.ts` (6 new tests - real inbox reads, honest stub-mode 503, mark-one-read, and the two "never leaks or mutates someone else's notification" tests). `tests/e2e/notifications.spec.ts` (2 new tests - the bell's own honest absence in stub mode, on two different screens).
+
+**Full regression, all green:** `npx tsc --noEmit` clean; unit suite 337/337 passing (31 files); E2E suite 116/117 passing (the same 1 pre-existing, already-disclosed `storage-putaway.spec.ts` timeout, unrelated). Harness checks: contract-guard/protected-integrity/yaml-lexical-guard PASS, static-guard 2 new findings - both a real, verified false positive (the new notification mark-read routes genuinely call `requireCurrentUserId()`, which the guard's own regex simply does not recognize as an auth call) rather than a route left deliberately open, disclosed as PEN-022's own Loop 50 addition, not routed around - package-integrity 2 pre-existing mismatches, unchanged.
+
+**Free-only confirmation:** no paid action, no infrastructure change - local code/test/docs work only.
+
 ## Architecture Decisions Log
 | Date | Decision | Status |
 |------|----------|--------|

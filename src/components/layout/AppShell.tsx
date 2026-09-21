@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { SidebarNav } from "./SidebarNav";
 import { BottomNav } from "./BottomNav";
+import { NotificationBell } from "./NotificationBell";
 
 /**
  * Real responsive app shell (Loop 4). NOT the reference HTML's fixed
@@ -16,6 +17,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main className="flex-1 pb-20 md:pb-0">{children}</main>
       </div>
       <BottomNav />
+      {/* Loop 50 / PEN-038: on every page via the shared shell, not a
+          per-page addition - see this component's own doc comment. */}
+      <NotificationBell />
     </div>
   );
 }

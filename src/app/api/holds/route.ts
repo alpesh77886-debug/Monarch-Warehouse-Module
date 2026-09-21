@@ -6,6 +6,7 @@ import { requirePermission, requireCurrentUserId } from "@/lib/auth";
 import { holdCreateSchema } from "@/lib/validations/hold";
 import { validateHoldReason, holdAgeDays, holdAgeBucket, holdNumberPrefix } from "@/lib/business-rules/hold";
 import { validatePalletStatusTransition, describeLedgerEntry, type PalletStatus } from "@/lib/workflows/pallet-status";
+import { buildWarehouseNotificationInserts } from "@/lib/notify";
 import {
   UnauthorizedError,
   ForbiddenError,
@@ -227,7 +228,19 @@ export async function POST(request: NextRequest) {
       ];
     });
 
-    await runAtomicBatch(db, [holdInsertStmt, ...palletStmts]);
+    // Loop 50 / PEN-038: notify the real Warehouse role graph that a
+    // hold now sits on their own inventory - see src/lib/notify.ts's own
+    // doc comment for the real R01/R02/R03 reading this fans out to.
+    const notifyStmts = await buildWarehouseNotificationInserts(db, {
+      eventType: "HOLD_PLACED",
+      title: `Hold placed: ${material.code}`,
+      body: `${holdNumber} - ${holdPalletRows.length} pallet(s) of ${material.code} (batch ${batch.batchNumber}) placed on hold: ${parsed.data.holdReason}.`,
+      referenceType: "HOLD_RECORD",
+      referenceId: holdId,
+      createdByUserId: currentUserId,
+    });
+
+    await runAtomicBatch(db, [holdInsertStmt, ...palletStmts, ...notifyStmts]);
 
     const [created] = await db.select().from(holdRecords).where(eq(holdRecords.id, holdId));
     return NextResponse.json({ hold: created }, { status: 201 });

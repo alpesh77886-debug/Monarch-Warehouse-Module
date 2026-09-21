@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { getDb } from "@/lib/db";
+import { getDb, runAtomicBatch } from "@/lib/db";
 import { holdRecords } from "../../../../../../drizzle/schema";
 import { requirePermission } from "@/lib/auth";
+import { buildWarehouseNotificationInserts } from "@/lib/notify";
 import {
   UnauthorizedError,
   ForbiddenError,
@@ -58,10 +59,27 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     const now = new Date().toISOString();
-    await db
+    const updateStmt = db
       .update(holdRecords)
       .set({ qcFollowupCount: hold.qcFollowupCount + 1, lastFollowupAt: now })
       .where(eq(holdRecords.id, params.id));
+
+    // Loop 50 / PEN-038: notify the real Warehouse role graph - see
+    // src/lib/notify.ts's own doc comment. No local users.id is resolved
+    // for the actor here (this route never needed one before this
+    // change), so createdByUserId is left null - the disclosed cost is
+    // the acting R03 also receives their own nudge's notification,
+    // rather than being excluded from it.
+    const notifyStmts = await buildWarehouseNotificationInserts(db, {
+      eventType: "HOLD_FOLLOWUP",
+      title: `QC follow-up sent: ${hold.holdNumber}`,
+      body: `${hold.holdNumber} - follow-up nudge #${hold.qcFollowupCount + 1} sent to QC.`,
+      referenceType: "HOLD_RECORD",
+      referenceId: hold.id,
+      createdByUserId: null,
+    });
+
+    await runAtomicBatch(db, [updateStmt, ...notifyStmts]);
 
     const [updated] = await db.select().from(holdRecords).where(eq(holdRecords.id, params.id));
     return NextResponse.json({ hold: updated });

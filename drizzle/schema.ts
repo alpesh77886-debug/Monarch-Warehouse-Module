@@ -769,3 +769,49 @@ export const maintenanceTickets = sqliteTable(
     ),
   })
 );
+
+// Loop 50 / PEN-038 (Alpesh: "Application Notification chahiye...
+// Pop-up and Notification dono aane chahiye...other department se abhi
+// humne link nahi kiya lekin Inter department rakho...Means Manager to
+// Operators and Executives, Executives to Operators and Managers,
+// Operators to executives and managers"). No entity for this exists
+// anywhere in the locked contracts - PEN-038 already established this
+// project has no real notification channel at all; this is a genuine
+// new addition, disclosed, not a translation of an already-contracted
+// shape. "Manager/Executive/Operator" is read literally against the
+// real 12-role table (the architecture blueprint's own role list): R01
+// "Warehouse Executive", R02 "Warehouse Operator", R03 "Warehouse
+// Incharge - Full dashboard, approvals, overrides" are the ONLY three
+// roles in the entire matrix whose own titles literally contain
+// "Executive"/"Operator" plus a manager-equivalent - no other
+// department has this 3-tier shape (QC is Officer/Head, Packing is
+// Supervisor/Operator, Production is a lone Executive, everything else
+// is one role). See this project's own notify helper module for the
+// real fan-out logic this table backs.
+export const notifications = sqliteTable(
+  "notifications",
+  {
+    id: text("id").primaryKey(),
+    recipientUserId: text("recipient_user_id")
+      .notNull()
+      .references(() => users.id),
+    eventType: text("event_type").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    referenceType: text("reference_type"),
+    referenceId: text("reference_id"),
+    createdByUserId: text("created_by_user_id").references(() => users.id),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    readAt: text("read_at"),
+  },
+  (table) => ({
+    eventTypeCheck: check(
+      "notifications_event_type_check",
+      sql`${table.eventType} IN ('HOLD_PLACED','HOLD_RELEASED','HOLD_REJECTED','HOLD_PARTIALLY_RELEASED','HOLD_FOLLOWUP')`
+    ),
+    recipientCreatedIdx: uniqueIndex("notifications_recipient_created_idx").on(
+      table.recipientUserId,
+      table.id
+    ),
+  })
+);

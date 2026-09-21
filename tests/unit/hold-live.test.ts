@@ -32,9 +32,8 @@ vi.mock("@/lib/auth", () => ({
 }));
 
 const { getDb } = await import("@/lib/db");
-const { users, materials, warehouses, batches, pallets, holdRecords, holdPallets, stockLedger } = await import(
-  "../../drizzle/schema"
-);
+const { users, materials, warehouses, batches, pallets, holdRecords, holdPallets, stockLedger, notifications } =
+  await import("../../drizzle/schema");
 const { GET: listHolds, POST: createHold } = await import("@/app/api/holds/route");
 const { GET: getHold } = await import("@/app/api/holds/[id]/route");
 const { POST: releaseHold } = await import("@/app/api/holds/[id]/release/route");
@@ -64,6 +63,12 @@ const FIXTURE_PALLET_C = "TEST-HOLD-PALLET-C";
 const FIXTURE_PALLET_D = "TEST-HOLD-PALLET-D";
 const FIXTURE_PALLET_E = "TEST-HOLD-PALLET-E";
 const FIXTURE_PALLET_F = "TEST-HOLD-PALLET-F";
+
+const WAREHOUSE_FIXTURE_USERS: Array<{ id: string; roleId: "R01" | "R02" | "R03" }> = [
+  { id: "loop-50-fixture-r01", roleId: "R01" },
+  { id: "loop-50-fixture-r02", roleId: "R02" },
+  { id: "loop-50-fixture-r03", roleId: "R03" },
+];
 
 let materialId: string;
 let warehouseId: string;
@@ -170,6 +175,23 @@ beforeAll(async () => {
     return id;
   }
 
+  // Loop 50 / PEN-038: real R01/R02/R03 users to prove the real
+  // Warehouse-role notification fan-out against, not a mock.
+  for (const u of WAREHOUSE_FIXTURE_USERS) {
+    const [existing] = await db.select().from(users).where(eq(users.id, u.id));
+    if (!existing) {
+      await db.insert(users).values({
+        id: u.id,
+        clerkUserId: `${u.id}-clerk`,
+        name: `Loop 50 fixture ${u.roleId}`,
+        email: `${u.id}@example.test`,
+        roleId: u.roleId,
+        department: "Warehouse",
+        plant: "LIMBASI",
+      });
+    }
+  }
+
   palletAId = await findOrCreateQcHoldPallet(FIXTURE_PALLET_A);
   palletBId = await findOrCreateQcHoldPallet(FIXTURE_PALLET_B);
   palletCId = await findOrCreateQcHoldPallet(FIXTURE_PALLET_C);
@@ -212,6 +234,21 @@ describe("Hold create (Flow 3 Step 1) really writes to local D1", () => {
       expect(row.statusAfter).toBe("HOLD");
       expect(row.referenceType).toBe("HOLD_RECORD");
       expect(row.userId).toBe(FIXTURE_USER_ID);
+    }
+
+    // Loop 50 / PEN-038: the real Warehouse role graph (R01/R02/R03) all
+    // get notified about a hold placed on their own inventory - the
+    // actor here (R04, QC) is not one of the three, so nobody is
+    // excluded.
+    const placedNotifications = await db
+      .select()
+      .from(notifications)
+      .where(and(eq(notifications.referenceId, holdId), eq(notifications.eventType, "HOLD_PLACED")));
+    for (const u of WAREHOUSE_FIXTURE_USERS) {
+      const mine = placedNotifications.find((n) => n.recipientUserId === u.id);
+      expect(mine, `expected a HOLD_PLACED notification for ${u.roleId}`).toBeDefined();
+      expect(mine!.referenceType).toBe("HOLD_RECORD");
+      expect(mine!.readAt).toBeNull();
     }
   });
 
@@ -281,6 +318,17 @@ describe("Follow-up nudge really increments the counter", () => {
       expect(res.status, JSON.stringify(body)).toBe(200);
       expect(body.hold.qcFollowupCount).toBe(1);
       expect(body.hold.lastFollowupAt).not.toBeNull();
+
+      // Loop 50 / PEN-038: followup's own actor (R03) is NOT excluded
+      // (createdByUserId is left null here - see the route's own doc
+      // comment), so all three Warehouse fixtures get one, R03 included.
+      const followupNotifications = await db
+        .select()
+        .from(notifications)
+        .where(and(eq(notifications.referenceId, holdId), eq(notifications.eventType, "HOLD_FOLLOWUP")));
+      for (const u of WAREHOUSE_FIXTURE_USERS) {
+        expect(followupNotifications.some((n) => n.recipientUserId === u.id)).toBe(true);
+      }
     } finally {
       currentRole.value = "R04";
     }
@@ -331,6 +379,14 @@ describe("Release (R04/R05, INV-005) really updates local D1", () => {
       expect(row.statusAfter).toBe("OK");
       expect(row.remarks).toBe("Re-inspected, temperature normal");
     }
+
+    const releasedNotifications = await db
+      .select()
+      .from(notifications)
+      .where(and(eq(notifications.referenceId, holdId), eq(notifications.eventType, "HOLD_RELEASED")));
+    for (const u of WAREHOUSE_FIXTURE_USERS) {
+      expect(releasedNotifications.some((n) => n.recipientUserId === u.id)).toBe(true);
+    }
   });
 
   it("refuses to release an already-RELEASED hold", async () => {
@@ -372,6 +428,14 @@ describe("Reject (R04) really updates local D1", () => {
     expect(adjustmentRows.length).toBe(1);
     expect(adjustmentRows[0].statusBefore).toBe("HOLD");
     expect(adjustmentRows[0].statusAfter).toBe("REJECTED");
+
+    const rejectedNotifications = await db
+      .select()
+      .from(notifications)
+      .where(and(eq(notifications.referenceId, rejectHoldId), eq(notifications.eventType, "HOLD_REJECTED")));
+    for (const u of WAREHOUSE_FIXTURE_USERS) {
+      expect(rejectedNotifications.some((n) => n.recipientUserId === u.id)).toBe(true);
+    }
   });
 
   it("rejects an empty rejection reason", async () => {
@@ -446,6 +510,16 @@ describe("Partial release/reject (Loop 50 / PEN-037) really updates local D1", (
     );
     expect(detailByPalletId.get(palletDId)).toBe("RELEASED");
     expect(detailByPalletId.get(palletEId)).toBe("ACTIVE");
+
+    // Loop 50 / PEN-038: a genuinely partial release fires its own
+    // distinct event type, not the plain "released" wording.
+    const partialNotifications = await db
+      .select()
+      .from(notifications)
+      .where(and(eq(notifications.referenceId, partialHoldId), eq(notifications.eventType, "HOLD_PARTIALLY_RELEASED")));
+    for (const u of WAREHOUSE_FIXTURE_USERS) {
+      expect(partialNotifications.some((n) => n.recipientUserId === u.id)).toBe(true);
+    }
   });
 
   it("refuses to act on a pallet that is no longer ACTIVE on this hold", async () => {
