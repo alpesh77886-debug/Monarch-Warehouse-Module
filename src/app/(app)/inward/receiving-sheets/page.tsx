@@ -3,6 +3,24 @@
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
+import {
+  Card,
+  Field,
+  KpiCard,
+  Pill,
+  type PillTone,
+  StateBox,
+  Steps,
+  SubText,
+  TableWrap,
+  btn,
+  inputClass,
+  rowFlagCls,
+  tableCls,
+  tdCls,
+  thCls,
+  trCls,
+} from "@/components/ui";
 
 type MaterialOption = { id: string; code: string; description: string };
 
@@ -142,13 +160,33 @@ export default function ReceivingSheetsPage() {
     }
   }
 
+  const draftCount = sheets.filter((s) => s.status === "DRAFT").length;
+  const awaitingCount = sheets.filter((s) => s.status === "PENDING_PACKING" || s.status === "PENDING_WAREHOUSE").length;
+  const lockedCount = sheets.filter((s) => s.status === "LOCKED").length;
+  const totalCartons = sheets.filter((s) => s.status !== "CANCELLED").reduce((sum, s) => sum + s.totalQty, 0);
+
   return (
     <>
-      <PageHeader breadcrumb="Home / Inward / Receiving Sheets" title="Receiving Sheets" />
-      <div className="flex flex-col gap-6 p-4 sm:p-6">
-        <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-          <h2 className="text-sm font-bold text-navy">New receiving sheet</h2>
-          <form className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
+      <PageHeader breadcrumb="Operations / Receiving Sheet" title="Receiving Sheets" />
+      <div className="flex flex-col gap-5 bg-canvas p-4 sm:p-6">
+        <Steps steps={["Sheet Details", "Pallet Entry", "Dual Confirmation"]} current={1} />
+
+        {loadState === "ready" && sheets.length > 0 ? (
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <KpiCard color="#64748B" label="Draft" value={draftCount} sub="pallet entry open" />
+            <KpiCard color="#D97706" label="Awaiting Confirm" value={awaitingCount} sub="packing / warehouse side" />
+            <KpiCard color="#059669" label="Locked" value={lockedCount} sub="legal record" />
+            <KpiCard color="#0D9488" label="Cartons Received" value={totalCartons} sub="excl. cancelled" />
+          </div>
+        ) : null}
+
+        <Card
+          title="New receiving sheet"
+          sub="Step 1 · sheet details - pallets are added on the next screen"
+          className="bg-gradient-to-r from-[#F0FDFA] to-white"
+          bodyClassName="p-4 sm:p-5"
+        >
+          <form className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" onSubmit={handleSubmit}>
             <Field label="Date">
               <input
                 type="date"
@@ -230,9 +268,9 @@ export default function ReceivingSheetsPage() {
               </Field>
             ) : null}
 
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-2 lg:col-span-3">
               {submitNotice ? (
-                <p className="mb-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-warning" role="status">
+                <p className="mb-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-[#B45309]" role="status">
                   {submitNotice}
                 </p>
               ) : null}
@@ -241,102 +279,84 @@ export default function ReceivingSheetsPage() {
                   {submitError}
                 </p>
               ) : null}
-              <button
-                type="submit"
-                disabled={submitState === "submitting"}
-                className="min-h-[48px] w-full rounded-lg bg-teal px-4 text-sm font-bold text-white disabled:opacity-60 sm:w-auto"
-              >
+              <button type="submit" disabled={submitState === "submitting"} className={btn("teal", "w-full sm:w-auto")}>
                 {submitState === "submitting" ? "Creating..." : "Create draft sheet"}
               </button>
             </div>
           </form>
-        </section>
+        </Card>
 
-        <section>
-          <h2 className="mb-3 text-sm font-bold text-navy">Existing sheets</h2>
-          {loadState === "loading" ? (
-            <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">
-              Loading...
-            </div>
-          ) : loadState === "error" ? (
-            <div className="rounded-xl border border-danger bg-danger-light p-6 text-sm text-danger shadow-card" role="alert">
-              {loadError}
-            </div>
-          ) : sheets.length === 0 ? (
-            <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">
-              No receiving sheets yet.
-            </div>
-          ) : (
-            <ul className="flex flex-col gap-3">
-              {sheets.map((s) => (
-                <li key={s.id}>
-                  <Link
-                    href={`/inward/receiving-sheets/${s.id}`}
-                    className="flex min-h-[64px] flex-col justify-center rounded-xl border border-line bg-white p-4 shadow-card"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-navy">{s.sheetNumber}</span>
-                      <StatusPill status={s.status} />
-                    </div>
-                    <div className="mt-1 text-xs text-muted">
-                      {s.materialCode} - {s.materialDescription} - batch {s.batchNumber}
-                    </div>
-                    <div className="mt-1 text-xs text-muted">
-                      {s.date} - Shift {s.shift} - {s.totalBoxes} pallet(s), {s.totalQty} cartons
-                    </div>
-                    {s.bulkReason ? (
-                      <div className="mt-1 text-xs font-semibold text-accent">Bulk - {s.bulkReason}</div>
-                    ) : null}
-                    {s.originalBulkPalletId ? (
-                      <div className="mt-1 text-xs font-semibold text-accent">Repack receipt (linked to original bulk pallet)</div>
-                    ) : null}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        {loadState === "loading" ? (
+          <StateBox>Loading...</StateBox>
+        ) : loadState === "error" ? (
+          <StateBox tone="danger">{loadError}</StateBox>
+        ) : sheets.length === 0 ? (
+          <StateBox>No receiving sheets yet.</StateBox>
+        ) : (
+          <Card title="Existing sheets" sub={`${sheets.length} sheet(s) · newest first`} bodyClassName="px-4 pb-2 pt-1">
+            <TableWrap minWidth={760}>
+              <table className={tableCls}>
+                <thead>
+                  <tr>
+                    <th className={thCls}>Sheet No</th>
+                    <th className={thCls}>Date / Shift</th>
+                    <th className={thCls}>Material</th>
+                    <th className={thCls}>Batch</th>
+                    <th className={thCls + " text-right"}>Pallets</th>
+                    <th className={thCls + " text-right"}>Cartons</th>
+                    <th className={thCls}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sheets.map((s) => (
+                    <tr key={s.id} className={trCls + " " + rowFlagCls(s.status === "CANCELLED" ? "critical" : s.bulkReason ? "violet" : null)}>
+                      <td className={tdCls}>
+                        <Link
+                          href={`/inward/receiving-sheets/${s.id}`}
+                          className="flex min-h-[44px] flex-col justify-center font-extrabold text-teal-2 hover:underline"
+                        >
+                          {s.sheetNumber}
+                        </Link>
+                        {s.bulkReason ? <div className="text-[11px] font-semibold text-accent">Bulk - {s.bulkReason}</div> : null}
+                        {s.originalBulkPalletId ? (
+                          <div className="text-[11px] font-semibold text-accent">Repack receipt (linked to original bulk pallet)</div>
+                        ) : null}
+                      </td>
+                      <td className={tdCls}>
+                        <div className="font-semibold text-ink">{s.date}</div>
+                        <div className="mt-0.5">
+                          <Pill tone="shift">Shift {s.shift}</Pill> <span className="text-[11px] text-muted2">{s.line}</span>
+                        </div>
+                      </td>
+                      <td className={tdCls}>
+                        <div className="font-bold text-ink">{s.materialCode}</div>
+                        <SubText>{s.materialDescription}</SubText>
+                      </td>
+                      <td className={tdCls + " font-semibold text-ink2"}>{s.batchNumber}</td>
+                      <td className={tdCls + " text-right"}>{s.totalBoxes}</td>
+                      <td className={tdCls + " text-right font-bold text-ink"}>{s.totalQty}</td>
+                      <td className={tdCls}>
+                        <StatusPill status={s.status} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
+          </Card>
+        )}
       </div>
     </>
   );
 }
 
 function StatusPill({ status }: { status: ReceivingSheetRow["status"] }) {
-  const styles: Record<ReceivingSheetRow["status"], string> = {
-    DRAFT: "bg-line text-muted",
-    PENDING_PACKING: "bg-warning-light text-warning",
-    PENDING_WAREHOUSE: "bg-warning-light text-warning",
-    LOCKED: "bg-success-light text-success",
-    CANCELLED: "bg-danger-light text-danger",
+  const tone: Record<ReceivingSheetRow["status"], PillTone> = {
+    DRAFT: "neutral",
+    PENDING_PACKING: "hold",
+    PENDING_WAREHOUSE: "hold",
+    LOCKED: "ok",
+    CANCELLED: "rejected",
   };
-  return (
-    <span className={"rounded-full px-2 py-0.5 text-xs font-bold " + styles[status]}>
-      {STATUS_LABEL[status]}
-    </span>
-  );
-}
-
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block text-xs font-semibold text-ink2">
-      {label}
-      <div className="mt-1">{children}</div>
-      {error ? <span className="mt-1 block text-xs font-semibold text-danger">{error}</span> : null}
-    </label>
-  );
-}
-
-function inputClass(error?: string) {
-  return (
-    "min-h-[48px] w-full rounded-lg border bg-white px-3 text-sm text-ink2 outline-none focus:border-teal " +
-    (error ? "border-danger" : "border-line")
-  );
+  return <Pill tone={tone[status]}>{STATUS_LABEL[status]}</Pill>;
 }

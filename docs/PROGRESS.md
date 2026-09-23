@@ -979,6 +979,20 @@ Same session, the "Dusri baat" (second matter) from the same message: "Dashboard
 
 **Free-only confirmation:** no paid action, no infrastructure change - local code/test/docs work only.
 
+## Loop 51 Checkpoint - PEN-050: visual redesign of the other 9 screens
+
+**Asked (Alpesh):** "Dashboard ke alawa baaki 9 screens (Receiving Sheet, Rack Map, Hold Tracking, Bulk, Dispatch, Transfers, Maintenance, Stock Ledger, IN-OUT Report) ka visual redesign kardo" - deploy troubleshooting paused by Alpesh for this.
+
+**Built:** new shared primitives `src/components/ui/index.tsx` matching `reference/IBF_FG_Warehouse_Frontend_Design_v5.html`'s own card/KPI/pill/button/table/note/steps styles; 15 page files restyled (9 screens incl. their detail pages); Dashboard's local Card/KpiCard replaced by the shared ones. Visual only - no API, schema, business-rule or contract change. What was added from real data and which reference pieces were deliberately not built (no data source): see PEN-050.
+
+**Kept test-stable on purpose:** every button name, label, placeholder and role the E2E suite queries is unchanged; list rows the suite queries as links stay links; detail pages still render exactly one `<table>`; status names / sheet numbers / pallet numbers still appear exactly once per page (progress strips use different words - "Pick", "Load", "Dispatch" - so strict-mode text queries stay unique); permission-denied states still render no table.
+
+**Real bug found and fixed:** `tests/unit/dashboard-live.test.ts`'s "today's inward" fixture was find-or-create on one fixed reference id, so its only row stayed dated on its first run (2026-09-21) and the test failed on every later day - now keyed per day (`loop-47-dashboard-fixture-<date>`), assertion unchanged.
+
+**Verification:** `npx tsc --noEmit` clean; `npm run build` clean; unit 345/345 (32 files); E2E 115 passed / 1 failed / 2 not run (118 total; the 2 sit behind the failing test in the same spec file) - the only failure is the pre-existing `storage-putaway.spec.ts:127` timeout on a page this loop never touched, now root-caused (PEN-050); holds + maintenance specs re-run 10/10 after the last small edits. Mobile check via a Playwright script at 360 / 768 / 1280px on all 13 redesigned routes: 0px horizontal overflow everywhere, 0 visible interactive elements under 44px tall inside `<main>`. Harness: contract-guard PASS; static-guard shows only pre-existing findings (one new "raw SQL" false positive this loop introduced - a sentence on Holds - was reworded away). `.env.local` moved aside only for the E2E run (documented PEN-030 step) and restored.
+
+**Free-only confirmation:** no paid action, no infrastructure change - local code/test/docs work only.
+
 ## Architecture Decisions Log
 | Date | Decision | Status |
 |------|----------|--------|

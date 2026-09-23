@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Card, KpiCard } from "@/components/ui";
 
 type AgeBucketTone = "RED" | "AMBER" | "OK";
 
@@ -352,59 +353,6 @@ export default function DashboardPage() {
         ) : null}
       </div>
     </>
-  );
-}
-
-function Card({
-  title,
-  sub,
-  action,
-  accentColor,
-  children,
-}: {
-  title: string;
-  sub?: string;
-  action?: React.ReactNode;
-  accentColor?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section
-      className="rounded-xl border border-line bg-white shadow-card"
-      style={accentColor ? { borderLeft: `4px solid ${accentColor}` } : undefined}
-    >
-      <div className="flex items-center justify-between border-b border-line px-4 py-3">
-        <div>
-          <h2 className="text-sm font-bold text-navy">{title}</h2>
-          {sub ? <span className="text-[11px] font-semibold text-muted2">{sub}</span> : null}
-        </div>
-        {action}
-      </div>
-      <div className="p-4">{children}</div>
-    </section>
-  );
-}
-
-function KpiCard({
-  color,
-  label,
-  value,
-  sub,
-  subTone = "muted",
-}: {
-  color: string;
-  label: string;
-  value: number | string;
-  sub: string;
-  subTone?: "muted" | "danger";
-}) {
-  return (
-    <div className="relative overflow-hidden rounded-xl border border-line bg-white p-3.5 shadow-card sm:p-4">
-      <div className="absolute inset-x-0 top-0 h-[3px]" style={{ background: color }} />
-      <div className="text-[10px] font-bold uppercase tracking-wide text-muted">{label}</div>
-      <div className="mt-1 text-2xl font-extrabold tracking-tight text-navy">{value}</div>
-      <div className={"mt-0.5 text-[11px] font-semibold " + (subTone === "danger" ? "text-danger" : "text-muted2")}>{sub}</div>
-    </div>
   );
 }
 

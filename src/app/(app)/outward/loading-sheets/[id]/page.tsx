@@ -3,6 +3,20 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
+import {
+  Card,
+  Field,
+  Pill,
+  StateBox,
+  TableWrap,
+  btn,
+  inputClass,
+  statusTone,
+  tableCls,
+  tdCls,
+  thCls,
+  trCls,
+} from "@/components/ui";
 
 type LoadingSheet = {
   id: string;
@@ -62,6 +76,11 @@ const STATUS_LABEL: Record<LoadingSheet["status"], string> = {
   GATE_PASSED: "Gate passed",
   DISPATCHED: "Dispatched",
 };
+
+const STAGE_ORDER: LoadingSheet["status"][] = ["DRAFT", "STAGING", "LOADED", "VERIFIED", "GATE_PASSED", "DISPATCHED"];
+// Deliberately not the STATUS_LABEL words - the header pill is the single place the status name appears.
+const STAGE_LABELS = ["Create", "Pick", "Load", "Verify", "Gate pass", "Dispatch"];
+const BLOCKED_STATUSES = ["HOLD", "QC_HOLD", "BULK", "REJECTED"];
 
 export default function LoadingSheetDetailPage() {
   const params = useParams<{ id: string }>();
@@ -189,9 +208,9 @@ export default function LoadingSheetDetailPage() {
   if (loadState === "loading") {
     return (
       <>
-        <PageHeader breadcrumb="Home / Outward / Loading Sheets" title="Loading..." />
-        <div className="p-4 sm:p-6">
-          <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">Loading...</div>
+        <PageHeader breadcrumb="Operations / Dispatch & Loading" title="Loading..." />
+        <div className="bg-canvas p-4 sm:p-6">
+          <StateBox>Loading...</StateBox>
         </div>
       </>
     );
@@ -199,11 +218,9 @@ export default function LoadingSheetDetailPage() {
   if (loadState === "error" || !sheet) {
     return (
       <>
-        <PageHeader breadcrumb="Home / Outward / Loading Sheets" title="Not found" />
-        <div className="p-4 sm:p-6">
-          <div className="rounded-xl border border-danger bg-danger-light p-6 text-sm text-danger shadow-card" role="alert">
-            {loadError}
-          </div>
+        <PageHeader breadcrumb="Operations / Dispatch & Loading" title="Not found" />
+        <div className="bg-canvas p-4 sm:p-6">
+          <StateBox tone="danger">{loadError}</StateBox>
         </div>
       </>
     );
@@ -216,222 +233,296 @@ export default function LoadingSheetDetailPage() {
   const canGatePass = sheet.status === "VERIFIED";
   const canDispatch = sheet.status === "GATE_PASSED";
 
+  const blockedPallets = allPallets.filter((p) => BLOCKED_STATUSES.includes(p.statusCode));
+  const totalCartons = pickedPallets.reduce((sum, p) => sum + p.cartonQty, 0);
+  const totalKg = pickedPallets.reduce((sum, p) => sum + p.weightKg, 0);
+  const stageIndex = STAGE_ORDER.indexOf(sheet.status);
+
   return (
     <>
-      <PageHeader breadcrumb="Home / Outward / Loading Sheets" title={sheet.loadingSheetNumber} />
-      <div className="flex flex-col gap-6 p-4 sm:p-6">
-        <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-navy">Header</h2>
-            <span className="rounded-full bg-canvas px-2 py-0.5 text-xs font-bold text-navy">
-              {STATUS_LABEL[sheet.status]}
-              {sheet.exportDomestic === "EXPORT" ? " · Export" : ""}
-            </span>
-          </div>
-          <dl className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
-            <Detail label="Date" value={sheet.date} />
-            <Detail label="Vehicle" value={sheet.vehicleNumber} />
-            <Detail label="Driver" value={sheet.driverName} />
-            <Detail label="Party" value={sheet.partyName} />
-            <Detail label="Destination" value={sheet.destination} />
-            <Detail label="Temperature" value={`${sheet.temperatureC} C`} />
-            {sheet.containerNumber ? <Detail label="Container" value={sheet.containerNumber} /> : null}
-            {sheet.gatePassNumber ? <Detail label="Gate pass" value={sheet.gatePassNumber} /> : null}
-          </dl>
-        </section>
+      <PageHeader
+        breadcrumb="Operations / Dispatch & Loading / Detail"
+        title={sheet.loadingSheetNumber}
+        actions={
+          <Pill tone={statusTone(sheet.status)}>
+            {STATUS_LABEL[sheet.status]}
+            {sheet.exportDomestic === "EXPORT" ? " · Export" : ""}
+          </Pill>
+        }
+      />
+      <div className="flex flex-col gap-5 bg-canvas p-4 sm:p-6">
+        <ol className="flex overflow-x-auto rounded-xl border border-line bg-white p-3 shadow-card" aria-label="Loading progress">
+          {STAGE_LABELS.map((label, i) => {
+            const done = i < stageIndex || sheet.status === "DISPATCHED";
+            const on = i === stageIndex && sheet.status !== "DISPATCHED";
+            return (
+              <li key={label} className="flex min-w-[64px] flex-1 items-start">
+                <div className="flex w-full flex-col items-center gap-1">
+                  <span
+                    className={
+                      "flex h-7 w-7 items-center justify-center rounded-full border-[2.5px] text-[11px] font-extrabold " +
+                      (done
+                        ? "border-teal bg-teal-light text-teal"
+                        : on
+                          ? "border-gold bg-[#FFEDD5] text-gold"
+                          : "border-[#CBD5E1] bg-[#F1F5F9] text-muted2")
+                    }
+                  >
+                    {done ? "✓" : i + 1}
+                  </span>
+                  <span className="text-center text-[9px] font-extrabold uppercase tracking-wide text-muted2">{label}</span>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
 
-        <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-          <h2 className="text-sm font-bold text-navy">Picked pallets ({pickedPallets.length})</h2>
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[600px] text-left text-xs">
-              <thead className="text-muted2">
-                <tr>
-                  <th className="py-1 pr-2">#</th>
-                  <th className="py-1 pr-2">Pallet</th>
-                  <th className="py-1 pr-2">Material</th>
-                  <th className="py-1 pr-2">Batch</th>
-                  <th className="py-1 pr-2">Cartons</th>
-                  <th className="py-1 pr-2">FIFO override</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {pickedPallets.map((p) => (
-                  <tr key={p.id}>
-                    <td className="py-2 pr-2">{p.loadingSequence}</td>
-                    <td className="py-2 pr-2 font-bold text-navy">{p.palletNumber}</td>
-                    <td className="py-2 pr-2">{p.materialCode}</td>
-                    <td className="py-2 pr-2">{p.batchNumber}</td>
-                    <td className="py-2 pr-2">{p.cartonQty}</td>
-                    <td className="py-2 pr-2">{p.fifoOverrideReason ?? ""}</td>
-                  </tr>
-                ))}
-                {pickedPallets.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-3 text-muted">
-                      No pallets picked yet.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_1.15fr]">
+          <div className="flex flex-col gap-5">
+            {canPick ? (
+              <Card title="FIFO Pick List" sub="OK / available pallets only · oldest production date first">
+                <form className="flex flex-col gap-3" onSubmit={handlePick}>
+                  <Field label="Pick an OK pallet (FIFO order - oldest first)">
+                    <select
+                      className={inputClass()}
+                      value={selectedPalletId}
+                      onChange={(e) => setSelectedPalletId(e.target.value)}
+                    >
+                      <option value="">Select a pallet...</option>
+                      {eligiblePallets.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.palletNumber} - {p.materialCode} - batch {p.batchNumber} ({p.productionDate})
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  {isFifoViolation ? (
+                    <div className="rounded-lg border border-[#FDE68A] bg-[#FFFBEB] p-3">
+                      <p className="mb-2 text-xs font-semibold text-[#92400E]">
+                        ⚠ An older batch is still available - this pick needs a logged FIFO override reason.
+                      </p>
+                      <Field label="FIFO override reason (required - an older batch is still available)">
+                        <input
+                          className={inputClass()}
+                          value={overrideReason}
+                          onChange={(e) => setOverrideReason(e.target.value)}
+                        />
+                      </Field>
+                    </div>
+                  ) : null}
+                  {pickNotice ? (
+                    <p className="rounded-lg bg-warning-light p-3 text-xs font-semibold text-[#B45309]" role="status">
+                      {pickNotice}
+                    </p>
+                  ) : null}
+                  {pickError ? (
+                    <p className="rounded-lg bg-danger-light p-3 text-xs font-semibold text-danger" role="alert">
+                      {pickError}
+                    </p>
+                  ) : null}
+                  <button type="submit" disabled={pickState === "submitting"} className={btn("teal", "w-full")}>
+                    {pickState === "submitting" ? "Picking..." : "Pick pallet"}
+                  </button>
+                </form>
+              </Card>
+            ) : null}
 
-          {canPick ? (
-            <form className="mt-4 flex flex-col gap-3 border-t border-line pt-4" onSubmit={handlePick}>
-              <Field label="Pick an OK pallet (FIFO order - oldest first)">
-                <select
-                  className={inputClass()}
-                  value={selectedPalletId}
-                  onChange={(e) => setSelectedPalletId(e.target.value)}
-                >
-                  <option value="">Select a pallet...</option>
-                  {eligiblePallets.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.palletNumber} - {p.materialCode} - batch {p.batchNumber} ({p.productionDate})
-                    </option>
+            {canPick && blockedPallets.length > 0 ? (
+              <section className="rounded-xl border-[1.5px] border-dashed border-[#FCA5A5] bg-white p-4 shadow-card">
+                <div className="text-[11px] font-extrabold uppercase tracking-wider text-danger">
+                  Auto-blocked — not selectable ({blockedPallets.length})
+                </div>
+                <ul className="mt-2 space-y-1.5 text-xs">
+                  {blockedPallets.slice(0, 6).map((p) => (
+                    <li key={p.id} className="flex flex-wrap items-center gap-1.5">
+                      <span className="font-extrabold text-danger">✗</span>
+                      <span className="text-ink2">batch {p.batchNumber ?? "-"}</span>
+                      <Pill tone={statusTone(p.statusCode)}>{p.statusCode}</Pill>
+                      <span className="text-muted2">· {p.totalCartons} bx</span>
+                    </li>
                   ))}
-                </select>
-              </Field>
-              {isFifoViolation ? (
-                <Field label="FIFO override reason (required - an older batch is still available)">
-                  <input
-                    className={inputClass()}
-                    value={overrideReason}
-                    onChange={(e) => setOverrideReason(e.target.value)}
-                  />
-                </Field>
-              ) : null}
-              {pickNotice ? (
-                <p className="rounded-lg bg-warning-light p-3 text-xs font-semibold text-warning" role="status">
-                  {pickNotice}
-                </p>
-              ) : null}
-              {pickError ? (
-                <p className="rounded-lg bg-danger-light p-3 text-xs font-semibold text-danger" role="alert">
-                  {pickError}
-                </p>
-              ) : null}
-              <button
-                type="submit"
-                disabled={pickState === "submitting"}
-                className="min-h-[48px] w-full rounded-lg bg-teal px-4 text-sm font-bold text-white disabled:opacity-60 sm:w-auto"
-              >
-                {pickState === "submitting" ? "Picking..." : "Pick pallet"}
-              </button>
-            </form>
-          ) : null}
-        </section>
+                </ul>
+                {blockedPallets.length > 6 ? (
+                  <div className="mt-1.5 text-[11px] text-muted2">+ {blockedPallets.length - 6} more</div>
+                ) : null}
+              </section>
+            ) : null}
 
-        {canQcApprove ? (
-          <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-            <h2 className="text-sm font-bold text-navy">QC container approval (Export)</h2>
-            {sheet.qcApprovalAt ? (
-              <p className="mt-2 text-xs text-success">Approved at {sheet.qcApprovalAt}</p>
-            ) : (
-              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <Field label="Container number">
-                  <input
-                    className={inputClass()}
-                    value={qcForm.containerNumber}
-                    onChange={(e) => setQcForm({ ...qcForm, containerNumber: e.target.value })}
-                  />
-                </Field>
-                <Field label="Seal number">
-                  <input
-                    className={inputClass()}
-                    value={qcForm.sealNumber}
-                    onChange={(e) => setQcForm({ ...qcForm, sealNumber: e.target.value })}
-                  />
-                </Field>
-                <Field label="Bolt number">
-                  <input
-                    className={inputClass()}
-                    value={qcForm.boltNumber}
-                    onChange={(e) => setQcForm({ ...qcForm, boltNumber: e.target.value })}
-                  />
-                </Field>
-                <div className="sm:col-span-3">
+            {canQcApprove ? (
+              <Card title="QC container approval (Export)" accentColor="#7C3AED">
+                {sheet.qcApprovalAt ? (
+                  <p className="text-xs font-semibold text-success">✓ Approved at {sheet.qcApprovalAt}</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <Field label="Container number">
+                      <input
+                        className={inputClass()}
+                        value={qcForm.containerNumber}
+                        onChange={(e) => setQcForm({ ...qcForm, containerNumber: e.target.value })}
+                      />
+                    </Field>
+                    <Field label="Seal number">
+                      <input
+                        className={inputClass()}
+                        value={qcForm.sealNumber}
+                        onChange={(e) => setQcForm({ ...qcForm, sealNumber: e.target.value })}
+                      />
+                    </Field>
+                    <Field label="Bolt number">
+                      <input
+                        className={inputClass()}
+                        value={qcForm.boltNumber}
+                        onChange={(e) => setQcForm({ ...qcForm, boltNumber: e.target.value })}
+                      />
+                    </Field>
+                    <div className="sm:col-span-3">
+                      <button type="button" onClick={() => runAction("qc-approve", qcForm)} className={btn("teal", "w-full sm:w-auto")}>
+                        Approve container
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </Card>
+            ) : null}
+          </div>
+
+          <section className="relative overflow-hidden rounded-xl border-[1.5px] border-[#CBD5E1] bg-white p-4 shadow-card sm:p-5">
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-navy-3 to-teal" />
+            <div className="mb-3 flex items-end justify-between border-b-[2.5px] border-navy pb-2.5">
+              <div>
+                <h2 className="text-base font-extrabold tracking-[2px] text-navy">LOADING SHEET</h2>
+                <div className="text-[11px] font-bold text-muted">{sheet.exportDomestic}</div>
+              </div>
+              <div className="text-right text-[11px] font-bold text-muted">{sheet.date}</div>
+            </div>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-4">
+              <Detail label="Vehicle" value={sheet.vehicleNumber} />
+              <Detail label="Driver" value={sheet.driverName} />
+              <Detail label="Party" value={sheet.partyName} />
+              <Detail label="Destination" value={sheet.destination} />
+              {sheet.transporter ? <Detail label="Transporter" value={sheet.transporter} /> : null}
+              <Detail label="Temperature" value={`${sheet.temperatureC} C`} />
+              {sheet.containerNumber ? <Detail label="Container" value={sheet.containerNumber} /> : null}
+              {sheet.sealNumber ? <Detail label="Seal / Bolt" value={`${sheet.sealNumber} · ${sheet.boltNumber ?? "-"}`} /> : null}
+              {sheet.gatePassNumber ? <Detail label="Gate pass" value={sheet.gatePassNumber} /> : null}
+            </dl>
+
+            <div className="mt-4">
+              <TableWrap minWidth={560}>
+                <table className={tableCls}>
+                  <thead>
+                    <tr>
+                      <th className={thCls}>#</th>
+                      <th className={thCls}>Pallet</th>
+                      <th className={thCls}>Material</th>
+                      <th className={thCls}>Batch</th>
+                      <th className={thCls + " text-right"}>Cartons</th>
+                      <th className={thCls + " text-right"}>kg</th>
+                      <th className={thCls}>FIFO override</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pickedPallets.map((p) => (
+                      <tr key={p.id} className={trCls + (p.fifoOverrideReason ? " bg-[#FFFBEB]" : "")}>
+                        <td className={tdCls + " text-muted"}>{p.loadingSequence}</td>
+                        <td className={tdCls + " font-bold text-ink"}>{p.palletNumber}</td>
+                        <td className={tdCls}>{p.materialCode}</td>
+                        <td className={tdCls}>{p.batchNumber}</td>
+                        <td className={tdCls + " text-right"}>{p.cartonQty}</td>
+                        <td className={tdCls + " text-right text-muted"}>{p.weightKg}</td>
+                        <td className={tdCls + " text-xs italic text-[#92400E]"}>{p.fifoOverrideReason ?? ""}</td>
+                      </tr>
+                    ))}
+                    {pickedPallets.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className={tdCls + " text-center text-muted"}>
+                          No pallets picked yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr className="bg-[#F8FAFC]">
+                        <td colSpan={4} className={tdCls + " text-right font-extrabold text-ink"}>
+                          TOTAL · {pickedPallets.length} pallet(s)
+                        </td>
+                        <td className={tdCls + " text-right font-extrabold text-ink"}>{totalCartons}</td>
+                        <td className={tdCls + " text-right font-extrabold text-ink"}>{totalKg}</td>
+                        <td className={tdCls}></td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </TableWrap>
+            </div>
+
+            <div className="mt-4 border-t border-dashed border-[#CBD5E1] pt-4">
+              <div className="flex flex-wrap gap-3">
+                {canLoad ? (
                   <button
                     type="button"
-                    onClick={() => runAction("qc-approve", qcForm)}
-                    className="min-h-[48px] w-full rounded-lg bg-teal px-4 text-sm font-bold text-white sm:w-auto"
+                    disabled={actionState === "submitting"}
+                    onClick={() => runAction("load", {})}
+                    className={btn("teal", "flex-1")}
                   >
-                    Approve container
+                    Mark Loaded
                   </button>
-                </div>
+                ) : null}
+                {canVerify ? (
+                  <button
+                    type="button"
+                    disabled={actionState === "submitting"}
+                    onClick={() => runAction("verify", {})}
+                    className={btn("teal", "flex-1")}
+                  >
+                    Verify
+                  </button>
+                ) : null}
+                {canGatePass ? (
+                  <div className="flex min-w-[240px] flex-1 gap-2">
+                    <input
+                      className={inputClass() + " flex-1"}
+                      placeholder="Gate pass number"
+                      value={gatePassNumber}
+                      onChange={(e) => setGatePassNumber(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      disabled={actionState === "submitting"}
+                      onClick={() => runAction("gate-pass", { gatePassNumber })}
+                      className={btn("primary")}
+                    >
+                      Record Gate Pass
+                    </button>
+                  </div>
+                ) : null}
+                {canDispatch ? (
+                  <button
+                    type="button"
+                    disabled={actionState === "submitting"}
+                    onClick={() => runAction("dispatch", {}, "Dispatched.")}
+                    className={btn("primary", "flex-1")}
+                  >
+                    Dispatch
+                  </button>
+                ) : null}
+                {sheet.status === "DISPATCHED" ? (
+                  <p className="w-full rounded-lg bg-success-light p-3 text-sm font-semibold text-success">
+                    Dispatched - stock deducted, this loading sheet is now immutable.
+                  </p>
+                ) : null}
               </div>
-            )}
+              {actionNotice ? (
+                <p className="mt-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-[#B45309]" role="status">
+                  {actionNotice}
+                </p>
+              ) : null}
+              {actionError ? (
+                <p className="mt-3 rounded-lg bg-danger-light p-3 text-xs font-semibold text-danger" role="alert">
+                  {actionError}
+                </p>
+              ) : null}
+            </div>
           </section>
-        ) : null}
-
-        <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-          <h2 className="text-sm font-bold text-navy">Actions</h2>
-          <div className="mt-3 flex flex-wrap gap-3">
-            {canLoad ? (
-              <button
-                type="button"
-                disabled={actionState === "submitting"}
-                onClick={() => runAction("load", {})}
-                className="min-h-[48px] rounded-lg bg-teal px-4 text-sm font-bold text-white disabled:opacity-60"
-              >
-                Mark Loaded
-              </button>
-            ) : null}
-            {canVerify ? (
-              <button
-                type="button"
-                disabled={actionState === "submitting"}
-                onClick={() => runAction("verify", {})}
-                className="min-h-[48px] rounded-lg bg-teal px-4 text-sm font-bold text-white disabled:opacity-60"
-              >
-                Verify
-              </button>
-            ) : null}
-            {canGatePass ? (
-              <div className="flex flex-1 min-w-[240px] gap-2">
-                <input
-                  className={inputClass() + " flex-1"}
-                  placeholder="Gate pass number"
-                  value={gatePassNumber}
-                  onChange={(e) => setGatePassNumber(e.target.value)}
-                />
-                <button
-                  type="button"
-                  disabled={actionState === "submitting"}
-                  onClick={() => runAction("gate-pass", { gatePassNumber })}
-                  className="min-h-[48px] rounded-lg bg-teal px-4 text-sm font-bold text-white disabled:opacity-60"
-                >
-                  Record Gate Pass
-                </button>
-              </div>
-            ) : null}
-            {canDispatch ? (
-              <button
-                type="button"
-                disabled={actionState === "submitting"}
-                onClick={() => runAction("dispatch", {}, "Dispatched.")}
-                className="min-h-[48px] rounded-lg bg-success px-4 text-sm font-bold text-white disabled:opacity-60"
-              >
-                Dispatch
-              </button>
-            ) : null}
-            {sheet.status === "DISPATCHED" ? (
-              <p className="text-sm font-semibold text-success">
-                Dispatched - stock deducted, this loading sheet is now immutable.
-              </p>
-            ) : null}
-          </div>
-          {actionNotice ? (
-            <p className="mt-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-warning" role="status">
-              {actionNotice}
-            </p>
-          ) : null}
-          {actionError ? (
-            <p className="mt-3 rounded-lg bg-danger-light p-3 text-xs font-semibold text-danger" role="alert">
-              {actionError}
-            </p>
-          ) : null}
-        </section>
+        </div>
       </div>
     </>
   );
@@ -440,21 +531,8 @@ export default function LoadingSheetDetailPage() {
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-muted2">{label}</dt>
-      <dd className="font-semibold text-navy">{value}</dd>
+      <dt className="text-[10px] font-bold uppercase tracking-wide text-muted2">{label}</dt>
+      <dd className="font-bold text-ink">{value}</dd>
     </div>
   );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block text-xs font-semibold text-ink2">
-      {label}
-      <div className="mt-1">{children}</div>
-    </label>
-  );
-}
-
-function inputClass() {
-  return "min-h-[48px] w-full rounded-lg border border-line bg-white px-3 text-sm text-ink2 outline-none focus:border-teal";
 }

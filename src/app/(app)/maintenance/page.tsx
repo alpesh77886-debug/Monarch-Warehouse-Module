@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Card, Field, KpiCard, Pill, type PillTone, StateBox, btn, inputClass } from "@/components/ui";
 
 type MaintenanceTicketRow = {
   id: string;
@@ -24,11 +25,11 @@ const EMPTY_FORM = {
   severity: "MEDIUM" as MaintenanceTicketRow["severity"],
 };
 
-const SEVERITY_STYLE: Record<MaintenanceTicketRow["severity"], string> = {
-  LOW: "bg-line text-muted",
-  MEDIUM: "bg-warning-light text-warning",
-  HIGH: "bg-accent-light text-accent",
-  CRITICAL: "bg-danger-light text-danger",
+const SEVERITY_TONE: Record<MaintenanceTicketRow["severity"], PillTone> = {
+  LOW: "neutral",
+  MEDIUM: "qc",
+  HIGH: "hold",
+  CRITICAL: "rejected",
 };
 const STATUS_LABEL: Record<MaintenanceTicketRow["status"], string> = {
   OPEN: "Open",
@@ -38,14 +39,22 @@ const STATUS_LABEL: Record<MaintenanceTicketRow["status"], string> = {
   CLOSED: "Closed",
   REOPENED: "Reopened",
 };
-const STATUS_STYLE: Record<MaintenanceTicketRow["status"], string> = {
-  OPEN: "bg-danger-light text-danger",
-  ACKNOWLEDGED: "bg-warning-light text-warning",
-  IN_PROGRESS: "bg-sky-light text-sky",
-  RESOLVED: "bg-accent-light text-accent",
-  CLOSED: "bg-success-light text-success",
-  REOPENED: "bg-danger-light text-danger",
+const STATUS_TONE: Record<MaintenanceTicketRow["status"], PillTone> = {
+  OPEN: "rejected",
+  ACKNOWLEDGED: "qc",
+  IN_PROGRESS: "hold",
+  RESOLVED: "ok",
+  CLOSED: "ok",
+  REOPENED: "rejected",
 };
+const PROGRESS_ORDER: MaintenanceTicketRow["status"][] = ["OPEN", "ACKNOWLEDGED", "IN_PROGRESS", "RESOLVED", "CLOSED"];
+
+function sinceRaised(createdAt: string): string {
+  const mins = Math.max(0, Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000));
+  const days = Math.floor(mins / 1440);
+  if (days > 0) return `${days}d ${Math.floor((mins % 1440) / 60)}h`;
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+}
 
 function ageDays(createdAt: string): number {
   return Math.max(0, Math.floor((Date.now() - new Date(createdAt).getTime()) / (24 * 60 * 60 * 1000)));
@@ -118,20 +127,83 @@ export default function MaintenancePage() {
     }
   }
 
+  const featured = openTickets
+    .filter((t) => t.severity === "CRITICAL" && t.status !== "RESOLVED")
+    .sort((x, y) => x.createdAt.localeCompare(y.createdAt))[0];
+
   return (
     <>
-      <PageHeader breadcrumb="Home / Maintenance" title="Maintenance" />
-      <div className="flex flex-col gap-6 p-4 sm:p-6">
-        <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatTile label="Open issues" value={openTickets.length} />
-          <StatTile label="Critical (open)" value={criticalOpenCount} tone="danger" />
-          <StatTile label="High" value={bySeverity.HIGH} tone="warning" />
-          <StatTile label="Medium" value={bySeverity.MEDIUM} />
+      <PageHeader breadcrumb="Support / Maintenance" title="Warehouse Maintenance Tickets" />
+      <div className="flex flex-col gap-5 bg-canvas p-4 sm:p-6">
+        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <KpiCard color="#475569" label="Open issues" value={openTickets.length} sub="not closed" />
+          <KpiCard
+            color="#DC2626"
+            label="Critical (open)"
+            value={criticalOpenCount}
+            sub="product at risk"
+            subTone={criticalOpenCount > 0 ? "danger" : "muted"}
+          />
+          <KpiCard color="#D97706" label="High" value={bySeverity.HIGH} sub="stops work" />
+          <KpiCard color="#0284C7" label="Medium" value={bySeverity.MEDIUM} sub="workaround possible" />
         </section>
 
-        <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-          <h2 className="text-sm font-bold text-navy">Raise an issue</h2>
-          <form className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
+        {featured ? (
+          <section className="rounded-xl border-[1.5px] border-[#FCA5A5] bg-gradient-to-br from-[#FFF5F5] to-white p-4 shadow-card sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <Pill tone="rejected">🔴 Critical · {featured.ticketNumber}</Pill>
+                <div className="mt-2 text-[15px] font-extrabold text-navy">{featured.description}</div>
+                <div className="mt-1 text-[11px] text-muted2">
+                  {featured.category} · {featured.location}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-extrabold text-danger">{sinceRaised(featured.createdAt)}</div>
+                <div className="text-[11px] text-muted2">since raised</div>
+              </div>
+            </div>
+            <ol className="mt-4 flex items-start">
+              {PROGRESS_ORDER.map((st, i) => {
+                const current = PROGRESS_ORDER.indexOf(featured.status === "REOPENED" ? "ACKNOWLEDGED" : featured.status);
+                const done = i < current;
+                const on = i === current;
+                return (
+                  <li key={st} className="flex flex-1 items-start">
+                    <div className="flex w-full flex-col items-center gap-1">
+                      <span
+                        className={
+                          "flex h-7 w-7 items-center justify-center rounded-full border-[2.5px] text-[11px] font-extrabold " +
+                          (done
+                            ? "border-danger bg-danger-light text-danger"
+                            : on
+                              ? "border-gold bg-[#FFEDD5] text-gold"
+                              : "border-[#CBD5E1] bg-[#F1F5F9] text-muted2")
+                        }
+                      >
+                        {done ? "✓" : on ? "◐" : i + 1}
+                      </span>
+                      <span className="text-center text-[9px] font-extrabold uppercase tracking-wide text-muted2">
+                        {st === "ACKNOWLEDGED" ? "Ack" : st === "IN_PROGRESS" ? "Working" : st === "RESOLVED" ? "Fix" : st === "OPEN" ? "Raised" : "Verify"}
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+            <div className="mt-3 text-right">
+              <Link
+                href={`/maintenance/${featured.id}`}
+                className="inline-flex min-h-[44px] items-center text-xs font-bold text-teal hover:underline"
+              >
+                Open ticket →
+              </Link>
+            </div>
+          </section>
+        ) : null}
+
+        <Card title="Raise an issue" sub="anyone can raise · critical escalates immediately">
+          <form className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" onSubmit={handleSubmit}>
             <Field label="Category">
               <select
                 className={inputClass()}
@@ -170,9 +242,9 @@ export default function MaintenancePage() {
               />
             </Field>
 
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-2 lg:col-span-4">
               {submitNotice ? (
-                <p className="mb-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-warning" role="status">
+                <p className="mb-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-[#B45309]" role="status">
                   {submitNotice}
                 </p>
               ) : null}
@@ -181,52 +253,50 @@ export default function MaintenancePage() {
                   {submitError}
                 </p>
               ) : null}
-              <button
-                type="submit"
-                disabled={submitState === "submitting"}
-                className="min-h-[48px] w-full rounded-lg bg-teal px-4 text-sm font-bold text-white disabled:opacity-60 sm:w-auto"
-              >
+              <button type="submit" disabled={submitState === "submitting"} className={btn("danger", "w-full sm:w-auto")}>
                 {submitState === "submitting" ? "Raising..." : "Raise issue"}
               </button>
             </div>
           </form>
-        </section>
+        </Card>
 
         <section>
-          <h2 className="mb-3 text-sm font-bold text-navy">Open issues by age, severity, category</h2>
+          <h2 className="mb-3 text-[11px] font-extrabold uppercase tracking-widest text-muted2">
+            Open issues by age, severity, category
+          </h2>
           {loadState === "loading" ? (
-            <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">Loading...</div>
+            <StateBox>Loading...</StateBox>
           ) : loadState === "error" ? (
-            <div className="rounded-xl border border-danger bg-danger-light p-6 text-sm text-danger shadow-card" role="alert">
-              {loadError}
-            </div>
+            <StateBox tone="danger">{loadError}</StateBox>
           ) : openTickets.length === 0 ? (
-            <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">
-              No open maintenance issues.
-            </div>
+            <StateBox>No open maintenance issues.</StateBox>
           ) : (
             <ul className="flex flex-col gap-3">
               {openTickets.map((t) => (
                 <li key={t.id}>
                   <Link
                     href={`/maintenance/${t.id}`}
-                    className="flex min-h-[64px] flex-col justify-center rounded-xl border border-line bg-white p-4 shadow-card"
+                    className={
+                      "grid min-h-[64px] grid-cols-1 gap-2 rounded-xl border bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:border-teal sm:grid-cols-[1fr_2fr_auto_auto] sm:items-center " +
+                      (t.severity === "CRITICAL" ? "border-[#FCA5A5]" : "border-line")
+                    }
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-navy">{t.ticketNumber}</span>
-                      <div className="flex gap-2">
-                        <span className={"rounded-full px-2 py-0.5 text-xs font-bold " + SEVERITY_STYLE[t.severity]}>
-                          {t.severity}
-                        </span>
-                        <span className={"rounded-full px-2 py-0.5 text-xs font-bold " + STATUS_STYLE[t.status]}>
-                          {STATUS_LABEL[t.status]}
-                        </span>
+                    <div>
+                      <div className="text-sm font-extrabold text-ink">{t.ticketNumber}</div>
+                      <div className="text-[11px] text-muted2">{ageDays(t.createdAt)}d old</div>
+                    </div>
+                    <div className="text-xs">
+                      <div className="font-bold text-ink2">
+                        {t.category} · {t.location}
                       </div>
+                      <div className="text-muted2">{t.description}</div>
                     </div>
-                    <div className="mt-1 text-xs text-muted">
-                      {t.category} - {t.location} - {t.description}
+                    <div>
+                      <Pill tone={SEVERITY_TONE[t.severity]}>{t.severity}</Pill>
                     </div>
-                    <div className="mt-1 text-xs text-muted">{ageDays(t.createdAt)}d old</div>
+                    <div className="sm:text-right">
+                      <Pill tone={STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</Pill>
+                    </div>
                   </Link>
                 </li>
               ))}
@@ -236,27 +306,4 @@ export default function MaintenancePage() {
       </div>
     </>
   );
-}
-
-function StatTile({ label, value, tone }: { label: string; value: number; tone?: "danger" | "warning" }) {
-  const color = tone === "danger" ? "text-danger" : tone === "warning" ? "text-warning" : "text-navy";
-  return (
-    <div className="rounded-xl border border-line bg-white p-4 shadow-card">
-      <div className="text-xs text-muted">{label}</div>
-      <div className={"mt-1 text-2xl font-extrabold " + color}>{value}</div>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block text-xs font-semibold text-ink2">
-      {label}
-      <div className="mt-1">{children}</div>
-    </label>
-  );
-}
-
-function inputClass() {
-  return "min-h-[48px] w-full rounded-lg border border-line bg-white px-3 text-sm text-ink2 outline-none focus:border-teal";
 }

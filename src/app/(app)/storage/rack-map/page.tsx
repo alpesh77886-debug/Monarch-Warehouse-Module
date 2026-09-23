@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Card, Pill, StateBox, inputClass } from "@/components/ui";
 import { rackMapCellColor, RACK_MAP_COLOR_LABEL, type RackMapColor } from "@/lib/rack-map";
 
 type Location = {
@@ -27,16 +28,14 @@ type Pallet = {
 
 type LoadState = "loading" | "ready" | "error";
 
+// Reference .rc-e/.rc-f/.rc-p/.rc-m/.rc-h/.rc-x swatches.
 const COLOR_CLASSES: Record<RackMapColor, string> = {
-  green: "bg-success-light border-success text-success",
-  red: "bg-danger-light border-danger text-danger",
-  blue: "bg-sky-light border-sky text-sky",
-  orange: "bg-warning-light border-warning text-warning",
-  grey: "bg-line border-muted2 text-muted",
-  // Tailwind's default "yellow" scale (not the "warning" design token,
-  // which is already amber-ish and used for orange/HOLD above - reusing
-  // it here would make mix and hold look the same color).
-  yellow: "bg-yellow-100 border-yellow-500 text-yellow-700",
+  green: "bg-[#ECFDF5] border-[#A7F3D0] text-[#047857]",
+  red: "bg-[#FEE2E2] border-[#FCA5A5] text-[#B91C1C]",
+  blue: "bg-[#DBEAFE] border-[#93C5FD] text-[#1D4ED8]",
+  orange: "bg-[#FFEDD5] border-[#FDBA74] text-[#C2410C]",
+  grey: "bg-[#E2E8F0] border-[#CBD5E1] text-[#64748B]",
+  yellow: "bg-[#FEF9C3] border-[#FDE047] text-[#A16207]",
 };
 
 export default function RackMapPage() {
@@ -103,101 +102,178 @@ export default function RackMapPage() {
     );
   }
 
+  const roomLocations = locations.filter((l) => l.coldRoom === currentColdRoom);
+  const roomOccupied = roomLocations.filter((l) => l.status === "OCCUPIED" || l.status === "PARTIAL").length;
+  const roomUsable = roomLocations.filter((l) => l.status !== "BLOCKED").length;
+  const roomPct = roomUsable === 0 ? 0 : Math.round((roomOccupied / roomUsable) * 100);
+
+  function renderCell(loc: Location, label: string, compact: boolean) {
+    const occupant = loc.currentPalletId ? palletById.get(loc.currentPalletId) ?? null : null;
+    const color = rackMapCellColor(
+      loc,
+      occupant ? { statusCode: occupant.statusCode, distinctBatchCount: occupant.distinctBatchCount } : null
+    );
+    const isMatch = matchesSearch(loc);
+    const second =
+      color === "green"
+        ? "empty"
+        : color === "grey"
+          ? "blocked"
+          : color === "orange"
+            ? "⚠ HOLD"
+            : color === "yellow" && occupant
+              ? `${occupant.distinctBatchCount} batches`
+              : occupant
+                ? `${occupant.totalCartons} ctn`
+                : RACK_MAP_COLOR_LABEL[color];
+    return (
+      <button
+        key={loc.id}
+        type="button"
+        onClick={() => setSelected(loc)}
+        className={
+          "flex min-h-[52px] flex-col items-center justify-center rounded-[9px] border-[1.5px] px-1 py-1.5 font-bold transition hover:-translate-y-0.5 hover:shadow-[0_10px_22px_-8px_rgba(15,23,42,.35)] " +
+          COLOR_CLASSES[color] +
+          (isMatch ? " ring-2 ring-accent ring-offset-1" : "") +
+          (compact ? " w-[72px]" : "")
+        }
+        title={loc.fullCode}
+        aria-label={`${loc.fullCode} - ${RACK_MAP_COLOR_LABEL[color]}${occupant ? `, pallet ${occupant.palletNumber}, ${occupant.materialCode}` : ""}`}
+      >
+        <span className="text-[11.5px] font-extrabold">{label}</span>
+        <span className="mt-0.5 text-[9px] opacity-80">{second}</span>
+      </button>
+    );
+  }
+
   return (
     <>
-      <PageHeader breadcrumb="Home / Storage / Rack Map" title="Rack Map" />
-      <div className="flex flex-col gap-4 p-4 sm:p-6">
-        {state === "loading" ? (
-          <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">
-            Loading rack map...
-          </div>
-        ) : state === "error" ? (
-          <div className="rounded-xl border border-danger bg-danger-light p-6 text-sm text-danger shadow-card" role="alert">
-            {error}
-          </div>
-        ) : locations.length === 0 ? (
-          <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">
-            No locations exist yet - add some in{" "}
-            <a href="/storage/locations" className="font-bold text-teal underline">
-              Locations
-            </a>
-            .
-          </div>
-        ) : (
-          <>
-            <div className="flex flex-wrap gap-2">
+      <PageHeader
+        breadcrumb="Operations / Rack Map"
+        title={currentColdRoom ? `Rack Map — ${currentColdRoom}` : "Rack Map"}
+        actions={
+          coldRooms.length > 0 ? (
+            <div className="flex rounded-[11px] bg-[#F1F5F9] p-1" role="group" aria-label="Cold room">
               {coldRooms.map((cr) => (
                 <button
                   key={cr}
                   type="button"
                   onClick={() => setActiveColdRoom(cr)}
                   className={
-                    "min-h-[48px] rounded-lg border px-4 text-sm font-bold " +
+                    "min-h-[44px] min-w-[56px] rounded-lg px-4 text-sm font-bold transition " +
                     (cr === currentColdRoom
-                      ? "border-teal bg-teal text-white"
-                      : "border-line bg-white text-ink2")
+                      ? "bg-gradient-to-br from-navy-3 to-navy text-white shadow-card"
+                      : "bg-transparent text-muted")
                   }
                 >
                   {cr}
                 </button>
               ))}
             </div>
+          ) : null
+        }
+      />
+      <div className="flex flex-col gap-4 bg-canvas p-4 sm:p-6">
+        {state === "loading" ? (
+          <StateBox>Loading rack map...</StateBox>
+        ) : state === "error" ? (
+          <StateBox tone="danger">{error}</StateBox>
+        ) : locations.length === 0 ? (
+          <StateBox>
+            No locations exist yet - add some in{" "}
+            <a href="/storage/locations" className="font-bold text-teal underline">
+              Locations
+            </a>
+            .
+          </StateBox>
+        ) : (
+          <>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-lg text-muted2">⌕</span>
+              <input
+                className={inputClass() + " pl-10"}
+                placeholder="Search material, batch, or pallet number..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
 
-            <input
-              className="min-h-[48px] w-full rounded-lg border border-line bg-white px-3 text-sm text-ink2 outline-none focus:border-teal"
-              placeholder="Search material, batch, or pallet number..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-
-            <div className="flex flex-wrap gap-3 text-xs text-muted">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] font-semibold text-ink2">
               {(Object.keys(RACK_MAP_COLOR_LABEL) as RackMapColor[]).map((c) => (
-                <span key={c} className="flex items-center gap-1">
-                  <span className={"h-3 w-3 rounded-full border " + COLOR_CLASSES[c]} />
+                <span key={c} className="flex items-center gap-1.5">
+                  <span className={"h-3.5 w-3.5 rounded border " + COLOR_CLASSES[c]} />
                   {RACK_MAP_COLOR_LABEL[c]}
                 </span>
               ))}
-              <span className="flex items-center gap-1">
-                <span className="h-3 w-3 rounded-full border-2 border-accent" />
+              <span className="flex items-center gap-1.5">
+                <span className="h-3.5 w-3.5 rounded border-2 border-accent" />
                 Search match
+              </span>
+              <span className="sm:ml-auto">
+                <Pill tone="ok">
+                  {currentColdRoom}: {roomPct}% occupied · {roomOccupied}/{roomUsable} positions
+                </Pill>
               </span>
             </div>
 
-            <div className="flex flex-col gap-6">
-              {blocks.map(([blockName, blockLocations]) => (
-                <div key={blockName}>
-                  <div className="mb-2 text-xs font-bold uppercase text-muted2">Block {blockName}</div>
-                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
-                    {blockLocations.map((loc) => {
-                      const occupant = loc.currentPalletId ? palletById.get(loc.currentPalletId) ?? null : null;
-                      const color = rackMapCellColor(
-                        loc,
-                        occupant
-                          ? { statusCode: occupant.statusCode, distinctBatchCount: occupant.distinctBatchCount }
-                          : null
-                      );
-                      const isMatch = matchesSearch(loc);
-                      return (
-                        <button
-                          key={loc.id}
-                          type="button"
-                          onClick={() => setSelected(loc)}
-                          className={
-                            "flex min-h-[48px] flex-col items-center justify-center rounded-lg border-2 p-1 text-[10px] font-bold " +
-                            COLOR_CLASSES[color] +
-                            (isMatch ? " ring-2 ring-accent" : "")
-                          }
-                          title={loc.fullCode}
-                          aria-label={`${loc.fullCode} - ${RACK_MAP_COLOR_LABEL[color]}${occupant ? `, pallet ${occupant.palletNumber}, ${occupant.materialCode}` : ""}`}
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              {blocks.map(([blockName, blockLocations]) => {
+                const occupied = blockLocations.filter((l) => l.status === "OCCUPIED" || l.status === "PARTIAL").length;
+                const positions = Array.from(new Set(blockLocations.map((l) => l.position).filter((p): p is string => !!p))).sort();
+                const floors = Array.from(new Set(blockLocations.map((l) => l.floor).filter((f): f is number => f !== null))).sort(
+                  (x, y) => y - x
+                );
+                const isMatrix =
+                  positions.length > 0 && floors.length > 0 && blockLocations.every((l) => l.position && l.floor !== null);
+                const byKey = new Map(blockLocations.map((l) => [`${l.position}|${l.floor}`, l]));
+                return (
+                  <Card
+                    key={blockName}
+                    title={`Block ${blockName}`}
+                    sub={
+                      isMatrix
+                        ? `Positions ${positions[0]}–${positions[positions.length - 1]} × Floors ${floors[floors.length - 1]}–${floors[0]} · ${occupied}/${blockLocations.length}`
+                        : `${occupied}/${blockLocations.length} occupied`
+                    }
+                  >
+                    {isMatrix ? (
+                      <div className="overflow-x-auto">
+                        <div
+                          className="grid min-w-[300px] gap-2"
+                          style={{ gridTemplateColumns: `40px repeat(${positions.length}, minmax(48px, 1fr))` }}
                         >
-                          <span>{loc.position ?? loc.fullCode}</span>
-                          {loc.floor ? <span className="text-[9px] opacity-75">F{loc.floor}</span> : null}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+                          <div className="flex items-end justify-center pb-1 text-[8px] font-extrabold uppercase leading-tight text-muted2">
+                            Floor↓
+                          </div>
+                          {positions.map((pos) => (
+                            <div key={pos} className="text-center text-[11px] font-extrabold text-muted2">
+                              {pos}
+                            </div>
+                          ))}
+                          {floors.map((fl) => (
+                            <FloorRow key={fl} floor={fl}>
+                              {positions.map((pos) => {
+                                const loc = byKey.get(`${pos}|${fl}`);
+                                return loc ? (
+                                  renderCell(loc, `${pos}-${fl}`, false)
+                                ) : (
+                                  <div key={pos} className="rounded-[9px] border border-dashed border-line" />
+                                );
+                              })}
+                            </FloorRow>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {blockLocations.map((loc) =>
+                          renderCell(loc, `${loc.position ?? loc.fullCode}${loc.floor ? `-${loc.floor}` : ""}`, true)
+                        )}
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
             </div>
           </>
         )}
@@ -214,6 +290,15 @@ export default function RackMapPage() {
   );
 }
 
+function FloorRow({ floor, children }: { floor: number; children: React.ReactNode }) {
+  return (
+    <>
+      <div className="flex items-center justify-center text-[11px] font-extrabold text-muted2">F{floor}</div>
+      {children}
+    </>
+  );
+}
+
 function PalletDetailPopup({
   location,
   pallet,
@@ -224,36 +309,51 @@ function PalletDetailPopup({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-0 sm:items-center sm:p-6">
-      <div className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-elevated sm:rounded-2xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-0 sm:items-center sm:p-6" onClick={onClose}>
+      <div
+        className="w-full max-w-sm rounded-t-2xl bg-navy p-5 text-[13px] leading-7 text-[#CBD5E1] shadow-[0_16px_40px_-10px_rgba(11,31,58,.55)] sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-navy">{location.fullCode}</h3>
+          <h3 className="text-sm font-extrabold text-[#2DD4BF]">📍 {location.fullCode}</h3>
           <button
             type="button"
             onClick={onClose}
-            className="min-h-[48px] min-w-[48px] rounded-lg text-lg text-muted"
+            className="min-h-[48px] min-w-[48px] rounded-lg text-xl text-[#8FA3C0]"
             aria-label="Close"
           >
             &times;
           </button>
         </div>
-        <div className="mt-2 text-xs text-muted">Status: {location.status}</div>
+        <div className="text-xs text-[#8FA3C0]">Status: {location.status}</div>
         {pallet ? (
-          <div className="mt-3 flex flex-col gap-1 text-sm text-ink2">
+          <div className="mt-2 flex flex-col">
             <div>
-              Pallet: <span className="font-bold">{pallet.palletNumber}</span>
+              Pallet: <span className="font-bold text-white">{pallet.palletNumber}</span>
             </div>
-            <div>Material: {pallet.materialCode}</div>
+            <div>
+              Material: <span className="font-bold text-white">{pallet.materialCode}</span>
+            </div>
             <div>
               {pallet.totalCartons} cartons | {pallet.totalWeightKg} kg
             </div>
-            <div>Pallet status: {pallet.statusCode}</div>
+            <div
+              className={
+                pallet.statusCode === "OK"
+                  ? "text-[#34D399]"
+                  : pallet.statusCode === "HOLD" || pallet.statusCode === "QC_HOLD"
+                    ? "text-[#FBBF24]"
+                    : "text-white"
+              }
+            >
+              Pallet status: {pallet.statusCode}
+            </div>
             {pallet.distinctBatchCount > 1 ? (
-              <div className="font-bold text-yellow-700">Mix of {pallet.distinctBatchCount} batches</div>
+              <div className="font-bold text-[#FDE047]">Mix of {pallet.distinctBatchCount} batches</div>
             ) : null}
           </div>
         ) : (
-          <div className="mt-3 text-sm text-muted">No pallet at this location.</div>
+          <div className="mt-2 text-[#8FA3C0]">No pallet at this location.</div>
         )}
       </div>
     </div>

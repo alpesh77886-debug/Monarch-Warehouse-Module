@@ -3,6 +3,23 @@
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
+import {
+  Card,
+  Field,
+  KpiCard,
+  Note,
+  Pill,
+  type PillTone,
+  StateBox,
+  SubText,
+  TableWrap,
+  btn,
+  inputClass,
+  tableCls,
+  tdCls,
+  thCls,
+  trCls,
+} from "@/components/ui";
 
 type BulkPalletRow = {
   id: string;
@@ -19,10 +36,10 @@ type BulkPalletRow = {
 
 type LoadState = "loading" | "ready" | "error";
 
-const AGE_STYLE: Record<BulkPalletRow["ageBucket"], string> = {
-  RED: "bg-danger-light text-danger",
-  AMBER: "bg-warning-light text-warning",
-  OK: "bg-line text-muted",
+const AGE_TONE: Record<BulkPalletRow["ageBucket"], PillTone> = {
+  RED: "rejected",
+  AMBER: "hold",
+  OK: "ok",
 };
 
 const EMPTY_FORM = {
@@ -105,13 +122,13 @@ export default function BulkManagementPage() {
 
   return (
     <>
-      <PageHeader breadcrumb="Home / Bulk Management" title="Bulk Management" />
-      <div className="flex flex-col gap-6 p-4 sm:p-6">
-        <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatTile label="Pending repack" value={bulkPallets.length} />
-          <StatTile label="Total cartons" value={totalCartons} />
-          <StatTile label="Aging > 7d" value={redCount} tone="danger" />
-          <StatTile label="Aging > 3d" value={amberCount} tone="warning" />
+      <PageHeader breadcrumb="Operations / Bulk Tracking" title="Bulk Management" />
+      <div className="flex flex-col gap-5 bg-canvas p-4 sm:p-6">
+        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <KpiCard color="#7C3AED" label="Pending repack" value={bulkPallets.length} sub="bulk pallets" />
+          <KpiCard color="#475569" label="Total cartons" value={totalCartons} sub="in bulk" />
+          <KpiCard color="#DC2626" label="Aging > 7d" value={redCount} sub="repack first" subTone={redCount > 0 ? "danger" : "muted"} />
+          <KpiCard color="#D97706" label="Aging > 3d" value={amberCount} sub="follow up" />
         </section>
 
         {lastCreatedSheetNumber ? (
@@ -125,56 +142,58 @@ export default function BulkManagementPage() {
           </div>
         ) : null}
 
-        <section>
-          <h2 className="mb-3 text-sm font-bold text-navy">
-            Pending repack - FIFO on bulk age ({bulkPallets.length})
-          </h2>
-          {loadState === "loading" ? (
-            <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">Loading...</div>
-          ) : loadState === "error" ? (
-            <div className="rounded-xl border border-danger bg-danger-light p-6 text-sm text-danger shadow-card" role="alert">
-              {loadError}
-            </div>
-          ) : bulkPallets.length === 0 ? (
-            <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">
-              No bulk stock pending repack.
-            </div>
-          ) : (
-            <div className="overflow-x-auto rounded-xl border border-line bg-white shadow-card">
-              <table className="w-full min-w-[720px] text-left text-xs">
-                <thead className="border-b border-line text-muted2">
+        {loadState === "loading" ? (
+          <StateBox>Loading...</StateBox>
+        ) : loadState === "error" ? (
+          <StateBox tone="danger">{loadError}</StateBox>
+        ) : bulkPallets.length === 0 ? (
+          <StateBox>No bulk stock pending repack.</StateBox>
+        ) : (
+          <Card
+            title={`Pending repack - FIFO on bulk age (${bulkPallets.length})`}
+            sub="bulk = over-production / defective, packed in bulk cartons"
+            bodyClassName="px-4 pb-3 pt-1"
+          >
+            <TableWrap minWidth={760}>
+              <table className={tableCls}>
+                <thead>
                   <tr>
-                    <th className="p-3">Material</th>
-                    <th className="p-3">Reason</th>
-                    <th className="p-3">Qty</th>
-                    <th className="p-3">Age</th>
-                    <th className="p-3"></th>
+                    <th className={thCls}>Material</th>
+                    <th className={thCls}>Pallet</th>
+                    <th className={thCls}>Type</th>
+                    <th className={thCls + " text-right"}>Qty</th>
+                    <th className={thCls + " text-center"}>Age</th>
+                    <th className={thCls}></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-line">
+                <tbody>
                   {bulkPallets.map((p) => (
-                    <tr key={p.id}>
-                      <td className="p-3">
-                        <div className="font-bold text-navy">{p.materialCode}</div>
-                        <div className="text-muted">
-                          {p.materialDescription} - {p.batchNumber ?? "no batch"} - pallet {p.palletNumber}
-                        </div>
+                    <tr key={p.id} className={trCls + (repackTargetId === p.id ? " bg-accent-light/40" : "")}>
+                      <td className={tdCls}>
+                        <div className="font-bold text-ink">{p.materialCode}</div>
+                        <SubText>
+                          {p.materialDescription} · {p.batchNumber ?? "no batch"}
+                        </SubText>
                       </td>
-                      <td className="p-3">{p.bulkReason ?? "-"}</td>
-                      <td className="p-3">
-                        {p.totalCartons} bx ({p.totalWeightKg} kg)
+                      <td className={tdCls + " font-semibold text-ink2"}>{p.palletNumber}</td>
+                      <td className={tdCls}>
+                        {p.bulkReason ? (
+                          <span className="inline-block rounded-md bg-[#EDE9FE] px-2 py-0.5 text-[10px] font-extrabold text-[#6D28D9]">
+                            {p.bulkReason}
+                          </span>
+                        ) : (
+                          <span className="text-muted2">-</span>
+                        )}
                       </td>
-                      <td className="p-3">
-                        <span className={"rounded-full px-2 py-0.5 text-xs font-bold " + AGE_STYLE[p.ageBucket]}>
-                          {p.ageDays}d
-                        </span>
+                      <td className={tdCls + " text-right"}>
+                        <div className="font-bold text-ink">{p.totalCartons} bx</div>
+                        <SubText>{p.totalWeightKg} kg</SubText>
                       </td>
-                      <td className="p-3">
-                        <button
-                          type="button"
-                          onClick={() => openRepackForm(p.id)}
-                          className="min-h-[36px] rounded-lg bg-teal px-3 text-xs font-bold text-white"
-                        >
+                      <td className={tdCls + " text-center"}>
+                        <Pill tone={AGE_TONE[p.ageBucket]}>{p.ageDays}d</Pill>
+                      </td>
+                      <td className={tdCls + " text-right"}>
+                        <button type="button" onClick={() => openRepackForm(p.id)} className={btn("teal", "px-3 text-xs")}>
                           Repack Receipt
                         </button>
                       </td>
@@ -182,18 +201,17 @@ export default function BulkManagementPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
-          )}
-        </section>
+            </TableWrap>
+          </Card>
+        )}
 
         {repackTargetId ? (
-          <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-            <h2 className="text-sm font-bold text-navy">Repack receipt - new receiving sheet</h2>
-            <p className="mt-1 text-xs text-muted">
+          <Card title="Repack receipt - new receiving sheet" accentColor="#7C3AED">
+            <p className="text-xs text-muted">
               Sends this bulk pallet to Packing (status -&gt; QC_HOLD) and opens a linked, empty DRAFT receiving
               sheet - add its pallet rows and confirm it from Receiving Sheets, same as any other sheet.
             </p>
-            <form className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2" onSubmit={handleRepack}>
+            <form className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" onSubmit={handleRepack}>
               <Field label="Date">
                 <input
                   type="date"
@@ -231,61 +249,37 @@ export default function BulkManagementPage() {
                   onChange={(e) => setForm({ ...form, batchNumber: e.target.value })}
                 />
               </Field>
-              <div className="flex gap-3 sm:col-span-2">
-                {submitNotice ? (
-                  <p className="rounded-lg bg-warning-light p-3 text-xs font-semibold text-warning" role="status">
-                    {submitNotice}
-                  </p>
-                ) : null}
-                {submitError ? (
-                  <p className="rounded-lg bg-danger-light p-3 text-xs font-semibold text-danger" role="alert">
-                    {submitError}
-                  </p>
-                ) : null}
-              </div>
-              <div className="flex gap-3 sm:col-span-2">
-                <button
-                  type="submit"
-                  disabled={submitState === "submitting"}
-                  className="min-h-[48px] rounded-lg bg-teal px-4 text-sm font-bold text-white disabled:opacity-60"
-                >
+              {submitNotice || submitError ? (
+                <div className="flex flex-col gap-2 sm:col-span-2 lg:col-span-4">
+                  {submitNotice ? (
+                    <p className="rounded-lg bg-warning-light p-3 text-xs font-semibold text-[#B45309]" role="status">
+                      {submitNotice}
+                    </p>
+                  ) : null}
+                  {submitError ? (
+                    <p className="rounded-lg bg-danger-light p-3 text-xs font-semibold text-danger" role="alert">
+                      {submitError}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+              <div className="flex flex-wrap gap-3 sm:col-span-2 lg:col-span-4">
+                <button type="submit" disabled={submitState === "submitting"} className={btn("teal")}>
                   {submitState === "submitting" ? "Creating..." : "Create repack receipt"}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setRepackTargetId(null)}
-                  className="min-h-[48px] rounded-lg border border-line px-4 text-sm font-bold text-ink2"
-                >
+                <button type="button" onClick={() => setRepackTargetId(null)} className={btn("outline")}>
                   Cancel
                 </button>
               </div>
             </form>
-          </section>
+          </Card>
         ) : null}
+
+        <Note>
+          Lifecycle: warehouse → Packing dept → repacked in branded cartons → <b>new Receiving Sheet</b> (new pallet IDs,
+          linked to the original bulk pallet) → QC HOLD → release → dispatchable. Full traceability.
+        </Note>
       </div>
     </>
   );
-}
-
-function StatTile({ label, value, tone }: { label: string; value: number; tone?: "danger" | "warning" }) {
-  const color = tone === "danger" ? "text-danger" : tone === "warning" ? "text-warning" : "text-navy";
-  return (
-    <div className="rounded-xl border border-line bg-white p-4 shadow-card">
-      <div className="text-xs text-muted">{label}</div>
-      <div className={"mt-1 text-2xl font-extrabold " + color}>{value}</div>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block text-xs font-semibold text-ink2">
-      {label}
-      <div className="mt-1">{children}</div>
-    </label>
-  );
-}
-
-function inputClass() {
-  return "min-h-[48px] w-full rounded-lg border border-line bg-white px-3 text-sm text-ink2 outline-none focus:border-teal";
 }

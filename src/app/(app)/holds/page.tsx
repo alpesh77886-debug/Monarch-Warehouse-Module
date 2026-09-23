@@ -2,6 +2,21 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import {
+  Card,
+  Field,
+  Note,
+  Pill,
+  StatTile,
+  StateBox,
+  SubText,
+  btn,
+  inputClass,
+  tableCls,
+  tdCls,
+  thCls,
+  trCls,
+} from "@/components/ui";
 
 type MaterialOption = { id: string; code: string; description: string };
 
@@ -65,11 +80,6 @@ const HOLD_REASONS = [
 ];
 const OTHER_REASON = "Other (requires supervisor approval)";
 
-const AGE_DOT: Record<Exclude<AgeBucket, null>, string> = {
-  RED: "bg-danger",
-  AMBER: "bg-warning",
-  OK: "bg-muted2",
-};
 const AGE_LABEL: Record<Exclude<AgeBucket, null>, string> = { RED: "d", AMBER: "d", OK: "d" };
 
 // Loop 50 / PEN-037: a hold with a partial release still has real
@@ -334,38 +344,33 @@ export default function HoldsPage() {
 
   return (
     <>
-      <PageHeader breadcrumb="Home / Hold Management" title="Hold Management" />
-      <div className="flex flex-col gap-6 p-4 sm:p-6">
+      <PageHeader breadcrumb="Operations / Hold Tracking" title="Hold Management" />
+      <div className="flex flex-col gap-5 bg-canvas p-4 sm:p-6">
         {loadState === "loading" ? (
-          <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">
-            Loading...
-          </div>
+          <StateBox>Loading...</StateBox>
         ) : loadState === "permission-denied" ? (
           <div
-            className="rounded-xl border border-warning bg-warning-light p-6 text-sm text-warning shadow-card"
+            className="rounded-xl border border-warning bg-warning-light p-6 text-sm font-semibold text-[#B45309] shadow-card"
             role="alert"
           >
             {loadMessage}
           </div>
         ) : loadState === "error" ? (
-          <div className="rounded-xl border border-danger bg-danger-light p-6 text-sm text-danger shadow-card" role="alert">
-            {loadMessage}
-          </div>
+          <StateBox tone="danger">{loadMessage}</StateBox>
         ) : (
           <>
-            <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-              <h2 className="text-sm font-bold text-navy">Hold Summary</h2>
-              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <SummaryTile label="Active Holds" value={summary.active} />
-                <SummaryTile label="Total Cartons" value={summary.totalCartons} />
-                <SummaryTile label="Red (>7d)" value={summary.red} dot="bg-danger" />
-                <SummaryTile label="Amber (>3d)" value={summary.amber} dot="bg-warning" />
+            <section aria-label="Hold Summary">
+              <h2 className="mb-2 text-[11px] font-extrabold uppercase tracking-widest text-muted2">Hold Summary</h2>
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <StatTile color="#DC2626" label="Red · overdue (>7d)" value={summary.red} sub="needs escalation" />
+                <StatTile color="#D97706" label="Amber (>3d)" value={summary.amber} sub="follow up" />
+                <StatTile color="#0284C7" label="Active Holds" value={summary.active} sub={`${summary.ok} within 3 days`} />
+                <StatTile color="#475569" label="Total Cartons" value={summary.totalCartons} sub="on active holds" />
               </div>
             </section>
 
-            <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-              <h2 className="text-sm font-bold text-navy">Place a hold</h2>
-              <form className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2" onSubmit={handleCreate}>
+            <Card title="Place a hold" sub="QC_HOLD pallets of one batch · fixed reason list">
+              <form className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" onSubmit={handleCreate}>
                 <Field label="Material (LFG/SFG code)" error={fieldErrors.materialCode}>
                   <input
                     className={inputClass(fieldErrors.materialCode)}
@@ -417,10 +422,8 @@ export default function HoldsPage() {
                   />
                 </Field>
 
-                <div className="sm:col-span-2">
-                  <div className="text-xs font-semibold text-ink2">
-                    QC_HOLD pallets for this material{fieldErrors.pallets ? "" : null}
-                  </div>
+                <div className="sm:col-span-2 lg:col-span-3">
+                  <div className="text-xs font-bold text-ink2">QC_HOLD pallets for this material</div>
                   {fieldErrors.pallets ? (
                     <div className="mt-1 text-xs font-semibold text-danger">{fieldErrors.pallets}</div>
                   ) : null}
@@ -429,29 +432,38 @@ export default function HoldsPage() {
                   ) : eligiblePallets.length === 0 ? (
                     <div className="mt-2 text-xs text-muted">No QC_HOLD pallets for this material right now.</div>
                   ) : (
-                    <ul className="mt-2 flex flex-col gap-1.5">
-                      {eligiblePallets.map((p) => (
-                        <li key={p.id}>
-                          <label className="flex min-h-[44px] items-center gap-2 rounded-lg border border-line px-3 text-sm text-ink2">
-                            <input
-                              type="checkbox"
-                              checked={selectedPalletIds.includes(p.id)}
-                              onChange={() => togglePallet(p.id)}
-                            />
-                            <span className="font-bold">{p.palletNumber}</span>
-                            <span className="text-muted">
-                              batch {p.batchNumber} - {p.totalCartons} cartons
-                            </span>
-                          </label>
-                        </li>
-                      ))}
+                    <ul className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {eligiblePallets.map((p) => {
+                        const checked = selectedPalletIds.includes(p.id);
+                        return (
+                          <li key={p.id}>
+                            <label
+                              className={
+                                "flex min-h-[48px] items-center gap-2.5 rounded-[11px] border-[1.5px] px-3 text-sm text-ink2 transition " +
+                                (checked ? "border-teal bg-teal-light/50" : "border-line bg-white")
+                              }
+                            >
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 accent-teal"
+                                checked={checked}
+                                onChange={() => togglePallet(p.id)}
+                              />
+                              <span className="font-bold text-ink">{p.palletNumber}</span>
+                              <span className="text-xs text-muted">
+                                batch {p.batchNumber} - {p.totalCartons} cartons
+                              </span>
+                            </label>
+                          </li>
+                        );
+                      })}
                     </ul>
                   )}
                 </div>
 
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-2 lg:col-span-3">
                   {formNotice ? (
-                    <p className="mb-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-warning" role="status">
+                    <p className="mb-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-[#B45309]" role="status">
                       {formNotice}
                     </p>
                   ) : null}
@@ -460,49 +472,18 @@ export default function HoldsPage() {
                       {formError}
                     </p>
                   ) : null}
-                  <button
-                    type="submit"
-                    disabled={submitState === "submitting"}
-                    className="min-h-[48px] w-full rounded-lg bg-teal px-4 text-sm font-bold text-white disabled:opacity-60 sm:w-auto"
-                  >
+                  <button type="submit" disabled={submitState === "submitting"} className={btn("gold", "w-full sm:w-auto")}>
                     {submitState === "submitting" ? "Placing hold..." : "Place hold"}
                   </button>
                 </div>
               </form>
-            </section>
-
-            <section>
-              <div className="flex flex-wrap gap-2">
-                <select className={inputClass() + " sm:w-56"} value={reasonFilter} onChange={(e) => setReasonFilter(e.target.value)}>
-                  <option value="">All Reasons</option>
-                  {HOLD_REASONS.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </select>
-                <select className={inputClass() + " sm:w-48"} value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
-                  <option value="">All Depts</option>
-                  {departments.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-                </select>
-                <select className={inputClass() + " sm:w-40"} value={agingFilter} onChange={(e) => setAgingFilter(e.target.value)}>
-                  <option value="">All Aging</option>
-                  <option value="RED">Red (&gt;7d)</option>
-                  <option value="AMBER">Amber (&gt;3d)</option>
-                  <option value="OK">OK</option>
-                </select>
-              </div>
-            </section>
+            </Card>
 
             {actionMessage ? (
               <p
                 className={
                   "rounded-lg p-3 text-xs font-semibold " +
-                  (actionMessage.kind === "notice" ? "bg-warning-light text-warning" : "bg-danger-light text-danger")
+                  (actionMessage.kind === "notice" ? "bg-warning-light text-[#B45309]" : "bg-danger-light text-danger")
                 }
                 role="status"
               >
@@ -510,12 +491,45 @@ export default function HoldsPage() {
               </p>
             ) : null}
 
-            <section>
-              <h2 className="mb-3 text-sm font-bold text-navy">Active Holds</h2>
+            <Card
+              title="Active Holds"
+              sub={`${filteredHolds.length} hold(s) · ${filteredHolds.reduce((sum, h) => sum + h.totalCartons, 0)} cartons`}
+              action={
+                agedHolds.length > 0 ? (
+                  <button type="button" onClick={sendReminderToAll} className={btn("gold")}>
+                    ⚡ Send Reminder
+                  </button>
+                ) : null
+              }
+              bodyClassName="px-4 pb-4 pt-3"
+            >
+              <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <select className={inputClass()} value={reasonFilter} onChange={(e) => setReasonFilter(e.target.value)}>
+                  <option value="">All Reasons</option>
+                  {HOLD_REASONS.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+                <select className={inputClass()} value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
+                  <option value="">All Depts</option>
+                  {departments.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+                <select className={inputClass()} value={agingFilter} onChange={(e) => setAgingFilter(e.target.value)}>
+                  <option value="">All Aging</option>
+                  <option value="RED">Red (&gt;7d)</option>
+                  <option value="AMBER">Amber (&gt;3d)</option>
+                  <option value="OK">OK</option>
+                </select>
+              </div>
+
               {filteredHolds.length === 0 ? (
-                <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">
-                  No holds match these filters.
-                </div>
+                <div className="rounded-lg bg-canvas p-5 text-center text-sm text-muted">No holds match these filters.</div>
               ) : (
                 <>
                   <ul className="flex flex-col gap-3 sm:hidden">
@@ -537,46 +551,41 @@ export default function HoldsPage() {
                     ))}
                   </ul>
 
-                  <div className="hidden overflow-x-auto rounded-xl border border-line bg-white shadow-card sm:block">
-                    <table className="w-full min-w-[1000px] text-left text-sm">
-                      <thead className="bg-canvas text-xs font-semibold uppercase text-muted2">
+                  <div className="hidden overflow-x-auto sm:block">
+                    <table className={tableCls + " min-w-[1000px]"}>
+                      <thead>
                         <tr>
-                          <th className="px-4 py-3">Hold ID</th>
-                          <th className="px-4 py-3">Material</th>
-                          <th className="px-4 py-3">Batch</th>
-                          <th className="px-4 py-3">Qty</th>
-                          <th className="px-4 py-3">Pallets</th>
-                          <th className="px-4 py-3">Reason</th>
-                          <th className="px-4 py-3">Age</th>
-                          <th className="px-4 py-3">Actions</th>
+                          <th className={thCls}>Hold ID</th>
+                          <th className={thCls}>Material</th>
+                          <th className={thCls}>Pallets / Qty</th>
+                          <th className={thCls}>Reason</th>
+                          <th className={thCls}>Placed By</th>
+                          <th className={thCls + " text-center"}>Aging</th>
+                          <th className={thCls}>Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-line">
+                      <tbody>
                         {filteredHolds.map((h) => (
-                          <tr key={h.id}>
-                            <td className="px-4 py-3 font-bold text-navy">{h.holdNumber}</td>
-                            <td className="px-4 py-3">{h.materialCode}</td>
-                            <td className="px-4 py-3">{h.batchNumber}</td>
-                            <td className="px-4 py-3">{h.totalCartons}</td>
-                            <td className="px-4 py-3">{h.palletNumbers.join(", ")}</td>
-                            <td className="px-4 py-3">{h.holdReason === OTHER_REASON ? h.customReason : h.holdReason}</td>
-                            <td className="px-4 py-3">
-                              {isOpenHold(h.status) ? (
-                                <span className="flex items-center gap-1.5">
-                                  <span className={"h-2.5 w-2.5 rounded-full " + AGE_DOT[h.ageBucket!]} />
-                                  {h.ageDays}
-                                  {AGE_LABEL[h.ageBucket!]}
-                                  {h.status === "PARTIALLY_RELEASED" ? (
-                                    <span className="ml-1 rounded bg-warning-light px-1.5 py-0.5 text-[10px] font-bold text-warning">
-                                      PARTIAL
-                                    </span>
-                                  ) : null}
-                                </span>
-                              ) : (
-                                <span className="text-muted">{h.status}</span>
-                              )}
+                          <tr key={h.id} className={trCls + " " + holdRowTint(h)}>
+                            <td className={tdCls + " font-extrabold text-ink"}>{h.holdNumber}</td>
+                            <td className={tdCls}>
+                              <div className="font-bold text-ink">{h.materialCode}</div>
+                              <SubText>{h.batchNumber}</SubText>
                             </td>
-                            <td className="px-4 py-3">
+                            <td className={tdCls}>
+                              <div className="text-ink2">{h.palletNumbers.join(", ")}</div>
+                              <SubText>
+                                {h.palletCount} pallet(s) · {h.totalCartons} ctn
+                              </SubText>
+                            </td>
+                            <td className={tdCls + " text-ink2"}>
+                              {h.holdReason === OTHER_REASON ? h.customReason : h.holdReason}
+                            </td>
+                            <td className={tdCls + " text-ink2"}>{h.placedByDepartment}</td>
+                            <td className={tdCls + " text-center"}>
+                              <AgeBadge hold={h} />
+                            </td>
+                            <td className={tdCls}>
                               {isOpenHold(h.status) ? (
                                 <RowActions
                                   hold={h}
@@ -592,9 +601,7 @@ export default function HoldsPage() {
                                   actionPalletsLoading={actionPalletsLoading}
                                 />
                               ) : (
-                                <span className="text-xs text-muted">
-                                  {h.status.toLowerCase()} by {h.status === "RELEASED" ? "QC" : "QC"}
-                                </span>
+                                <span className="text-xs text-muted2">{h.status.toLowerCase()} by QC</span>
                               )}
                             </td>
                           </tr>
@@ -604,27 +611,27 @@ export default function HoldsPage() {
                   </div>
                 </>
               )}
-            </section>
+            </Card>
 
-            <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-              <h2 className="text-sm font-bold text-navy">Follow-Up Nudge</h2>
+            <Card title="Follow-Up Nudge" accentColor="#D97706">
               {agedHolds.length === 0 ? (
-                <p className="mt-2 text-sm text-muted">No aged holds (amber/red) right now.</p>
+                <p className="text-sm text-muted">No aged holds (amber/red) right now.</p>
               ) : (
-                <>
-                  <p className="mt-2 text-sm text-ink2">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm text-ink2">
                     Send reminder to QC LAB about {agedHolds.length} aged hold{agedHolds.length === 1 ? "" : "s"}?
                   </p>
-                  <button
-                    type="button"
-                    onClick={sendReminderToAll}
-                    className="mt-3 min-h-[48px] rounded-lg bg-teal px-4 text-sm font-bold text-white"
-                  >
+                  <button type="button" onClick={sendReminderToAll} className={btn("gold")}>
                     Send Reminder
                   </button>
-                </>
+                </div>
               )}
-            </section>
+            </Card>
+
+            <Note>
+              🚫 <b>Hard block:</b> HOLD / QC_HOLD material cannot be selected for party dispatch. A 3PL transfer keeps the
+              HOLD tag. Release or reject is QC role only.
+            </Note>
           </>
         )}
       </div>
@@ -632,15 +639,25 @@ export default function HoldsPage() {
   );
 }
 
-function SummaryTile({ label, value, dot }: { label: string; value: number; dot?: string }) {
+function holdRowTint(h: Hold) {
+  if (!isOpenHold(h.status)) return "bg-[#F0FDF9]";
+  if (h.ageBucket === "RED") return "bg-[#FEF2F2]";
+  return "";
+}
+
+function AgeBadge({ hold }: { hold: Hold }) {
+  if (!isOpenHold(hold.status)) {
+    return <Pill tone={hold.status === "RELEASED" ? "ok" : "rejected"}>{hold.status}</Pill>;
+  }
+  const tone = hold.ageBucket === "RED" ? "rejected" : hold.ageBucket === "AMBER" ? "hold" : "ok";
   return (
-    <div className="rounded-lg border border-line bg-canvas p-3">
-      <div className="flex items-center gap-1.5 text-xs font-semibold text-muted">
-        {dot ? <span className={"h-2.5 w-2.5 rounded-full " + dot} /> : null}
-        {label}
-      </div>
-      <div className="mt-1 text-xl font-bold text-navy">{value}</div>
-    </div>
+    <span className="inline-flex items-center gap-1">
+      <Pill tone={tone}>
+        {hold.ageDays}
+        {AGE_LABEL[hold.ageBucket!]}
+      </Pill>
+      {hold.status === "PARTIALLY_RELEASED" ? <Pill tone="hold">PARTIAL</Pill> : null}
+    </span>
   );
 }
 
@@ -680,27 +697,27 @@ function RowActions({
         <button
           type="button"
           onClick={() => runAction(hold.id, "followup")}
-          className="min-h-[36px] rounded-lg border border-line px-3 text-xs font-bold text-ink2"
+          className={btn("outline", "px-3 text-xs")}
         >
           Follow Up
         </button>
         <button
           type="button"
           onClick={() => openActionRow(hold.id, "release")}
-          className="min-h-[36px] rounded-lg bg-success px-3 text-xs font-bold text-white"
+          className={btn("teal", "px-3 text-xs")}
         >
           Release
         </button>
         <button
           type="button"
           onClick={() => openActionRow(hold.id, "reject")}
-          className="min-h-[36px] rounded-lg bg-danger px-3 text-xs font-bold text-white"
+          className={btn("danger", "px-3 text-xs")}
         >
           Reject
         </button>
       </div>
       {isThisRow ? (
-        <div className="flex flex-col gap-2 rounded-lg border border-line bg-canvas p-2">
+        <div className="flex flex-col gap-2 rounded-xl border-[1.5px] border-dashed border-[#CBD5E1] bg-[#FAFBFC] p-3">
           {actionPalletsLoading ? (
             <div className="text-xs text-muted">Loading pallets...</div>
           ) : actionPallets.length > 1 ? (
@@ -716,7 +733,7 @@ function RowActions({
               <ul className="flex max-h-40 flex-col gap-1 overflow-y-auto">
                 {actionPallets.map((p) => (
                   <li key={p.id}>
-                    <label className="flex min-h-[36px] items-center gap-2 rounded border border-line bg-white px-2 text-xs text-ink2">
+                    <label className="flex min-h-[44px] items-center gap-2 rounded-lg border border-line bg-white px-2.5 text-xs text-ink2">
                       <input
                         type="checkbox"
                         checked={actionSelectedPalletIds.includes(p.id)}
@@ -731,7 +748,7 @@ function RowActions({
             </div>
           ) : null}
           <input
-            className="min-h-[40px] rounded-lg border border-line bg-white px-2 text-xs text-ink2 outline-none focus:border-teal"
+            className={inputClass()}
             placeholder={actionRow!.kind === "reject" ? "Reason (required)" : "Remarks (optional)"}
             value={actionRemarks}
             onChange={(e) => setActionRemarks(e.target.value)}
@@ -746,7 +763,7 @@ function RowActions({
                   palletIds: actionSelectedPalletIds,
                 })
               }
-              className="min-h-[36px] flex-1 rounded-lg bg-navy px-3 text-xs font-bold text-white disabled:opacity-60"
+              className={btn("primary", "flex-1 px-3 text-xs")}
             >
               Confirm {actionRow!.kind === "reject" ? "Reject" : "Release"}
               {actionPallets.length > 1 ? ` (${actionSelectedPalletIds.length})` : ""}
@@ -754,7 +771,7 @@ function RowActions({
             <button
               type="button"
               onClick={() => setActionRow(null)}
-              className="min-h-[36px] rounded-lg border border-line px-3 text-xs font-bold text-ink2"
+              className={btn("outline", "px-3 text-xs")}
             >
               Cancel
             </button>
@@ -791,28 +808,17 @@ function HoldCard({
   actionPalletsLoading: boolean;
 }) {
   return (
-    <li className="rounded-xl border border-line bg-white p-4 shadow-card">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-bold text-navy">{hold.holdNumber}</span>
-        {isOpenHold(hold.status) ? (
-          <span className="flex items-center gap-1.5 text-xs text-ink2">
-            <span className={"h-2.5 w-2.5 rounded-full " + AGE_DOT[hold.ageBucket!]} />
-            {hold.ageDays}d
-            {hold.status === "PARTIALLY_RELEASED" ? (
-              <span className="rounded bg-warning-light px-1.5 py-0.5 text-[10px] font-bold text-warning">PARTIAL</span>
-            ) : null}
-          </span>
-        ) : (
-          <span className="text-xs text-muted">{hold.status}</span>
-        )}
+    <li className={"rounded-xl border border-line p-4 shadow-card " + (holdRowTint(hold) || "bg-white")}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-extrabold text-ink">{hold.holdNumber}</span>
+        <AgeBadge hold={hold} />
       </div>
-      <div className="mt-1 text-xs text-muted">
-        {hold.materialCode} - batch {hold.batchNumber}
+      <div className="mt-1.5 text-xs">
+        <span className="font-bold text-ink">{hold.materialCode}</span>{" "}
+        <span className="text-muted2">- batch {hold.batchNumber}</span>
       </div>
-      <div className="mt-1 text-xs text-muted">
-        {hold.holdReason === OTHER_REASON ? hold.customReason : hold.holdReason}
-      </div>
-      <div className="mt-1 text-xs text-muted">
+      <div className="mt-1 text-xs text-ink2">{hold.holdReason === OTHER_REASON ? hold.customReason : hold.holdReason}</div>
+      <div className="mt-1 text-xs text-muted2">
         {hold.palletCount} pallet(s), {hold.totalCartons} cartons - {hold.palletNumbers.join(", ")}
       </div>
       {isOpenHold(hold.status) ? (
@@ -833,30 +839,5 @@ function HoldCard({
         </div>
       ) : null}
     </li>
-  );
-}
-
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block text-xs font-semibold text-ink2">
-      {label}
-      <div className="mt-1">{children}</div>
-      {error ? <span className="mt-1 block text-xs font-semibold text-danger">{error}</span> : null}
-    </label>
-  );
-}
-
-function inputClass(error?: string) {
-  return (
-    "min-h-[48px] w-full rounded-lg border bg-white px-3 text-sm text-ink2 outline-none focus:border-teal " +
-    (error ? "border-danger" : "border-line")
   );
 }

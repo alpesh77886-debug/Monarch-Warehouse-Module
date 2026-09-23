@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Card, Field, KpiCard, Pill, type PillTone, StateBox, btn, inputClass } from "@/components/ui";
 
 type LoadingSheetRow = {
   id: string;
@@ -38,13 +39,13 @@ const STATUS_LABEL: Record<LoadingSheetRow["status"], string> = {
   GATE_PASSED: "Gate passed",
   DISPATCHED: "Dispatched",
 };
-const STATUS_STYLE: Record<LoadingSheetRow["status"], string> = {
-  DRAFT: "bg-line text-muted",
-  STAGING: "bg-warning-light text-warning",
-  LOADED: "bg-warning-light text-warning",
-  VERIFIED: "bg-sky-light text-sky",
-  GATE_PASSED: "bg-sky-light text-sky",
-  DISPATCHED: "bg-success-light text-success",
+const STATUS_TONE: Record<LoadingSheetRow["status"], PillTone> = {
+  DRAFT: "neutral",
+  STAGING: "hold",
+  LOADED: "hold",
+  VERIFIED: "qc",
+  GATE_PASSED: "qc",
+  DISPATCHED: "ok",
 };
 
 export default function LoadingSheetsPage() {
@@ -128,13 +129,30 @@ export default function LoadingSheetsPage() {
     }
   }
 
+  const openCount = sheets.filter((s) => s.status !== "DISPATCHED").length;
+  const dispatchedCount = sheets.filter((s) => s.status === "DISPATCHED").length;
+  const exportCount = sheets.filter((s) => s.exportDomestic === "EXPORT").length;
+  const dispatchedCartons = sheets.filter((s) => s.status === "DISPATCHED").reduce((sum, s) => sum + s.totalCartons, 0);
+
   return (
     <>
-      <PageHeader breadcrumb="Home / Outward / Loading Sheets" title="Loading Sheets" />
-      <div className="flex flex-col gap-6 p-4 sm:p-6">
-        <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-          <h2 className="text-sm font-bold text-navy">New loading sheet</h2>
-          <form className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
+      <PageHeader
+        breadcrumb="Operations / Dispatch & Loading"
+        title="Loading Sheets"
+        actions={<Pill tone="ok">only OK / available stock selectable</Pill>}
+      />
+      <div className="flex flex-col gap-5 bg-canvas p-4 sm:p-6">
+        {loadState === "ready" && sheets.length > 0 ? (
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <KpiCard color="#D97706" label="In progress" value={openCount} sub="draft → gate pass" />
+            <KpiCard color="#059669" label="Dispatched" value={dispatchedCount} sub="immutable" />
+            <KpiCard color="#2563EB" label="Cartons out" value={dispatchedCartons} sub="dispatched sheets" />
+            <KpiCard color="#7C3AED" label="Export" value={exportCount} sub="QC approval needed" />
+          </div>
+        ) : null}
+
+        <Card title="New loading sheet" sub="vehicle + party details · pallets are picked FIFO on the next screen">
+          <form className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" onSubmit={handleSubmit}>
             <Field label="Date">
               <input
                 type="date"
@@ -198,9 +216,9 @@ export default function LoadingSheetsPage() {
               />
             </Field>
 
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-2 lg:col-span-4">
               {submitNotice ? (
-                <p className="mb-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-warning" role="status">
+                <p className="mb-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-[#B45309]" role="status">
                   {submitNotice}
                 </p>
               ) : null}
@@ -209,51 +227,54 @@ export default function LoadingSheetsPage() {
                   {submitError}
                 </p>
               ) : null}
-              <button
-                type="submit"
-                disabled={submitState === "submitting"}
-                className="min-h-[48px] w-full rounded-lg bg-teal px-4 text-sm font-bold text-white disabled:opacity-60 sm:w-auto"
-              >
+              <button type="submit" disabled={submitState === "submitting"} className={btn("teal", "w-full sm:w-auto")}>
                 {submitState === "submitting" ? "Creating..." : "Create draft loading sheet"}
               </button>
             </div>
           </form>
-        </section>
+        </Card>
 
         <section>
-          <h2 className="mb-3 text-sm font-bold text-navy">Existing loading sheets</h2>
+          <h2 className="mb-3 text-[11px] font-extrabold uppercase tracking-widest text-muted2">Existing loading sheets</h2>
           {loadState === "loading" ? (
-            <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">
-              Loading...
-            </div>
+            <StateBox>Loading...</StateBox>
           ) : loadState === "error" ? (
-            <div className="rounded-xl border border-danger bg-danger-light p-6 text-sm text-danger shadow-card" role="alert">
-              {loadError}
-            </div>
+            <StateBox tone="danger">{loadError}</StateBox>
           ) : sheets.length === 0 ? (
-            <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">
-              No loading sheets yet.
-            </div>
+            <StateBox>No loading sheets yet.</StateBox>
           ) : (
             <ul className="flex flex-col gap-3">
               {sheets.map((s) => (
                 <li key={s.id}>
                   <Link
                     href={`/outward/loading-sheets/${s.id}`}
-                    className="flex min-h-[64px] flex-col justify-center rounded-xl border border-line bg-white p-4 shadow-card"
+                    className="relative grid min-h-[64px] grid-cols-1 gap-2 overflow-hidden rounded-xl border border-line bg-white p-4 pl-5 shadow-card transition hover:-translate-y-0.5 hover:border-teal sm:grid-cols-[1.2fr_1.5fr_1fr_auto] sm:items-center"
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-navy">{s.loadingSheetNumber}</span>
-                      <span className={"rounded-full px-2 py-0.5 text-xs font-bold " + STATUS_STYLE[s.status]}>
+                    <span
+                      className="absolute inset-y-0 left-0 w-1"
+                      style={{ background: s.status === "DISPATCHED" ? "#059669" : s.exportDomestic === "EXPORT" ? "#7C3AED" : "#0D9488" }}
+                    />
+                    <div>
+                      <div className="text-sm font-extrabold text-ink">{s.loadingSheetNumber}</div>
+                      <div className="mt-0.5 text-[11px] font-semibold text-muted2">{s.date}</div>
+                    </div>
+                    <div className="text-xs">
+                      <div className="font-bold text-ink2">{s.partyName}</div>
+                      <div className="text-muted2">
+                        {s.destination} - vehicle {s.vehicleNumber}
+                      </div>
+                    </div>
+                    <div className="text-xs text-ink2">
+                      <b className="text-ink">{s.totalCartons}</b> cartons · {s.palletCount} pallet(s)
+                    </div>
+                    <div className="flex items-center gap-2 sm:justify-end">
+                      <Pill tone={STATUS_TONE[s.status]}>
                         {STATUS_LABEL[s.status]}
                         {s.exportDomestic === "EXPORT" ? " · Export" : ""}
+                      </Pill>
+                      <span className="text-muted2" aria-hidden>
+                        →
                       </span>
-                    </div>
-                    <div className="mt-1 text-xs text-muted">
-                      {s.partyName} - {s.destination} - vehicle {s.vehicleNumber}
-                    </div>
-                    <div className="mt-1 text-xs text-muted">
-                      {s.date} - {s.palletCount} pallet(s), {s.totalCartons} cartons
                     </div>
                   </Link>
                 </li>
@@ -263,30 +284,5 @@ export default function LoadingSheetsPage() {
         </section>
       </div>
     </>
-  );
-}
-
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block text-xs font-semibold text-ink2">
-      {label}
-      <div className="mt-1">{children}</div>
-      {error ? <span className="mt-1 block text-xs font-semibold text-danger">{error}</span> : null}
-    </label>
-  );
-}
-
-function inputClass(error?: string) {
-  return (
-    "min-h-[48px] w-full rounded-lg border bg-white px-3 text-sm text-ink2 outline-none focus:border-teal " +
-    (error ? "border-danger" : "border-line")
   );
 }

@@ -3,6 +3,22 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
+import {
+  Card,
+  Field,
+  Pill,
+  type PillTone,
+  StateBox,
+  Steps,
+  TableWrap,
+  btn,
+  inputClass,
+  rowFlagCls,
+  tableCls,
+  tdCls,
+  thCls,
+  trCls,
+} from "@/components/ui";
 
 type ReceivingSheet = {
   id: string;
@@ -197,9 +213,9 @@ export default function ReceivingSheetDetailPage() {
   if (loadState === "loading") {
     return (
       <>
-        <PageHeader breadcrumb="Home / Inward / Receiving Sheets" title="Loading..." />
-        <div className="p-4 sm:p-6">
-          <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">Loading...</div>
+        <PageHeader breadcrumb="Operations / Receiving Sheet" title="Loading..." />
+        <div className="bg-canvas p-4 sm:p-6">
+          <StateBox>Loading...</StateBox>
         </div>
       </>
     );
@@ -208,11 +224,9 @@ export default function ReceivingSheetDetailPage() {
   if (loadState === "error" || !sheet) {
     return (
       <>
-        <PageHeader breadcrumb="Home / Inward / Receiving Sheets" title="Not found" />
-        <div className="p-4 sm:p-6">
-          <div className="rounded-xl border border-danger bg-danger-light p-6 text-sm text-danger shadow-card" role="alert">
-            {loadError}
-          </div>
+        <PageHeader breadcrumb="Operations / Receiving Sheet" title="Not found" />
+        <div className="bg-canvas p-4 sm:p-6">
+          <StateBox tone="danger">{loadError}</StateBox>
         </div>
       </>
     );
@@ -222,80 +236,117 @@ export default function ReceivingSheetDetailPage() {
   const isLocked = sheet.status === "LOCKED";
   const isCancelled = sheet.status === "CANCELLED";
 
+  const currentStep = isLocked ? 4 : sheet.status === "DRAFT" ? 2 : 3;
+  const isWarm = (p: PalletRow) =>
+    typeof p.temperatureC === "number" && p.temperatureC > TEMPERATURE_WARNING_THRESHOLD_C;
+  const conditionFlagCount = pallets.filter((p) => p.cartonCondition !== "OK").length;
+  const tempFlagCount = pallets.filter(isWarm).length;
+  let runningTotal = 0;
+
   return (
     <>
-      <PageHeader breadcrumb="Home / Inward / Receiving Sheets" title={sheet.sheetNumber} />
-      <div className="flex flex-col gap-6 p-4 sm:p-6">
-        <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-navy">Header</h2>
-            <StatusPill status={sheet.status} />
-          </div>
-          <dl className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+      <PageHeader
+        breadcrumb="Operations / Receiving Sheet / Detail"
+        title={sheet.sheetNumber}
+        actions={<StatusPill status={sheet.status} />}
+      />
+      <div className="flex flex-col gap-5 bg-canvas p-4 sm:p-6">
+        {!isCancelled ? (
+          <Steps steps={["Sheet Details", "Pallet Entry", "Dual Confirmation"]} current={currentStep} />
+        ) : null}
+
+        <section className="rounded-xl border border-[#99F6E4] bg-gradient-to-r from-[#F0FDFA] to-white p-4 shadow-card sm:px-5">
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs sm:flex sm:flex-wrap sm:items-end">
             <Detail label="Date" value={sheet.date} />
-            <Detail label="Shift" value={sheet.shift} />
-            <Detail label="Line" value={sheet.line} />
-            <Detail label="Default status" value={sheet.defaultPalletStatus} />
+            <Detail label="Line / Shift" value={`${sheet.line} · Shift ${sheet.shift}`} />
             <Detail label="Material" value={`${sheet.materialCode} - ${sheet.materialDescription}`} />
             <Detail label="Batch" value={sheet.batchNumber} />
-            <Detail label="Total qty" value={String(sheet.totalQty)} />
+            <Detail label="Default status" value={sheet.defaultPalletStatus} />
             <Detail label="Total boxes" value={String(sheet.totalBoxes)} />
+            <div className="col-span-2 sm:ml-auto sm:text-right">
+              <dt className="text-[10px] font-bold uppercase tracking-wide text-muted2">Total qty</dt>
+              <dd className="text-xl font-extrabold text-teal-2">{sheet.totalQty} cartons</dd>
+            </div>
           </dl>
         </section>
 
-        <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-          <h2 className="text-sm font-bold text-navy">Pallets ({pallets.length}/35)</h2>
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[600px] text-left text-xs">
-              <thead className="text-muted2">
+        <Card
+          title="Pallet-wise Entry"
+          sub={`${pallets.length} of 35 · temp flag above ${TEMPERATURE_WARNING_THRESHOLD_C}°C`}
+          bodyClassName="px-4 pb-4 pt-1"
+        >
+          <TableWrap minWidth={680}>
+            <table className={tableCls}>
+              <thead>
                 <tr>
-                  <th className="py-1 pr-2">Sr</th>
-                  <th className="py-1 pr-2">Pallet No</th>
-                  <th className="py-1 pr-2">Qty</th>
-                  <th className="py-1 pr-2">Time</th>
-                  <th className="py-1 pr-2">Condition</th>
-                  <th className="py-1 pr-2">Temp</th>
-                  <th className="py-1 pr-2">Remarks</th>
+                  <th className={thCls}>Sr</th>
+                  <th className={thCls}>Pallet No</th>
+                  <th className={thCls + " text-right"}>Qty</th>
+                  <th className={thCls}>Time</th>
+                  <th className={thCls + " text-right"}>Total</th>
+                  <th className={thCls}>Condition</th>
+                  <th className={thCls}>Temp °C</th>
+                  <th className={thCls}>Remarks</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody>
                 {pallets.map((p) => {
-                  const warm =
-                    typeof p.temperatureC === "number" && p.temperatureC > TEMPERATURE_WARNING_THRESHOLD_C;
+                  const warm = isWarm(p);
+                  runningTotal += p.qty;
+                  const flag = warm
+                    ? "critical"
+                    : p.cartonCondition === "SHORT_QUANTITY"
+                      ? "violet"
+                      : p.cartonCondition !== "OK"
+                        ? "warn"
+                        : "ok";
                   return (
-                    <tr key={p.id}>
-                      <td className="py-2 pr-2">{p.srNo}</td>
-                      <td className="py-2 pr-2 font-bold text-navy">{p.palletNumber}</td>
-                      <td className="py-2 pr-2">{p.qty}</td>
-                      <td className="py-2 pr-2">{p.receivingTime}</td>
-                      <td className="py-2 pr-2">
-                        {p.cartonCondition === "OK" ? (
-                          "OK"
-                        ) : (
-                          <span className="font-semibold text-warning">{p.cartonCondition}</span>
-                        )}
+                    <tr key={p.id} className={trCls + " " + rowFlagCls(flag)}>
+                      <td className={tdCls + " text-muted"}>{p.srNo}</td>
+                      <td className={tdCls + " font-bold text-ink"}>{p.palletNumber}</td>
+                      <td className={tdCls + " text-right"}>{p.qty}</td>
+                      <td className={tdCls}>{p.receivingTime}</td>
+                      <td className={tdCls + " text-right font-semibold text-ink2"}>{runningTotal}</td>
+                      <td className={tdCls}>
+                        <Pill tone={p.cartonCondition === "OK" ? "ok" : p.cartonCondition === "SHORT_QUANTITY" ? "bulk" : "hold"}>
+                          {p.cartonCondition}
+                        </Pill>
                       </td>
-                      <td className={"py-2 pr-2 " + (warm ? "font-semibold text-warning" : "")}>
+                      <td className={tdCls + " font-extrabold " + (warm ? "text-danger" : "text-sky")}>
                         {p.temperatureC ?? "-"}
                         {warm ? " ⚠" : ""}
                       </td>
-                      <td className="py-2 pr-2">{p.remarks ?? ""}</td>
+                      <td className={tdCls + " text-xs italic " + (p.cartonCondition !== "OK" ? "text-[#B45309]" : "text-muted2")}>
+                        {p.remarks ?? ""}
+                      </td>
                     </tr>
                   );
                 })}
                 {pallets.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-3 text-muted">
+                    <td colSpan={8} className={tdCls + " text-center text-muted"}>
                       No pallets added yet.
                     </td>
                   </tr>
                 ) : null}
               </tbody>
             </table>
-          </div>
+          </TableWrap>
+
+          {pallets.length > 0 ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-muted2">
+              Flags:
+              {conditionFlagCount === 0 && tempFlagCount === 0 ? <Pill tone="ok">None</Pill> : null}
+              {conditionFlagCount > 0 ? <Pill tone="hold">{conditionFlagCount} carton condition</Pill> : null}
+              {tempFlagCount > 0 ? <Pill tone="rejected">{tempFlagCount} temp</Pill> : null}
+            </div>
+          ) : null}
 
           {isDraft && pallets.length < 35 ? (
-            <form className="mt-4 grid grid-cols-1 gap-3 border-t border-line pt-4 sm:grid-cols-3" onSubmit={handleAddPallet}>
+            <form
+              className="mt-4 grid grid-cols-1 gap-4 rounded-xl border-[1.5px] border-dashed border-[#CBD5E1] bg-[#FAFBFC] p-4 sm:grid-cols-3"
+              onSubmit={handleAddPallet}
+            >
               <Field label="Pallet No" error={palletFieldErrors.palletNumber}>
                 <input
                   className={inputClass(palletFieldErrors.palletNumber)}
@@ -357,7 +408,7 @@ export default function ReceivingSheetDetailPage() {
 
               <div className="sm:col-span-3">
                 {palletNotice ? (
-                  <p className="mb-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-warning" role="status">
+                  <p className="mb-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-[#B45309]" role="status">
                     {palletNotice}
                   </p>
                 ) : null}
@@ -366,66 +417,79 @@ export default function ReceivingSheetDetailPage() {
                     {palletError}
                   </p>
                 ) : null}
-                <button
-                  type="submit"
-                  disabled={palletSubmitting}
-                  className="min-h-[48px] w-full rounded-lg bg-teal px-4 text-sm font-bold text-white disabled:opacity-60 sm:w-auto"
-                >
+                <button type="submit" disabled={palletSubmitting} className={btn("teal", "w-full sm:w-auto")}>
                   {palletSubmitting ? "Adding..." : "+ Add Pallet Row"}
                 </button>
               </div>
             </form>
           ) : null}
-        </section>
+        </Card>
 
         {isCancelled ? (
-          <section className="rounded-xl border border-line bg-canvas p-4 text-sm font-semibold text-muted shadow-card sm:p-6">
+          <section className="rounded-xl border border-danger/30 bg-danger-light/40 p-4 text-sm font-semibold text-danger shadow-card sm:p-5">
             Cancelled - this draft was withdrawn before either side confirmed it.
           </section>
         ) : isLocked ? (
-          <section className="rounded-xl border border-success bg-success-light p-4 text-sm font-semibold text-success shadow-card sm:p-6">
-            Locked - both sides confirmed. This sheet is now a permanent, immutable record.
+          <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-navy to-navy-3 p-5 text-white shadow-elevated">
+            <div>
+              <div className="text-base font-extrabold">🔒 Locked - both sides confirmed. This sheet is now a permanent, immutable record.</div>
+              <div className="mt-1 text-xs text-[#8FA3C0]">
+                Packing: {sheet.packingConfirmedAt} · Warehouse: {sheet.warehouseConfirmedAt}
+              </div>
+            </div>
           </section>
         ) : (
-          <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-            <h2 className="text-sm font-bold text-navy">Confirmation</h2>
-            <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <div className="text-xs font-semibold text-ink2">Packing side</div>
-                {sheet.packingConfirmedAt ? (
-                  <p className="mt-2 text-xs text-success">Confirmed at {sheet.packingConfirmedAt}</p>
-                ) : (
+          <Card
+            title="Dual Confirmation & Lock"
+            action={
+              <Pill tone="qc">
+                {sheet.packingConfirmedAt && !sheet.warehouseConfirmedAt
+                  ? "awaiting warehouse side"
+                  : !sheet.packingConfirmedAt && sheet.warehouseConfirmedAt
+                    ? "awaiting packing side"
+                    : "awaiting both sides"}
+              </Pill>
+            }
+          >
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <ConfirmPanel
+                title="⇱ Packing side"
+                confirmedAt={sheet.packingConfirmedAt}
+                button={
                   <button
                     type="button"
                     disabled={confirming !== null || pallets.length === 0}
                     onClick={() => handleConfirm("packing")}
-                    className="mt-2 min-h-[48px] w-full rounded-lg bg-teal px-4 text-sm font-bold text-white disabled:opacity-60"
+                    className={btn("gold", "w-full")}
                   >
                     {confirming === "packing" ? "Confirming..." : "Login → Confirm (Packing)"}
                   </button>
-                )}
-              </div>
-              <div>
-                <div className="text-xs font-semibold text-ink2">Warehouse side</div>
-                {sheet.warehouseConfirmedAt ? (
-                  <p className="mt-2 text-xs text-success">Confirmed at {sheet.warehouseConfirmedAt}</p>
-                ) : (
+                }
+              />
+              <ConfirmPanel
+                title="⇲ Warehouse side"
+                confirmedAt={sheet.warehouseConfirmedAt}
+                button={
                   <button
                     type="button"
                     disabled={confirming !== null || pallets.length === 0}
                     onClick={() => handleConfirm("warehouse")}
-                    className="mt-2 min-h-[48px] w-full rounded-lg bg-teal px-4 text-sm font-bold text-white disabled:opacity-60"
+                    className={btn("gold", "w-full")}
                   >
                     {confirming === "warehouse" ? "Confirming..." : "Login → Confirm (Warehouse)"}
                   </button>
-                )}
-              </div>
+                }
+              />
             </div>
+            <p className="mt-3 text-[11px] leading-relaxed text-muted2">
+              Both sides confirmed → sheet locks as a legal record → pallets move to{" "}
+              <Pill tone={sheet.defaultPalletStatus === "BULK" ? "bulk" : "qc"}>{sheet.defaultPalletStatus}</Pill>
+            </p>
             {pallets.length === 0 ? (
               <p className="mt-3 text-xs text-muted">Add at least one pallet row before confirming.</p>
             ) : null}
             {confirmNotice ? (
-              <p className="mt-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-warning" role="status">
+              <p className="mt-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-[#B45309]" role="status">
                 {confirmNotice}
               </p>
             ) : null}
@@ -441,12 +505,12 @@ export default function ReceivingSheetDetailPage() {
                   type="button"
                   disabled={cancelling}
                   onClick={handleCancel}
-                  className="min-h-[48px] w-full rounded-lg border border-danger px-4 text-sm font-bold text-danger disabled:opacity-60 sm:w-auto"
+                  className="inline-flex min-h-[48px] w-full items-center justify-center rounded-[11px] border-[1.5px] border-danger bg-white px-4 text-sm font-bold text-danger disabled:opacity-60 sm:w-auto"
                 >
                   {cancelling ? "Cancelling..." : "Cancel this draft"}
                 </button>
                 {cancelNotice ? (
-                  <p className="mt-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-warning" role="status">
+                  <p className="mt-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-[#B45309]" role="status">
                     {cancelNotice}
                   </p>
                 ) : null}
@@ -457,18 +521,56 @@ export default function ReceivingSheetDetailPage() {
                 ) : null}
               </div>
             ) : null}
-          </section>
+          </Card>
         )}
       </div>
     </>
   );
 }
 
+function ConfirmPanel({
+  title,
+  confirmedAt,
+  button,
+}: {
+  title: string;
+  confirmedAt: string | null;
+  button: React.ReactNode;
+}) {
+  return (
+    <div
+      className={
+        "rounded-xl border-[1.5px] p-4 " +
+        (confirmedAt ? "border-[#A7F3D0] bg-[#F0FDF9]" : "border-[#FDE68A] bg-[#FFFBEB]")
+      }
+    >
+      <div
+        className={
+          "text-xs font-extrabold uppercase tracking-wide " + (confirmedAt ? "text-teal-2" : "text-[#B45309]")
+        }
+      >
+        {title}
+      </div>
+      {confirmedAt ? (
+        <div className="mt-3 flex items-center justify-between rounded-lg border-[1.5px] border-teal bg-teal-light px-3.5 py-3 text-xs">
+          <span className="font-semibold text-ink">Confirmed at {confirmedAt}</span>
+          <span className="text-sm font-extrabold text-success">✓</span>
+        </div>
+      ) : (
+        <div className="mt-3 rounded-lg border-[1.5px] border-dashed border-warning bg-white p-3">
+          <div className="mb-2 text-xs font-bold text-[#B45309]">Awaiting…</div>
+          {button}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-muted2">{label}</dt>
-      <dd className="font-semibold text-navy">{value}</dd>
+      <dt className="text-[10px] font-bold uppercase tracking-wide text-muted2">{label}</dt>
+      <dd className="mt-0.5 text-[13px] font-bold text-ink">{value}</dd>
     </div>
   );
 }
@@ -481,39 +583,12 @@ function StatusPill({ status }: { status: ReceivingSheet["status"] }) {
     LOCKED: "Locked",
     CANCELLED: "Cancelled",
   };
-  const styles: Record<ReceivingSheet["status"], string> = {
-    DRAFT: "bg-line text-muted",
-    PENDING_PACKING: "bg-warning-light text-warning",
-    PENDING_WAREHOUSE: "bg-warning-light text-warning",
-    LOCKED: "bg-success-light text-success",
-    CANCELLED: "bg-danger-light text-danger",
+  const tone: Record<ReceivingSheet["status"], PillTone> = {
+    DRAFT: "neutral",
+    PENDING_PACKING: "hold",
+    PENDING_WAREHOUSE: "hold",
+    LOCKED: "ok",
+    CANCELLED: "rejected",
   };
-  return (
-    <span className={"rounded-full px-2 py-0.5 text-xs font-bold " + styles[status]}>{label[status]}</span>
-  );
-}
-
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block text-xs font-semibold text-ink2">
-      {label}
-      <div className="mt-1">{children}</div>
-      {error ? <span className="mt-1 block text-xs font-semibold text-danger">{error}</span> : null}
-    </label>
-  );
-}
-
-function inputClass(error?: string) {
-  return (
-    "min-h-[48px] w-full rounded-lg border bg-white px-3 text-sm text-ink2 outline-none focus:border-teal " +
-    (error ? "border-danger" : "border-line")
-  );
+  return <Pill tone={tone[status]}>{label[status]}</Pill>;
 }

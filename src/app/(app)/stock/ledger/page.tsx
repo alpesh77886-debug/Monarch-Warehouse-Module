@@ -2,6 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import {
+  Card,
+  Pill,
+  type PillTone,
+  StateBox,
+  TableWrap,
+  btn,
+  inputClass,
+  tableCls,
+  tdCls,
+  thCls,
+  trCls,
+} from "@/components/ui";
 
 type LedgerEntry = {
   id: string;
@@ -79,7 +92,7 @@ export default function StockLedgerPage() {
   return (
     <>
       <PageHeader
-        breadcrumb="Home / Stock / Ledger"
+        breadcrumb="Support / Stock Ledger"
         title="Stock Ledger"
         actions={
           <a
@@ -88,100 +101,119 @@ export default function StockLedgerPage() {
                 ? `/api/stock/ledger/export?transactionType=${transactionType}`
                 : "/api/stock/ledger/export"
             }
-            className="flex min-h-[48px] items-center rounded-lg bg-teal px-4 text-sm font-bold text-white"
+            className={btn("primary")}
           >
-            Export (DSR format)
+            ⇩ Export (DSR format)
           </a>
         }
       />
-      <div className="flex flex-col gap-4 p-4 sm:p-6">
-        <select
-          className="min-h-[48px] w-full rounded-lg border border-line bg-white px-3 text-sm text-ink2 outline-none focus:border-teal sm:w-64"
-          value={transactionType}
-          onChange={(e) => {
-            setPage(1);
-            setTransactionType(e.target.value);
-          }}
-        >
-          <option value="">All transaction types</option>
-          {TRANSACTION_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
+      <div className="flex flex-col gap-4 bg-canvas p-4 sm:p-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            className={inputClass() + " sm:w-64"}
+            value={transactionType}
+            onChange={(e) => {
+              setPage(1);
+              setTransactionType(e.target.value);
+            }}
+          >
+            <option value="">All transaction types</option>
+            {TRANSACTION_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+          <span className="text-[11px] text-muted2">Append-only · every row is who / when / what / why</span>
+        </div>
 
         {state === "loading" ? (
-          <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">
-            Loading ledger...
-          </div>
+          <StateBox>Loading ledger...</StateBox>
         ) : state === "permission-denied" ? (
           <div
-            className="rounded-xl border border-warning bg-warning-light p-6 text-sm text-warning shadow-card"
+            className="rounded-xl border border-warning bg-warning-light p-6 text-sm font-semibold text-[#B45309] shadow-card"
             role="alert"
           >
             {message}
           </div>
         ) : state === "error" ? (
-          <div className="rounded-xl border border-danger bg-danger-light p-6 text-sm text-danger shadow-card" role="alert">
-            {message}
-          </div>
+          <StateBox tone="danger">{message}</StateBox>
         ) : entries.length === 0 ? (
-          <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">
-            No ledger entries {transactionType ? `of type ${transactionType} ` : ""}yet.
-          </div>
+          <StateBox>No ledger entries {transactionType ? `of type ${transactionType} ` : ""}yet.</StateBox>
         ) : (
           <>
             <ul className="flex flex-col gap-2 sm:hidden">
               {entries.map((e) => (
-                <li key={e.id} className="rounded-xl border border-line bg-white p-4 shadow-card">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-navy">{e.transactionType}</span>
-                    <span className="text-xs text-muted">
+                <li key={e.id} className={"rounded-xl border border-line p-4 shadow-card " + (ledgerRowTint(e.transactionType) || "bg-white")}>
+                  <div className="flex items-center justify-between gap-2">
+                    <Pill tone={typeTone(e.transactionType)}>{e.transactionType}</Pill>
+                    <span className="text-[11px] text-muted2">
                       {e.date} · {e.shift}
                     </span>
                   </div>
-                  <div className="mt-1 text-sm text-ink2">{e.materialCode}</div>
+                  <div className="mt-1.5 text-sm font-bold text-ink">{e.materialCode}</div>
                   <div className="mt-1 text-xs text-muted">
-                    qty {e.qtyChange >= 0 ? "+" : ""}
-                    {e.qtyChange} (after {e.qtyAfter}) · {e.weightChangeKg} kg
+                    qty <QtyChange value={e.qtyChange} /> (after {e.qtyAfter}) · {e.weightChangeKg} kg
                   </div>
                 </li>
               ))}
             </ul>
 
-            <div className="hidden overflow-x-auto rounded-xl border border-line bg-white shadow-card sm:block">
-              <table className="w-full min-w-[900px] text-left text-sm">
-                <thead className="bg-canvas text-xs font-semibold uppercase text-muted2">
-                  <tr>
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3">Shift</th>
-                    <th className="px-4 py-3">Type</th>
-                    <th className="px-4 py-3">Material</th>
-                    <th className="px-4 py-3">Qty change</th>
-                    <th className="px-4 py-3">Qty after</th>
-                    <th className="px-4 py-3">Weight change kg</th>
-                    <th className="px-4 py-3">Reference</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {entries.map((e) => (
-                    <tr key={e.id}>
-                      <td className="px-4 py-3">{e.date}</td>
-                      <td className="px-4 py-3">{e.shift}</td>
-                      <td className="px-4 py-3 font-bold text-navy">{e.transactionType}</td>
-                      <td className="px-4 py-3">{e.materialCode}</td>
-                      <td className="px-4 py-3">{e.qtyChange}</td>
-                      <td className="px-4 py-3">{e.qtyAfter}</td>
-                      <td className="px-4 py-3">{e.weightChangeKg}</td>
-                      <td className="px-4 py-3">
-                        {e.referenceType} / {e.referenceId}
-                      </td>
+            <Card
+              className="hidden sm:block"
+              title="Transactions"
+              sub={`${total} total · running balance per pallet`}
+              bodyClassName="px-4 pb-2 pt-1"
+            >
+              <TableWrap minWidth={960}>
+                <table className={tableCls + " text-xs"}>
+                  <thead>
+                    <tr>
+                      <th className={thCls}>Date</th>
+                      <th className={thCls}>Shift</th>
+                      <th className={thCls}>Type</th>
+                      <th className={thCls}>FG Code</th>
+                      <th className={thCls + " text-right"}>Qty change</th>
+                      <th className={thCls + " text-right"}>Qty after</th>
+                      <th className={thCls + " text-right"}>Weight change kg</th>
+                      <th className={thCls}>Status</th>
+                      <th className={thCls}>Reference</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {entries.map((e) => (
+                      <tr key={e.id} className={trCls + " " + ledgerRowTint(e.transactionType)}>
+                        <td className={tdCls + " whitespace-nowrap"}>{e.date}</td>
+                        <td className={tdCls}>
+                          <Pill tone="shift">{e.shift}</Pill>
+                        </td>
+                        <td className={tdCls}>
+                          <Pill tone={typeTone(e.transactionType)}>{e.transactionType}</Pill>
+                        </td>
+                        <td className={tdCls + " font-bold text-ink"}>{e.materialCode}</td>
+                        <td className={tdCls + " text-right"}>
+                          <QtyChange value={e.qtyChange} />
+                        </td>
+                        <td className={tdCls + " text-right font-semibold text-ink"}>{e.qtyAfter}</td>
+                        <td className={tdCls + " text-right text-muted"}>{e.weightChangeKg}</td>
+                        <td className={tdCls + " whitespace-nowrap text-[11px] text-muted"}>
+                          {e.statusBefore || e.statusAfter ? (
+                            <>
+                              {e.statusBefore ?? "—"} → <b className="text-ink2">{e.statusAfter ?? "—"}</b>
+                            </>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className={tdCls + " text-[11px] text-muted2"}>
+                          {e.referenceType} / {e.referenceId}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TableWrap>
+            </Card>
 
             <div className="flex items-center justify-between text-xs text-muted">
               <span>
@@ -192,17 +224,17 @@ export default function StockLedgerPage() {
                   type="button"
                   disabled={page <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  className="min-h-[48px] rounded-lg border border-line bg-white px-4 font-bold text-ink2 disabled:opacity-40"
+                  className={btn("outline")}
                 >
-                  Previous
+                  ← Previous
                 </button>
                 <button
                   type="button"
                   disabled={page >= totalPages}
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  className="min-h-[48px] rounded-lg border border-line bg-white px-4 font-bold text-ink2 disabled:opacity-40"
+                  className={btn("outline")}
                 >
-                  Next
+                  Next →
                 </button>
               </div>
             </div>
@@ -210,5 +242,42 @@ export default function StockLedgerPage() {
         )}
       </div>
     </>
+  );
+}
+
+function typeTone(t: string): PillTone {
+  switch (t) {
+    case "INWARD":
+    case "RELEASE":
+    case "BULK_RECEIVE":
+      return "ok";
+    case "HOLD":
+      return "hold";
+    case "DISPATCH":
+    case "TRANSFER_OUT":
+      return "transit";
+    case "TRANSFER_IN":
+      return "qc";
+    case "BULK_SEND":
+      return "bulk";
+    case "ADJUSTMENT":
+      return "rejected";
+    default:
+      return "neutral";
+  }
+}
+
+function ledgerRowTint(t: string) {
+  if (t === "HOLD") return "bg-[#FFFBEB]";
+  if (t === "RELEASE") return "bg-[#F0FDF9]";
+  return "";
+}
+
+function QtyChange({ value }: { value: number }) {
+  return (
+    <span className={"font-bold " + (value > 0 ? "text-success" : value < 0 ? "text-danger" : "text-muted")}>
+      {value > 0 ? "+" : ""}
+      {value}
+    </span>
   );
 }

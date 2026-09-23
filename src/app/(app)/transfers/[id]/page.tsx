@@ -3,6 +3,20 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
+import {
+  Card,
+  Field,
+  Pill,
+  StateBox,
+  TableWrap,
+  btn,
+  inputClass,
+  statusTone,
+  tableCls,
+  tdCls,
+  thCls,
+  trCls,
+} from "@/components/ui";
 
 type TransferOrder = {
   id: string;
@@ -58,6 +72,10 @@ const STATUS_LABEL: Record<TransferOrder["status"], string> = {
   COMPLETED: "Completed",
   CANCELLED: "Cancelled",
 };
+
+const STAGE_ORDER: TransferOrder["status"][] = ["DRAFT", "PICKED", "LOADED", "IN_TRANSIT", "RECEIVED", "COMPLETED"];
+// Deliberately not the STATUS_LABEL words - the header pill is the single place the status name appears.
+const STAGE_LABELS = ["Create", "Pick", "Load", "Dispatch", "Receive", "Close"];
 
 export default function TransferOrderDetailPage() {
   const params = useParams<{ id: string }>();
@@ -179,9 +197,9 @@ export default function TransferOrderDetailPage() {
   if (loadState === "loading") {
     return (
       <>
-        <PageHeader breadcrumb="Home / Transfers" title="Loading..." />
-        <div className="p-4 sm:p-6">
-          <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">Loading...</div>
+        <PageHeader breadcrumb="Operations / Transfers" title="Loading..." />
+        <div className="bg-canvas p-4 sm:p-6">
+          <StateBox>Loading...</StateBox>
         </div>
       </>
     );
@@ -189,11 +207,9 @@ export default function TransferOrderDetailPage() {
   if (loadState === "error" || !order) {
     return (
       <>
-        <PageHeader breadcrumb="Home / Transfers" title="Not found" />
-        <div className="p-4 sm:p-6">
-          <div className="rounded-xl border border-danger bg-danger-light p-6 text-sm text-danger shadow-card" role="alert">
-            {loadError}
-          </div>
+        <PageHeader breadcrumb="Operations / Transfers" title="Not found" />
+        <div className="bg-canvas p-4 sm:p-6">
+          <StateBox tone="danger">{loadError}</StateBox>
         </div>
       </>
     );
@@ -204,27 +220,77 @@ export default function TransferOrderDetailPage() {
   const canDispatch = order.status === "LOADED";
   const canReceive = order.status === "IN_TRANSIT";
   const canComplete = order.status === "RECEIVED";
+  const stageIndex = STAGE_ORDER.indexOf(order.status);
+  const totalCartons = pickedPallets.reduce((sum, p) => sum + p.cartonQty, 0);
 
   return (
     <>
-      <PageHeader breadcrumb="Home / Transfers" title={order.transferNumber} />
-      <div className="flex flex-col gap-6 p-4 sm:p-6">
-        <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-navy">Header</h2>
-            <span className="rounded-full bg-canvas px-2 py-0.5 text-xs font-bold text-navy">
-              {STATUS_LABEL[order.status]} · {order.transferType}
-            </span>
+      <PageHeader
+        breadcrumb="Operations / Transfers / Detail"
+        title={order.transferNumber}
+        actions={
+          <Pill tone={statusTone(order.status)}>
+            {STATUS_LABEL[order.status]} · {order.transferType}
+          </Pill>
+        }
+      />
+      <div className="flex flex-col gap-5 bg-canvas p-4 sm:p-6">
+        <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-5">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wide text-muted2">Source</div>
+              <div className="text-base font-extrabold text-ink">{order.sourceWarehouseCode ?? "?"}</div>
+            </div>
+            <div className="text-2xl text-teal">⇄</div>
+            <div className="text-right">
+              <div className="text-[10px] font-bold uppercase tracking-wide text-muted2">Destination</div>
+              <div className="text-base font-extrabold text-ink">
+                {`${order.destinationWarehouseCode ?? "?"} (${order.destinationWarehouseType ?? "?"})`}
+              </div>
+            </div>
           </div>
-          <dl className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
-            <Detail label="Source" value={order.sourceWarehouseCode ?? "?"} />
-            <Detail label="Destination" value={`${order.destinationWarehouseCode ?? "?"} (${order.destinationWarehouseType ?? "?"})`} />
-            {order.vehicleNumber ? <Detail label="Vehicle" value={order.vehicleNumber} /> : null}
-            {order.driverName ? <Detail label="Driver" value={order.driverName} /> : null}
-            {order.lrNumber ? <Detail label="LR number" value={order.lrNumber} /> : null}
-          </dl>
+          {order.vehicleNumber || order.driverName || order.lrNumber ? (
+            <dl className="mt-3 grid grid-cols-2 gap-3 border-t border-line pt-3 text-xs sm:grid-cols-4">
+              {order.vehicleNumber ? <Detail label="Vehicle" value={order.vehicleNumber} /> : null}
+              {order.driverName ? <Detail label="Driver" value={order.driverName} /> : null}
+              {order.transporter ? <Detail label="Transporter" value={order.transporter} /> : null}
+              {order.lrNumber ? <Detail label="LR number" value={order.lrNumber} /> : null}
+            </dl>
+          ) : null}
+
+          <ol className="mt-4 flex overflow-x-auto" aria-label="Transfer progress">
+            {STAGE_LABELS.map((label, i) => {
+              const done = i < stageIndex || order.status === "COMPLETED";
+              const on = i === stageIndex && order.status !== "COMPLETED";
+              return (
+                <li key={label} className="flex min-w-[60px] flex-1 flex-col items-center gap-1">
+                  <span
+                    className={
+                      "flex h-7 w-7 items-center justify-center rounded-full border-[2.5px] text-[11px] font-extrabold " +
+                      (done
+                        ? "border-teal bg-teal-light text-teal"
+                        : on
+                          ? "border-gold bg-[#FFEDD5] text-gold"
+                          : "border-[#CBD5E1] bg-[#F1F5F9] text-muted2")
+                    }
+                  >
+                    {done ? "✓" : i + 1}
+                  </span>
+                  <span className="text-center text-[9px] font-extrabold uppercase tracking-wide text-muted2">{label}</span>
+                </li>
+              );
+            })}
+          </ol>
+
           {order.transferType !== "NORMAL" ? (
-            <p className="mt-3 rounded-lg bg-accent-light p-3 text-xs font-semibold text-accent">
+            <p
+              className={
+                "mt-4 rounded-lg border-l-4 p-3 text-xs font-semibold " +
+                (order.transferType === "HOLD_TAG"
+                  ? "border-[#FDBA74] bg-[#FFEDD5]/60 text-[#C2410C]"
+                  : "border-accent bg-accent-light text-accent")
+              }
+            >
               {order.transferType === "HOLD_TAG"
                 ? "Hold tag transfer - material keeps HOLD status throughout; the receiving warehouse's own QC must release it before it can dispatch (INV-017)."
                 : "Bulk tag transfer - material keeps BULK status throughout; the receiving warehouse must arrange repacking."}
@@ -232,40 +298,46 @@ export default function TransferOrderDetailPage() {
           ) : null}
         </section>
 
-        <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-          <h2 className="text-sm font-bold text-navy">Picked pallets ({pickedPallets.length})</h2>
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[560px] text-left text-xs">
-              <thead className="text-muted2">
+        <Card
+          title={`Picked pallets (${pickedPallets.length})`}
+          sub={pickedPallets.length > 0 ? `${totalCartons} cartons` : undefined}
+          bodyClassName="px-4 pb-4 pt-1"
+        >
+          <TableWrap minWidth={520}>
+            <table className={tableCls}>
+              <thead>
                 <tr>
-                  <th className="py-1 pr-2">Pallet</th>
-                  <th className="py-1 pr-2">Material</th>
-                  <th className="py-1 pr-2">Batch</th>
-                  <th className="py-1 pr-2">Cartons</th>
+                  <th className={thCls}>Pallet</th>
+                  <th className={thCls}>Material</th>
+                  <th className={thCls}>Batch</th>
+                  <th className={thCls + " text-right"}>Cartons</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody>
                 {pickedPallets.map((p) => (
-                  <tr key={p.id}>
-                    <td className="py-2 pr-2 font-bold text-navy">{p.palletNumber}</td>
-                    <td className="py-2 pr-2">{p.materialCode}</td>
-                    <td className="py-2 pr-2">{p.batchNumber}</td>
-                    <td className="py-2 pr-2">{p.cartonQty}</td>
+                  <tr key={p.id} className={trCls}>
+                    <td className={tdCls + " font-bold text-ink"}>{p.palletNumber}</td>
+                    <td className={tdCls}>{p.materialCode}</td>
+                    <td className={tdCls}>{p.batchNumber}</td>
+                    <td className={tdCls + " text-right"}>{p.cartonQty}</td>
                   </tr>
                 ))}
                 {pickedPallets.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-3 text-muted">
+                    <td colSpan={4} className={tdCls + " text-center text-muted"}>
                       No pallets picked yet.
                     </td>
                   </tr>
                 ) : null}
               </tbody>
             </table>
-          </div>
+          </TableWrap>
 
           {canPick ? (
-            <form className="mt-4 flex flex-col gap-3 border-t border-line pt-4" onSubmit={handlePick}>
+            <form
+              className="mt-4 flex flex-col gap-3 rounded-xl border-[1.5px] border-dashed border-[#CBD5E1] bg-[#FAFBFC] p-4"
+              onSubmit={handlePick}
+            >
               <Field label={`Pick a ${REQUIRED_STATUS[order.transferType]}-status pallet from the source warehouse`}>
                 <select
                   className={inputClass()}
@@ -281,7 +353,7 @@ export default function TransferOrderDetailPage() {
                 </select>
               </Field>
               {pickNotice ? (
-                <p className="rounded-lg bg-warning-light p-3 text-xs font-semibold text-warning" role="status">
+                <p className="rounded-lg bg-warning-light p-3 text-xs font-semibold text-[#B45309]" role="status">
                   {pickNotice}
                 </p>
               ) : null}
@@ -290,21 +362,16 @@ export default function TransferOrderDetailPage() {
                   {pickError}
                 </p>
               ) : null}
-              <button
-                type="submit"
-                disabled={pickState === "submitting"}
-                className="min-h-[48px] w-full rounded-lg bg-teal px-4 text-sm font-bold text-white disabled:opacity-60 sm:w-auto"
-              >
+              <button type="submit" disabled={pickState === "submitting"} className={btn("teal", "w-full sm:w-auto")}>
                 {pickState === "submitting" ? "Picking..." : "Pick pallet"}
               </button>
             </form>
           ) : null}
-        </section>
+        </Card>
 
         {canLoad ? (
-          <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-            <h2 className="text-sm font-bold text-navy">Vehicle loading</h2>
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Card title="Vehicle loading">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Field label="Vehicle number">
                 <input
                   className={inputClass()}
@@ -333,7 +400,7 @@ export default function TransferOrderDetailPage() {
                   onChange={(e) => setLoadForm({ ...loadForm, lrNumber: e.target.value })}
                 />
               </Field>
-              <div className="sm:col-span-2">
+              <div className="sm:col-span-2 lg:col-span-4">
                 <button
                   type="button"
                   onClick={() =>
@@ -344,63 +411,66 @@ export default function TransferOrderDetailPage() {
                       lrNumber: loadForm.lrNumber || null,
                     })
                   }
-                  className="min-h-[48px] w-full rounded-lg bg-teal px-4 text-sm font-bold text-white sm:w-auto"
+                  className={btn("teal", "w-full sm:w-auto")}
                 >
                   Confirm loading
                 </button>
               </div>
             </div>
-          </section>
+          </Card>
         ) : null}
 
-        <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-          <h2 className="text-sm font-bold text-navy">Actions</h2>
-          <div className="mt-3 flex flex-wrap gap-3">
-            {canDispatch ? (
-              <button
-                type="button"
-                disabled={actionState === "submitting"}
-                onClick={() => runAction("dispatch", {})}
-                className="min-h-[48px] rounded-lg bg-teal px-4 text-sm font-bold text-white disabled:opacity-60"
-              >
-                Dispatch (mark in transit)
-              </button>
+        {canDispatch || canReceive || canComplete || order.status === "COMPLETED" || actionNotice || actionError ? (
+          <Card title="Actions">
+            <div className="flex flex-wrap gap-3">
+              {canDispatch ? (
+                <button
+                  type="button"
+                  disabled={actionState === "submitting"}
+                  onClick={() => runAction("dispatch", {})}
+                  className={btn("primary")}
+                >
+                  Dispatch (mark in transit)
+                </button>
+              ) : null}
+              {canReceive ? (
+                <button
+                  type="button"
+                  disabled={actionState === "submitting"}
+                  onClick={() => runAction("receive", {})}
+                  className={btn("teal")}
+                >
+                  Receive at destination
+                </button>
+              ) : null}
+              {canComplete ? (
+                <button
+                  type="button"
+                  disabled={actionState === "submitting"}
+                  onClick={() => runAction("complete", {}, "Transfer completed.")}
+                  className={btn("teal")}
+                >
+                  Complete transfer
+                </button>
+              ) : null}
+              {order.status === "COMPLETED" ? (
+                <p className="w-full rounded-lg bg-success-light p-3 text-sm font-semibold text-success">
+                  Completed - this transfer order is now archived.
+                </p>
+              ) : null}
+            </div>
+            {actionNotice ? (
+              <p className="mt-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-[#B45309]" role="status">
+                {actionNotice}
+              </p>
             ) : null}
-            {canReceive ? (
-              <button
-                type="button"
-                disabled={actionState === "submitting"}
-                onClick={() => runAction("receive", {})}
-                className="min-h-[48px] rounded-lg bg-teal px-4 text-sm font-bold text-white disabled:opacity-60"
-              >
-                Receive at destination
-              </button>
+            {actionError ? (
+              <p className="mt-3 rounded-lg bg-danger-light p-3 text-xs font-semibold text-danger" role="alert">
+                {actionError}
+              </p>
             ) : null}
-            {canComplete ? (
-              <button
-                type="button"
-                disabled={actionState === "submitting"}
-                onClick={() => runAction("complete", {}, "Transfer completed.")}
-                className="min-h-[48px] rounded-lg bg-success px-4 text-sm font-bold text-white disabled:opacity-60"
-              >
-                Complete transfer
-              </button>
-            ) : null}
-            {order.status === "COMPLETED" ? (
-              <p className="text-sm font-semibold text-success">Completed - this transfer order is now archived.</p>
-            ) : null}
-          </div>
-          {actionNotice ? (
-            <p className="mt-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-warning" role="status">
-              {actionNotice}
-            </p>
-          ) : null}
-          {actionError ? (
-            <p className="mt-3 rounded-lg bg-danger-light p-3 text-xs font-semibold text-danger" role="alert">
-              {actionError}
-            </p>
-          ) : null}
-        </section>
+          </Card>
+        ) : null}
       </div>
     </>
   );
@@ -409,21 +479,8 @@ export default function TransferOrderDetailPage() {
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-muted2">{label}</dt>
-      <dd className="font-semibold text-navy">{value}</dd>
+      <dt className="text-[10px] font-bold uppercase tracking-wide text-muted2">{label}</dt>
+      <dd className="font-bold text-ink">{value}</dd>
     </div>
   );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block text-xs font-semibold text-ink2">
-      {label}
-      <div className="mt-1">{children}</div>
-    </label>
-  );
-}
-
-function inputClass() {
-  return "min-h-[48px] w-full rounded-lg border border-line bg-white px-3 text-sm text-ink2 outline-none focus:border-teal";
 }

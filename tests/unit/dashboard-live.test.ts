@@ -302,11 +302,14 @@ beforeAll(async () => {
   // row's date (a real limitation of a date-scoped panel over an
   // append-only ledger, not a bug) - the assertion below only checks
   // that inward is not zero, not an exact count, for this reason.
+  // Keyed per day: a single fixed key left the only fixture row on its first run's date, so the
+  // "today's inward" assertion failed on every later day.
   const todayStr = new Date().toISOString().slice(0, 10);
+  const ledgerFixtureRef = `loop-47-dashboard-fixture-${todayStr}`;
   const [existingLedgerRow] = await db
     .select()
     .from(stockLedger)
-    .where(eq(stockLedger.referenceId, "loop-47-dashboard-fixture"));
+    .where(eq(stockLedger.referenceId, ledgerFixtureRef));
   if (!existingLedgerRow) {
     await db.insert(stockLedger).values({
       id: crypto.randomUUID(),
@@ -322,7 +325,7 @@ beforeAll(async () => {
       weightChangeKg: 100,
       weightAfterKg: 100,
       referenceType: "RECEIVING_SHEET",
-      referenceId: "loop-47-dashboard-fixture",
+      referenceId: ledgerFixtureRef,
       userId: FIXTURE_USER_ID,
     });
   }

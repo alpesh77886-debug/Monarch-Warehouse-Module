@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Card, Field, Pill, StateBox, btn, inputClass, statusTone } from "@/components/ui";
 
 type MaintenanceTicket = {
   id: string;
@@ -103,9 +104,9 @@ export default function MaintenanceTicketDetailPage() {
   if (loadState === "loading") {
     return (
       <>
-        <PageHeader breadcrumb="Home / Maintenance" title="Loading..." />
-        <div className="p-4 sm:p-6">
-          <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">Loading...</div>
+        <PageHeader breadcrumb="Support / Maintenance" title="Loading..." />
+        <div className="bg-canvas p-4 sm:p-6">
+          <StateBox>Loading...</StateBox>
         </div>
       </>
     );
@@ -113,11 +114,9 @@ export default function MaintenanceTicketDetailPage() {
   if (loadState === "error" || !ticket) {
     return (
       <>
-        <PageHeader breadcrumb="Home / Maintenance" title="Not found" />
-        <div className="p-4 sm:p-6">
-          <div className="rounded-xl border border-danger bg-danger-light p-6 text-sm text-danger shadow-card" role="alert">
-            {loadError}
-          </div>
+        <PageHeader breadcrumb="Support / Maintenance" title="Not found" />
+        <div className="bg-canvas p-4 sm:p-6">
+          <StateBox tone="danger">{loadError}</StateBox>
         </div>
       </>
     );
@@ -127,44 +126,91 @@ export default function MaintenanceTicketDetailPage() {
   const canStartWork = ticket.status === "ACKNOWLEDGED" || ticket.status === "REOPENED";
   const canResolve = ticket.status === "IN_PROGRESS";
   const canCloseOrReopen = ticket.status === "RESOLVED";
+  const isCritical = ticket.severity === "CRITICAL";
+
+  const timeline: { key: string; label: string; at: string | null; reached: boolean }[] = [
+    { key: "open", label: "Raised", at: ticket.createdAt, reached: true },
+    { key: "ack", label: "Ack", at: ticket.acknowledgedAt, reached: ticket.acknowledgedAt !== null },
+    {
+      key: "work",
+      label: "Working",
+      at: null,
+      reached: ["IN_PROGRESS", "RESOLVED", "CLOSED"].includes(ticket.status),
+    },
+    { key: "fix", label: "Fix", at: ticket.resolvedAt, reached: ticket.resolvedAt !== null },
+    { key: "close", label: "Verify", at: ticket.closedAt, reached: ticket.closedAt !== null },
+  ];
 
   return (
     <>
-      <PageHeader breadcrumb="Home / Maintenance" title={ticket.ticketNumber} />
-      <div className="flex flex-col gap-6 p-4 sm:p-6">
-        <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-navy">Header</h2>
-            <span className="rounded-full bg-canvas px-2 py-0.5 text-xs font-bold text-navy">
-              {STATUS_LABEL[ticket.status]} · {ticket.severity}
-            </span>
-          </div>
+      <PageHeader
+        breadcrumb="Support / Maintenance / Ticket"
+        title={ticket.ticketNumber}
+        actions={
+          <Pill tone={statusTone(ticket.status)}>
+            {STATUS_LABEL[ticket.status]} · {ticket.severity}
+          </Pill>
+        }
+      />
+      <div className="flex flex-col gap-5 bg-canvas p-4 sm:p-6">
+        <section
+          className={
+            "rounded-xl border-[1.5px] p-4 shadow-card sm:p-5 " +
+            (isCritical ? "border-[#FCA5A5] bg-gradient-to-br from-[#FFF5F5] to-white" : "border-line bg-white")
+          }
+        >
+          <div className="text-[15px] font-extrabold text-navy">{ticket.description}</div>
           <dl className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
             <Detail label="Category" value={ticket.category} />
             <Detail label="Location" value={ticket.location} />
-            <Detail label="Description" value={ticket.description} />
+            <Detail label="Raised" value={formatAt(ticket.createdAt)} />
+            {ticket.partsUsed ? <Detail label="Parts used" value={ticket.partsUsed} /> : null}
           </dl>
-          {ticket.severity === "CRITICAL" && ticket.status !== "CLOSED" ? (
-            <p className="mt-3 rounded-lg bg-danger-light p-3 text-xs font-semibold text-danger">
+          {isCritical && ticket.status !== "CLOSED" ? (
+            <p className="mt-3 rounded-lg border-l-4 border-danger bg-danger-light p-3 text-xs font-semibold text-danger">
               CRITICAL - escalated (product at risk). Requires immediate attention.
             </p>
           ) : null}
+
+          <ol className="mt-4 flex items-start" aria-label="Ticket progress">
+            {timeline.map((step, i) => {
+              const nextReached = timeline[i + 1]?.reached ?? false;
+              const on = step.reached && !nextReached && ticket.status !== "CLOSED";
+              return (
+                <li key={step.key} className="flex flex-1 flex-col items-center gap-1">
+                  <span
+                    className={
+                      "flex h-7 w-7 items-center justify-center rounded-full border-[2.5px] text-[11px] font-extrabold " +
+                      (on
+                        ? "border-gold bg-[#FFEDD5] text-gold"
+                        : step.reached
+                          ? "border-teal bg-teal-light text-teal"
+                          : "border-[#CBD5E1] bg-[#F1F5F9] text-muted2")
+                    }
+                  >
+                    {on ? "◐" : step.reached ? "✓" : i + 1}
+                  </span>
+                  <span className="text-center text-[9px] font-extrabold uppercase tracking-wide text-muted2">{step.label}</span>
+                  {step.at ? <span className="text-center text-[9px] text-muted2">{formatAt(step.at)}</span> : null}
+                </li>
+              );
+            })}
+          </ol>
+
           {ticket.resolutionNotes ? (
-            <div className="mt-3">
-              <div className="text-xs font-semibold text-muted2">Resolution notes</div>
-              <div className="whitespace-pre-line text-xs text-ink2">{ticket.resolutionNotes}</div>
+            <div className="mt-4 rounded-lg border border-[#A7F3D0] bg-[#F0FDF9] p-3">
+              <div className="text-[10px] font-bold uppercase tracking-wide text-teal-2">Resolution notes</div>
+              <div className="mt-1 whitespace-pre-line text-xs text-ink2">{ticket.resolutionNotes}</div>
             </div>
           ) : null}
-          {ticket.partsUsed ? <Detail label="Parts used" value={ticket.partsUsed} /> : null}
         </section>
 
         {canResolve ? (
-          <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-            <h2 className="text-sm font-bold text-navy">Resolve</h2>
-            <form className="mt-3 flex flex-col gap-3" onSubmit={handleResolve}>
+          <Card title="Resolve">
+            <form className="flex flex-col gap-3" onSubmit={handleResolve}>
               <Field label="Resolution notes (required)">
                 <textarea
-                  className={inputClass()}
+                  className={inputClass() + " py-3"}
                   value={resolveForm.resolutionNotes}
                   onChange={(e) => setResolveForm({ ...resolveForm, resolutionNotes: e.target.value })}
                 />
@@ -176,110 +222,97 @@ export default function MaintenanceTicketDetailPage() {
                   onChange={(e) => setResolveForm({ ...resolveForm, partsUsed: e.target.value })}
                 />
               </Field>
-              <button
-                type="submit"
-                disabled={actionState === "submitting"}
-                className="min-h-[48px] w-full rounded-lg bg-teal px-4 text-sm font-bold text-white disabled:opacity-60 sm:w-auto"
-              >
+              <button type="submit" disabled={actionState === "submitting"} className={btn("teal", "w-full sm:w-auto")}>
                 Mark resolved
               </button>
             </form>
-          </section>
+          </Card>
         ) : null}
 
         {canCloseOrReopen ? (
-          <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-            <h2 className="text-sm font-bold text-navy">Verify fix</h2>
-            <form className="mt-3 flex flex-col gap-3" onSubmit={handleReopen}>
+          <Card title="Verify fix" accentColor="#059669">
+            <form className="flex flex-col gap-3" onSubmit={handleReopen}>
               <Field label="If not fixed - reopen comments">
-                <input
-                  className={inputClass()}
-                  value={reopenComments}
-                  onChange={(e) => setReopenComments(e.target.value)}
-                />
+                <input className={inputClass()} value={reopenComments} onChange={(e) => setReopenComments(e.target.value)} />
               </Field>
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3">
                 <button
                   type="button"
                   disabled={actionState === "submitting"}
                   onClick={() => runAction("close", {}, "Closed.")}
-                  className="min-h-[48px] rounded-lg bg-success px-4 text-sm font-bold text-white disabled:opacity-60"
+                  className={btn("teal")}
                 >
                   Fixed - Close
                 </button>
                 <button
                   type="submit"
                   disabled={actionState === "submitting" || !reopenComments.trim()}
-                  className="min-h-[48px] rounded-lg bg-danger px-4 text-sm font-bold text-white disabled:opacity-60"
+                  className={btn("danger")}
                 >
                   Not fixed - Reopen
                 </button>
               </div>
             </form>
-          </section>
+          </Card>
         ) : null}
 
-        <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-          <h2 className="text-sm font-bold text-navy">Actions</h2>
-          <div className="mt-3 flex flex-wrap gap-3">
-            {canAcknowledge ? (
-              <button
-                type="button"
-                disabled={actionState === "submitting"}
-                onClick={() => runAction("acknowledge", {})}
-                className="min-h-[48px] rounded-lg bg-teal px-4 text-sm font-bold text-white disabled:opacity-60"
-              >
-                Acknowledge
-              </button>
+        {canAcknowledge || canStartWork || ticket.status === "CLOSED" || actionNotice || actionError ? (
+          <Card title="Actions">
+            <div className="flex flex-wrap gap-3">
+              {canAcknowledge ? (
+                <button
+                  type="button"
+                  disabled={actionState === "submitting"}
+                  onClick={() => runAction("acknowledge", {})}
+                  className={btn("gold")}
+                >
+                  Acknowledge
+                </button>
+              ) : null}
+              {canStartWork ? (
+                <button
+                  type="button"
+                  disabled={actionState === "submitting"}
+                  onClick={() => runAction("start-work", {})}
+                  className={btn("teal")}
+                >
+                  Start work
+                </button>
+              ) : null}
+              {ticket.status === "CLOSED" ? (
+                <p className="w-full rounded-lg bg-success-light p-3 text-sm font-semibold text-success">
+                  Closed - this ticket is now immutable.
+                </p>
+              ) : null}
+            </div>
+            {actionNotice ? (
+              <p className="mt-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-[#B45309]" role="status">
+                {actionNotice}
+              </p>
             ) : null}
-            {canStartWork ? (
-              <button
-                type="button"
-                disabled={actionState === "submitting"}
-                onClick={() => runAction("start-work", {})}
-                className="min-h-[48px] rounded-lg bg-teal px-4 text-sm font-bold text-white disabled:opacity-60"
-              >
-                Start work
-              </button>
+            {actionError ? (
+              <p className="mt-3 rounded-lg bg-danger-light p-3 text-xs font-semibold text-danger" role="alert">
+                {actionError}
+              </p>
             ) : null}
-            {ticket.status === "CLOSED" ? (
-              <p className="text-sm font-semibold text-success">Closed - this ticket is now immutable.</p>
-            ) : null}
-          </div>
-          {actionNotice ? (
-            <p className="mt-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-warning" role="status">
-              {actionNotice}
-            </p>
-          ) : null}
-          {actionError ? (
-            <p className="mt-3 rounded-lg bg-danger-light p-3 text-xs font-semibold text-danger" role="alert">
-              {actionError}
-            </p>
-          ) : null}
-        </section>
+          </Card>
+        ) : null}
       </div>
     </>
   );
 }
 
+function formatAt(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-muted2">{label}</dt>
-      <dd className="font-semibold text-navy">{value}</dd>
+      <dt className="text-[10px] font-bold uppercase tracking-wide text-muted2">{label}</dt>
+      <dd className="font-bold text-ink">{value}</dd>
     </div>
   );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block text-xs font-semibold text-ink2">
-      {label}
-      <div className="mt-1">{children}</div>
-    </label>
-  );
-}
-
-function inputClass() {
-  return "min-h-[48px] w-full rounded-lg border border-line bg-white px-3 text-sm text-ink2 outline-none focus:border-teal";
 }

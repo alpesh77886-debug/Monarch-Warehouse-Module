@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Card, Field, Note, Pill, type PillTone, StatTile, StateBox, btn, inputClass } from "@/components/ui";
 
 type WarehouseOption = { id: string; code: string; name: string; type: string };
 
@@ -36,14 +37,19 @@ const STATUS_LABEL: Record<TransferOrderRow["status"], string> = {
   COMPLETED: "Completed",
   CANCELLED: "Cancelled",
 };
-const STATUS_STYLE: Record<TransferOrderRow["status"], string> = {
-  DRAFT: "bg-line text-muted",
-  PICKED: "bg-warning-light text-warning",
-  LOADED: "bg-warning-light text-warning",
-  IN_TRANSIT: "bg-sky-light text-sky",
-  RECEIVED: "bg-accent-light text-accent",
-  COMPLETED: "bg-success-light text-success",
-  CANCELLED: "bg-danger-light text-danger",
+const STATUS_TONE: Record<TransferOrderRow["status"], PillTone> = {
+  DRAFT: "neutral",
+  PICKED: "hold",
+  LOADED: "hold",
+  IN_TRANSIT: "transit",
+  RECEIVED: "qc",
+  COMPLETED: "ok",
+  CANCELLED: "rejected",
+};
+const TYPE_CHIP: Record<TransferOrderRow["transferType"], string> = {
+  NORMAL: "bg-[#E0F2F1] text-[#0F766E]",
+  HOLD_TAG: "bg-[#FFEDD5] text-[#C2410C]",
+  BULK_TAG: "bg-[#EDE9FE] text-[#6D28D9]",
 };
 const TYPE_LABEL: Record<TransferOrderRow["transferType"], string> = {
   NORMAL: "Normal",
@@ -122,13 +128,26 @@ export default function TransfersPage() {
     }
   }
 
+  const inPrep = orders.filter((o) => o.status === "DRAFT" || o.status === "PICKED" || o.status === "LOADED").length;
+  const inTransit = orders.filter((o) => o.status === "IN_TRANSIT").length;
+  const received = orders.filter((o) => o.status === "RECEIVED").length;
+  const completed = orders.filter((o) => o.status === "COMPLETED").length;
+
   return (
     <>
-      <PageHeader breadcrumb="Home / Transfers" title="Inter-Warehouse Transfers" />
-      <div className="flex flex-col gap-6 p-4 sm:p-6">
-        <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
-          <h2 className="text-sm font-bold text-navy">New transfer order</h2>
-          <form className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
+      <PageHeader breadcrumb="Operations / Transfers" title="Inter-Warehouse Transfers" />
+      <div className="flex flex-col gap-5 bg-canvas p-4 sm:p-6">
+        {loadState === "ready" && orders.length > 0 ? (
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <StatTile color="#D97706" label="In preparation" value={inPrep} sub="draft / picked / loaded" />
+            <StatTile color="#2563EB" label="In transit" value={inTransit} sub="on the road" />
+            <StatTile color="#7C3AED" label="Received" value={received} sub="awaiting close" />
+            <StatTile color="#059669" label="Completed" value={completed} sub="archived" />
+          </div>
+        ) : null}
+
+        <Card title="New transfer order" sub="batch + pallet IDs stay the same across warehouses">
+          <form className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" onSubmit={handleSubmit}>
             <Field label="Date">
               <input
                 type="date"
@@ -177,9 +196,9 @@ export default function TransfersPage() {
               </select>
             </Field>
 
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-2 lg:col-span-4">
               {submitNotice ? (
-                <p className="mb-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-warning" role="status">
+                <p className="mb-3 rounded-lg bg-warning-light p-3 text-xs font-semibold text-[#B45309]" role="status">
                   {submitNotice}
                 </p>
               ) : null}
@@ -188,49 +207,46 @@ export default function TransfersPage() {
                   {submitError}
                 </p>
               ) : null}
-              <button
-                type="submit"
-                disabled={submitState === "submitting"}
-                className="min-h-[48px] w-full rounded-lg bg-teal px-4 text-sm font-bold text-white disabled:opacity-60 sm:w-auto"
-              >
+              <button type="submit" disabled={submitState === "submitting"} className={btn("teal", "w-full sm:w-auto")}>
                 {submitState === "submitting" ? "Creating..." : "Create draft transfer order"}
               </button>
             </div>
           </form>
-        </section>
+        </Card>
 
         <section>
-          <h2 className="mb-3 text-sm font-bold text-navy">Existing transfer orders</h2>
+          <h2 className="mb-3 text-[11px] font-extrabold uppercase tracking-widest text-muted2">Existing transfer orders</h2>
           {loadState === "loading" ? (
-            <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">Loading...</div>
+            <StateBox>Loading...</StateBox>
           ) : loadState === "error" ? (
-            <div className="rounded-xl border border-danger bg-danger-light p-6 text-sm text-danger shadow-card" role="alert">
-              {loadError}
-            </div>
+            <StateBox tone="danger">{loadError}</StateBox>
           ) : orders.length === 0 ? (
-            <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">
-              No transfer orders yet.
-            </div>
+            <StateBox>No transfer orders yet.</StateBox>
           ) : (
             <ul className="flex flex-col gap-3">
               {orders.map((o) => (
                 <li key={o.id}>
                   <Link
                     href={`/transfers/${o.id}`}
-                    className="flex min-h-[64px] flex-col justify-center rounded-xl border border-line bg-white p-4 shadow-card"
+                    className="grid min-h-[64px] grid-cols-1 gap-2 rounded-xl border border-line bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:border-teal sm:grid-cols-[1.1fr_1.4fr_1fr_auto] sm:items-center"
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-navy">{o.transferNumber}</span>
-                      <span className={"rounded-full px-2 py-0.5 text-xs font-bold " + STATUS_STYLE[o.status]}>
-                        {STATUS_LABEL[o.status]} · {TYPE_LABEL[o.transferType]}
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-extrabold text-ink">{o.transferNumber}</span>
+                      <span className={"rounded-md px-2 py-0.5 text-[10px] font-extrabold " + TYPE_CHIP[o.transferType]}>
+                        {TYPE_LABEL[o.transferType]}
                       </span>
                     </div>
-                    <div className="mt-1 text-xs text-muted">
-                      {o.sourceWarehouseCode} &rarr; {o.destinationWarehouseCode ?? "?"}
-                      {o.vehicleNumber ? ` - vehicle ${o.vehicleNumber}` : ""}
+                    <div className="text-xs">
+                      <span className="font-bold text-ink2">{o.sourceWarehouseCode}</span>
+                      <span className="mx-1.5 text-teal">&rarr;</span>
+                      <span className="font-bold text-ink2">{o.destinationWarehouseCode ?? "?"}</span>
+                      {o.vehicleNumber ? <span className="text-muted2">{` - vehicle ${o.vehicleNumber}`}</span> : null}
                     </div>
-                    <div className="mt-1 text-xs text-muted">
-                      {o.palletCount} pallet(s), {o.totalCartons} cartons
+                    <div className="text-xs text-ink2">
+                      <b className="text-ink">{o.totalCartons}</b> cartons · {o.palletCount} pallet(s)
+                    </div>
+                    <div className="sm:text-right">
+                      <Pill tone={STATUS_TONE[o.status]}>{STATUS_LABEL[o.status]}</Pill>
                     </div>
                   </Link>
                 </li>
@@ -238,20 +254,12 @@ export default function TransfersPage() {
             </ul>
           )}
         </section>
+
+        <Note>
+          HOLD tag → the receiving warehouse gets the material in HOLD status and must re-inspect it before it becomes
+          dispatchable. Pallet ID and batch stay the same — full traceability.
+        </Note>
       </div>
     </>
   );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block text-xs font-semibold text-ink2">
-      {label}
-      <div className="mt-1">{children}</div>
-    </label>
-  );
-}
-
-function inputClass() {
-  return "min-h-[48px] w-full rounded-lg border border-line bg-white px-3 text-sm text-ink2 outline-none focus:border-teal";
 }
