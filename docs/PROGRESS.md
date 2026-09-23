@@ -1005,6 +1005,20 @@ Same session, the "Dusri baat" (second matter) from the same message: "Dashboard
 
 **Free-only confirmation:** no paid action, no infrastructure change - local code/test/docs work only.
 
+## Loop 51 Checkpoint, part 3 - PEN-052: navigation gaps on the live site; PEN-053 recorded
+
+**Asked (Alpesh), after using the live deploy on his phone:** "Maintanence ka ticket kaha se raise kare?? Aur bhi bahut kuchh... check karo apne end se."
+
+**Found and fixed (PEN-052):** phone users had no route to 6 of 11 sections (bottom bar = 5 primary links only; sidebar is desktop-only) - added a "More" sheet listing every section; `/reports` sidebar link 404ed - added a real Reports landing grouping existing report screens; Outward landing still called Transfers "Not built yet" - now a real link; placeholder "•" nav icons replaced with the reference's own glyphs + active-page highlight (`src/lib/nav-items.ts` gained `icon` + `isActiveNav`; `BottomNav`/`SidebarNav` became client components for `usePathname`); section landing pages moved onto a new shared `SectionLink`.
+
+**Found, not fixable in code alone (PEN-053):** production has no Clerk keys, so the live site is view-only - every write is refused and gated reports show restricted. Needs Alpesh's decision and his own Clerk/Cloudflare dashboard steps, plus a user-sync build (PEN-010 webhook was never built). See PEN-053.
+
+**Tests:** `app-shell.spec.ts` +2 (More sheet reaches all 6 non-primary sections and navigates to Maintenance; `/reports` returns 200 with a real In-Out link). `outward-loading-sheets.spec.ts` landing assertion updated from the stale "Not built yet (TASK-009)." to asserting the real `/transfers` link.
+
+**Verification:** `npx tsc --noEmit` clean; full E2E 117 passed / 1 failed / 2 not run - the only failure is the pre-existing `storage-putaway.spec.ts:127` timeout (PEN-050 root cause), unchanged.
+
+**Free-only confirmation:** no paid action, no infrastructure change.
+
 ## Architecture Decisions Log
 | Date | Decision | Status |
 |------|----------|--------|

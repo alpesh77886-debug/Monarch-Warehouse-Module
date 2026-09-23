@@ -161,8 +161,8 @@ test.describe("Outward landing page", () => {
   test("links to Loading Sheets and shows Inter-Warehouse Transfers as not built", async ({ page }) => {
     await page.goto("/outward");
     await expect(page.getByText("Loading Sheets", { exact: true })).toBeVisible();
-    await expect(page.getByText("Inter-Warehouse Transfers")).toBeVisible();
-    await expect(page.getByText("Not built yet (TASK-009).")).toBeVisible();
+    // TASK-009 (Transfers) is built, so this is now a real link, not a placeholder.
+    await expect(page.getByRole("link", { name: /Inter-Warehouse Transfers/ })).toHaveAttribute("href", "/transfers");
     await page.getByRole("link", { name: /Loading Sheets/i }).click();
     await expect(page).toHaveURL(/\/outward\/loading-sheets$/);
   });

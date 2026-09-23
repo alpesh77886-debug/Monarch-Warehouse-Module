@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 // Shared visual primitives matching reference/IBF_FG_Warehouse_Frontend_Design_v5.html
 // (.card/.ch/.cb, .kpi, .pl-*, .btn-*, .note, table th/td). Visual only - no data logic.
@@ -248,6 +249,55 @@ export function linkCls() {
 // Sub-caption line used under bold primary cell values (.sm in the reference).
 export function SubText({ children }: { children: ReactNode }) {
   return <div className="mt-0.5 text-[11px] text-muted2">{children}</div>;
+}
+
+// Section landing-page entry: a large tappable card linking to one screen, or a
+// dashed "not built" placeholder when href is omitted.
+export function SectionLink({
+  href,
+  icon,
+  title,
+  description,
+  accent = "#0D9488",
+}: {
+  href?: string;
+  icon: string;
+  title: string;
+  description: string;
+  accent?: string;
+}) {
+  const body = (
+    <>
+      <span
+        aria-hidden
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl"
+        style={href ? { background: `${accent}1A`, color: accent } : undefined}
+      >
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className={"text-sm font-extrabold " + (href ? "text-navy" : "text-muted")}>{title}</div>
+        <div className="mt-0.5 text-xs text-muted">{description}</div>
+      </div>
+      {href ? (
+        <span aria-hidden className="text-lg text-teal">
+          &rarr;
+        </span>
+      ) : null}
+    </>
+  );
+  return href ? (
+    <Link
+      href={href}
+      className="flex min-h-[72px] items-center gap-3.5 rounded-xl border border-line bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:border-teal"
+    >
+      {body}
+    </Link>
+  ) : (
+    <div className="flex min-h-[72px] items-center gap-3.5 rounded-xl border border-dashed border-line bg-white/60 p-4">
+      {body}
+    </div>
+  );
 }
 
 // Reference ".steps" progress strip. `current` is 1-based; earlier steps render as done.

@@ -75,6 +75,18 @@ test.describe("mobile-first behavior (375x667, below md breakpoint)", () => {
     const links = page.locator("nav.fixed a");
     await expect(links).toHaveCount(5);
   });
+
+  test("the More button reaches every non-primary section (e.g. Maintenance) on a phone", async ({ page }) => {
+    await page.goto("/dashboard");
+    await page.getByRole("button", { name: "More" }).click();
+    const sheet = page.getByRole("dialog", { name: "All sections" });
+    for (const label of ["Hold Management", "Bulk Management", "Transfers", "Maintenance", "Masters", "Reports"]) {
+      await expect(sheet.getByRole("link", { name: label })).toBeVisible();
+    }
+    await sheet.getByRole("link", { name: "Maintenance" }).click();
+    await expect(page).toHaveURL(/\/maintenance$/);
+    await expect(page.getByRole("dialog", { name: "All sections" })).toHaveCount(0);
+  });
 });
 
 test.describe("desktop behavior (1280x800, at lg breakpoint)", () => {
@@ -103,6 +115,14 @@ test.describe("auth boundary (Clerk stub mode - no real keys configured)", () =>
   test("sign-up shows the stub-mode message, not a live Clerk widget", async ({ page }) => {
     await page.goto("/sign-up");
     await expect(page.getByText(/Clerk stub mode/i)).toBeVisible();
+  });
+});
+
+test.describe("Reports landing", () => {
+  test("the sidebar's Reports link resolves to a real page (it used to 404)", async ({ page }) => {
+    const response = await page.goto("/reports");
+    expect(response?.status()).toBe(200);
+    await expect(page.getByRole("link", { name: /In-Out Report/ })).toHaveAttribute("href", "/stock/in-out-summary");
   });
 });
 
