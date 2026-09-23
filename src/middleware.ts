@@ -1,4 +1,4 @@
-import { clerkMiddleware } from "@clerk/nextjs/server";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { assertClerkConfigIsNotPartial, getClerkConfigStatus } from "./lib/clerk-config";
 
@@ -16,8 +16,18 @@ import { assertClerkConfigIsNotPartial, getClerkConfigStatus } from "./lib/clerk
  */
 assertClerkConfigIsNotPartial();
 
+// With real keys, every app page requires a signed-in session (redirects to
+// /sign-in). API routes stay open at this layer because each one already
+// enforces its own permission check server-side and returns JSON 401/403.
+const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)", "/api(.*)"]);
+
 export default getClerkConfigStatus() === "configured"
-  ? clerkMiddleware()
+  ? clerkMiddleware(
+      async (auth, req) => {
+        if (!isPublicRoute(req)) await auth.protect();
+      },
+      { signInUrl: "/sign-in", signUpUrl: "/sign-up" }
+    )
   : function noopMiddleware() {
       return NextResponse.next();
     };

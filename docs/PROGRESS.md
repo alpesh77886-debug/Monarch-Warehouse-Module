@@ -1019,6 +1019,18 @@ Same session, the "Dusri baat" (second matter) from the same message: "Dashboard
 
 **Free-only confirmation:** no paid action, no infrastructure change.
 
+## Loop 51 Checkpoint, part 4 - PEN-053 login code + PEN-054 production database
+
+**Asked (Alpesh), both approved via explicit choice:** seed the live database with the real master data and remove the test fixture; start real login now.
+
+**Production database (PEN-054):** found remote D1 two migrations behind (0012 partial hold release, 0013 notifications) and empty of master data. Applied 0012 + 0013 through the Cloudflare connector (hold tables confirmed empty first), recorded both in `d1_migrations`, and re-compared the full remote schema to a fresh local migrate - identical (40 objects). Built `drizzle/seed/export-sql.ts` (idempotent SQL export of the same seed); verified on a fresh DB, twice. The `verify-*` fixture cleanup SQL is written but NOT run - it drops/recreates the stock_ledger append-only trigger around one DELETE, so it waits for Alpesh's explicit approval of that exact SQL.
+
+**Login (PEN-053):** first-login user provisioning from the real Clerk profile (replaces PEN-010's never-built webhook), role fallback to the Clerk profile when the session token lacks metadata, page protection via `clerkMiddleware` + `auth.protect()` when configured, account block (name, role, sign-out) in the sidebar and phone "More" sheet. Stub mode (no keys) unchanged - the whole E2E suite still runs in it.
+
+**Verification:** `npx tsc --noEmit` clean; unit 359/359 (33 files, +14 in `auth-provisioning-live.test.ts` against real local D1); stub-mode E2E 117 passed / 1 pre-existing putaway timeout / 2 not run; `next build` with real keys; a real OpenNext build run in local workerd with the keys supplied only as Worker secrets (as production will): signed-out page -> 307 to Clerk sign-in, `/sign-in` 200, write API -> 401 JSON; secret key confirmed absent from the built bundle. A hypothesised need for the `nodejs_compat_populate_process_env` compatibility flag was tested with a control run and disproven, so it was not added.
+
+**Free-only confirmation:** no paid action. Production D1 writes (two schema migrations) done on Alpesh's approval; D1 free tier.
+
 ## Architecture Decisions Log
 | Date | Decision | Status |
 |------|----------|--------|

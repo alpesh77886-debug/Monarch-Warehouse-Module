@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_ITEMS, SECTION_LABELS, isActiveNav } from "@/lib/nav-items";
+import { AccountControls } from "./AccountControls";
 
 const SECTIONS = ["main", "operations", "support"] as const;
 
@@ -10,7 +11,7 @@ const SECTIONS = ["main", "operations", "support"] as const;
  * Desktop/tablet sidebar. Hidden below md; icon-only between md and lg;
  * full labels at lg+. Never rendered on phone widths - see BottomNav.
  */
-export function SidebarNav() {
+export function SidebarNav({ authEnabled = false }: { authEnabled?: boolean }) {
   const pathname = usePathname() ?? "";
   return (
     <aside className="hidden bg-gradient-to-b from-navy to-[#0A1F3F] text-[#8FA3C0] md:sticky md:top-0 md:flex md:h-screen md:w-16 md:shrink-0 md:flex-col lg:w-60">
@@ -60,6 +61,11 @@ export function SidebarNav() {
           );
         })}
       </nav>
+      {authEnabled ? (
+        <div className="border-t border-white/10 px-3 py-3">
+          <AccountControls variant="sidebar" />
+        </div>
+      ) : null}
     </aside>
   );
 }

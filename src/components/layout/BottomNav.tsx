@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_ITEMS, SECTION_LABELS, isActiveNav } from "@/lib/nav-items";
+import { AccountControls } from "./AccountControls";
 
 const SECTIONS = ["main", "operations", "support"] as const;
 
@@ -13,7 +14,7 @@ const SECTIONS = ["main", "operations", "support"] as const;
  * Holds/Bulk/Transfers/Maintenance/Masters/Reports are reachable on a
  * phone too (they previously existed only in the desktop sidebar).
  */
-export function BottomNav() {
+export function BottomNav({ authEnabled = false }: { authEnabled?: boolean }) {
   const pathname = usePathname() ?? "";
   const [open, setOpen] = useState(false);
   const primaryItems = NAV_ITEMS.filter((item) => item.primary);
@@ -44,6 +45,11 @@ export function BottomNav() {
                 &times;
               </button>
             </div>
+            {authEnabled ? (
+              <div className="mb-3 rounded-xl border border-line bg-canvas px-3 py-1">
+                <AccountControls variant="sheet" />
+              </div>
+            ) : null}
             {SECTIONS.map((section) => (
               <div key={section} className="mb-3">
                 <div className="mb-1.5 text-[10px] font-extrabold uppercase tracking-widest text-muted2">

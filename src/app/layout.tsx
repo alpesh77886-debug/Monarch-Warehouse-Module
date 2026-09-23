@@ -32,5 +32,11 @@ export default function RootLayout({
     </html>
   );
 
-  return clerkConfigured ? <ClerkProvider>{document}</ClerkProvider> : document;
+  return clerkConfigured ? (
+    <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up" afterSignOutUrl="/sign-in">
+      {document}
+    </ClerkProvider>
+  ) : (
+    document
+  );
 }
