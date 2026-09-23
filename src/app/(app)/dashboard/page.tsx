@@ -137,7 +137,6 @@ export default function DashboardPage() {
   return (
     <>
       <PageHeader
-        breadcrumb="Home / Dashboard"
         title="Warehouse Overview"
         actions={
           <Link

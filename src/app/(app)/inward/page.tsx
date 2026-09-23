@@ -5,10 +5,10 @@ import { SectionLink } from "@/components/ui";
 export default function InwardLandingPage() {
   return (
     <>
-      <PageHeader breadcrumb="Operations / Inward" title="Inward" />
+      <PageHeader title="Inward" />
       <div className="flex flex-col gap-3 bg-canvas p-4 sm:p-6">
-        <SectionLink href="/inward/receiving-sheets" icon="⇩" title="Receiving Sheets" description="Digital receiving sheet - create, add pallets, dual-confirm, lock." accent="#0D9488" />
-        <SectionLink icon="⇲" title="3PL Inward (Other Plant)" description="Not built yet." />
+        <SectionLink href="/inward/receiving-sheets" icon="clipboard" title="Receiving Sheets" description="Digital receiving sheet - create, add pallets, dual-confirm, lock." accent="#0D9488" />
+        <SectionLink icon="building" title="3PL Inward (Other Plant)" description="Not built yet." />
       </div>
     </>
   );

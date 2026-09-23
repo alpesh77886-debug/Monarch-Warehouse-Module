@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Icon } from "@/components/icons";
 import {
   Card,
   Pill,
@@ -92,7 +93,6 @@ export default function StockLedgerPage() {
   return (
     <>
       <PageHeader
-        breadcrumb="Support / Stock Ledger"
         title="Stock Ledger"
         actions={
           <a
@@ -103,7 +103,7 @@ export default function StockLedgerPage() {
             }
             className={btn("primary")}
           >
-            ⇩ Export (DSR format)
+            <Icon name="inward" size={18} strokeWidth={2.2} /> Export (DSR format)
           </a>
         }
       />

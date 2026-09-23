@@ -35,6 +35,20 @@ const config: Config = {
       fontFamily: {
         sans: ["var(--font-plus-jakarta-sans)", "system-ui", "sans-serif"],
       },
+      keyframes: {
+        "sheet-up": {
+          from: { transform: "translateY(24px)", opacity: "0" },
+          to: { transform: "translateY(0)", opacity: "1" },
+        },
+        "fade-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+      },
+      animation: {
+        "sheet-up": "sheet-up 220ms cubic-bezier(.2,.8,.2,1)",
+        "fade-in": "fade-in 180ms ease-out",
+      },
     },
   },
   plugins: [],

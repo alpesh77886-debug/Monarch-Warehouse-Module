@@ -137,7 +137,6 @@ export default function LoadingSheetsPage() {
   return (
     <>
       <PageHeader
-        breadcrumb="Operations / Dispatch & Loading"
         title="Loading Sheets"
         actions={<Pill tone="ok">only OK / available stock selectable</Pill>}
       />

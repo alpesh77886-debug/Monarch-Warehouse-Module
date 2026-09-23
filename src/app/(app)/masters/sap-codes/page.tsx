@@ -33,7 +33,7 @@ export default function SapWarehouseMasterPage() {
 
   return (
     <>
-      <PageHeader breadcrumb="Home / Masters / SAP Warehouse Master" title="SAP Warehouse Master" />
+      <PageHeader title="SAP Warehouse Master" />
       <div className="p-4 sm:p-6">
         {state === "loading" ? (
           <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">

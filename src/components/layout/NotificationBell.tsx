@@ -118,7 +118,7 @@ export function NotificationBell() {
         type="button"
         aria-label="Notifications"
         onClick={() => setOpen((v) => !v)}
-        className="relative flex h-11 w-11 items-center justify-center rounded-full bg-white text-navy shadow-card ring-1 ring-line"
+        className="relative flex h-12 w-12 items-center justify-center rounded-full bg-white text-navy shadow-card ring-1 ring-line"
       >
         <BellIcon />
         {unreadCount > 0 ? (

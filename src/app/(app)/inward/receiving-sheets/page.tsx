@@ -167,7 +167,7 @@ export default function ReceivingSheetsPage() {
 
   return (
     <>
-      <PageHeader breadcrumb="Operations / Receiving Sheet" title="Receiving Sheets" />
+      <PageHeader title="Receiving Sheets" />
       <div className="flex flex-col gap-5 bg-canvas p-4 sm:p-6">
         <Steps steps={["Sheet Details", "Pallet Entry", "Dual Confirmation"]} current={1} />
 

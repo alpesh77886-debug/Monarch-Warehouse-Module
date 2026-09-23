@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Icon } from "@/components/icons";
 import {
   Card,
   Field,
@@ -197,7 +198,7 @@ export default function TransferOrderDetailPage() {
   if (loadState === "loading") {
     return (
       <>
-        <PageHeader breadcrumb="Operations / Transfers" title="Loading..." />
+        <PageHeader title="Loading..." />
         <div className="bg-canvas p-4 sm:p-6">
           <StateBox>Loading...</StateBox>
         </div>
@@ -207,7 +208,7 @@ export default function TransferOrderDetailPage() {
   if (loadState === "error" || !order) {
     return (
       <>
-        <PageHeader breadcrumb="Operations / Transfers" title="Not found" />
+        <PageHeader title="Not found" />
         <div className="bg-canvas p-4 sm:p-6">
           <StateBox tone="danger">{loadError}</StateBox>
         </div>
@@ -226,7 +227,6 @@ export default function TransferOrderDetailPage() {
   return (
     <>
       <PageHeader
-        breadcrumb="Operations / Transfers / Detail"
         title={order.transferNumber}
         actions={
           <Pill tone={statusTone(order.status)}>
@@ -241,7 +241,7 @@ export default function TransferOrderDetailPage() {
               <div className="text-[10px] font-bold uppercase tracking-wide text-muted2">Source</div>
               <div className="text-base font-extrabold text-ink">{order.sourceWarehouseCode ?? "?"}</div>
             </div>
-            <div className="text-2xl text-teal">⇄</div>
+            <div className="text-teal"><Icon name="transfers" size={26} strokeWidth={2.2} /></div>
             <div className="text-right">
               <div className="text-[10px] font-bold uppercase tracking-wide text-muted2">Destination</div>
               <div className="text-base font-extrabold text-ink">

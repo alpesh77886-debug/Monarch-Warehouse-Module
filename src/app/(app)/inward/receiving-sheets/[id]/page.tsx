@@ -213,7 +213,7 @@ export default function ReceivingSheetDetailPage() {
   if (loadState === "loading") {
     return (
       <>
-        <PageHeader breadcrumb="Operations / Receiving Sheet" title="Loading..." />
+        <PageHeader title="Loading..." />
         <div className="bg-canvas p-4 sm:p-6">
           <StateBox>Loading...</StateBox>
         </div>
@@ -224,7 +224,7 @@ export default function ReceivingSheetDetailPage() {
   if (loadState === "error" || !sheet) {
     return (
       <>
-        <PageHeader breadcrumb="Operations / Receiving Sheet" title="Not found" />
+        <PageHeader title="Not found" />
         <div className="bg-canvas p-4 sm:p-6">
           <StateBox tone="danger">{loadError}</StateBox>
         </div>
@@ -246,7 +246,6 @@ export default function ReceivingSheetDetailPage() {
   return (
     <>
       <PageHeader
-        breadcrumb="Operations / Receiving Sheet / Detail"
         title={sheet.sheetNumber}
         actions={<StatusPill status={sheet.status} />}
       />
@@ -453,7 +452,7 @@ export default function ReceivingSheetDetailPage() {
           >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <ConfirmPanel
-                title="⇱ Packing side"
+                title="Packing side"
                 confirmedAt={sheet.packingConfirmedAt}
                 button={
                   <button
@@ -467,7 +466,7 @@ export default function ReceivingSheetDetailPage() {
                 }
               />
               <ConfirmPanel
-                title="⇲ Warehouse side"
+                title="Warehouse side"
                 confirmedAt={sheet.warehouseConfirmedAt}
                 button={
                   <button

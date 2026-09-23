@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Icon } from "@/components/icons";
 import {
   Card,
   KpiCard,
@@ -90,11 +91,10 @@ export default function InOutSummaryPage() {
   return (
     <>
       <PageHeader
-        breadcrumb="Reports / IN-OUT Summary"
         title="In-Out Summary"
         actions={
           <a href="/api/reports/in-out-summary/export" className={btn("primary")}>
-            ⇩ Export (summary + full detail)
+            <Icon name="inward" size={18} strokeWidth={2.2} /> Export (summary + full detail)
           </a>
         }
       />

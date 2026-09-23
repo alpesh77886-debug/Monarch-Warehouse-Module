@@ -110,7 +110,7 @@ export default function LocationsPage() {
 
   return (
     <>
-      <PageHeader breadcrumb="Home / Storage / Locations" title="Locations" />
+      <PageHeader title="Locations" />
       <div className="flex flex-col gap-6 p-4 sm:p-6">
         <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
           <h2 className="text-sm font-bold text-navy">New location</h2>

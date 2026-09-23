@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_ITEMS, SECTION_LABELS, isActiveNav } from "@/lib/nav-items";
+import { Icon } from "@/components/icons";
 import { AccountControls } from "./AccountControls";
 
 const SECTIONS = ["main", "operations", "support"] as const;
@@ -50,9 +51,7 @@ export function SidebarNav({ authEnabled = false }: { authEnabled?: boolean }) {
                     aria-current={active ? "page" : undefined}
                   >
                     {active ? <span className="absolute left-0 h-[22px] w-[3.5px] rounded-r bg-[#2DD4BF]" /> : null}
-                    <span aria-hidden className="w-5 text-center text-[15px]">
-                      {item.icon}
-                    </span>
+                    <Icon name={item.icon} size={19} strokeWidth={active ? 2.2 : 1.8} className="shrink-0" />
                     <span className="hidden lg:inline">{item.label}</span>
                   </Link>
                 );

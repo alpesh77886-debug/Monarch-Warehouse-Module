@@ -344,7 +344,7 @@ export default function HoldsPage() {
 
   return (
     <>
-      <PageHeader breadcrumb="Operations / Hold Tracking" title="Hold Management" />
+      <PageHeader title="Hold Management" />
       <div className="flex flex-col gap-5 bg-canvas p-4 sm:p-6">
         {loadState === "loading" ? (
           <StateBox>Loading...</StateBox>

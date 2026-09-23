@@ -208,7 +208,7 @@ export default function LoadingSheetDetailPage() {
   if (loadState === "loading") {
     return (
       <>
-        <PageHeader breadcrumb="Operations / Dispatch & Loading" title="Loading..." />
+        <PageHeader title="Loading..." />
         <div className="bg-canvas p-4 sm:p-6">
           <StateBox>Loading...</StateBox>
         </div>
@@ -218,7 +218,7 @@ export default function LoadingSheetDetailPage() {
   if (loadState === "error" || !sheet) {
     return (
       <>
-        <PageHeader breadcrumb="Operations / Dispatch & Loading" title="Not found" />
+        <PageHeader title="Not found" />
         <div className="bg-canvas p-4 sm:p-6">
           <StateBox tone="danger">{loadError}</StateBox>
         </div>
@@ -241,7 +241,6 @@ export default function LoadingSheetDetailPage() {
   return (
     <>
       <PageHeader
-        breadcrumb="Operations / Dispatch & Loading / Detail"
         title={sheet.loadingSheetNumber}
         actions={
           <Pill tone={statusTone(sheet.status)}>

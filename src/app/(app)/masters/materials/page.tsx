@@ -123,7 +123,7 @@ export default function MaterialMasterPage() {
 
   return (
     <>
-      <PageHeader breadcrumb="Home / Masters / Material Master" title="Material Master" />
+      <PageHeader title="Material Master" />
       <div className="flex flex-col gap-6 p-4 sm:p-6">
         <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
           <h2 className="text-sm font-bold text-navy">New material</h2>

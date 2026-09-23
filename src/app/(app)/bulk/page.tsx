@@ -122,7 +122,7 @@ export default function BulkManagementPage() {
 
   return (
     <>
-      <PageHeader breadcrumb="Operations / Bulk Tracking" title="Bulk Management" />
+      <PageHeader title="Bulk Management" />
       <div className="flex flex-col gap-5 bg-canvas p-4 sm:p-6">
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <KpiCard color="#7C3AED" label="Pending repack" value={bulkPallets.length} sub="bulk pallets" />

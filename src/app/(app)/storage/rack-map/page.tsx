@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, Pill, StateBox, inputClass } from "@/components/ui";
+import { Icon } from "@/components/icons";
 import { rackMapCellColor, RACK_MAP_COLOR_LABEL, type RackMapColor } from "@/lib/rack-map";
 
 type Location = {
@@ -149,7 +150,6 @@ export default function RackMapPage() {
   return (
     <>
       <PageHeader
-        breadcrumb="Operations / Rack Map"
         title={currentColdRoom ? `Rack Map — ${currentColdRoom}` : "Rack Map"}
         actions={
           coldRooms.length > 0 ? (
@@ -189,7 +189,7 @@ export default function RackMapPage() {
         ) : (
           <>
             <div className="relative">
-              <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-lg text-muted2">⌕</span>
+              <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted2"><Icon name="search" size={18} /></span>
               <input
                 className={inputClass() + " pl-10"}
                 placeholder="Search material, batch, or pallet number..."

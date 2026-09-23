@@ -106,7 +106,7 @@ export default function WarehouseMasterPage() {
 
   return (
     <>
-      <PageHeader breadcrumb="Home / Masters / Warehouse Master" title="Warehouse Master" />
+      <PageHeader title="Warehouse Master" />
       <div className="flex flex-col gap-6 p-4 sm:p-6">
         <section className="rounded-xl border border-line bg-white p-4 shadow-card sm:p-6">
           <h2 className="text-sm font-bold text-navy">New warehouse</h2>

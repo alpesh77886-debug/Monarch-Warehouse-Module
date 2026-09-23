@@ -33,7 +33,7 @@ export default function StatusMasterPage() {
 
   return (
     <>
-      <PageHeader breadcrumb="Home / Masters / Status Master" title="Status Master" />
+      <PageHeader title="Status Master" />
       <div className="p-4 sm:p-6">
         {state === "loading" ? (
           <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">

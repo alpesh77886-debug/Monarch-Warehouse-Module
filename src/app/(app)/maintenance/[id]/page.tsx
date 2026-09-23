@@ -104,7 +104,7 @@ export default function MaintenanceTicketDetailPage() {
   if (loadState === "loading") {
     return (
       <>
-        <PageHeader breadcrumb="Support / Maintenance" title="Loading..." />
+        <PageHeader title="Loading..." />
         <div className="bg-canvas p-4 sm:p-6">
           <StateBox>Loading...</StateBox>
         </div>
@@ -114,7 +114,7 @@ export default function MaintenanceTicketDetailPage() {
   if (loadState === "error" || !ticket) {
     return (
       <>
-        <PageHeader breadcrumb="Support / Maintenance" title="Not found" />
+        <PageHeader title="Not found" />
         <div className="bg-canvas p-4 sm:p-6">
           <StateBox tone="danger">{loadError}</StateBox>
         </div>
@@ -144,7 +144,6 @@ export default function MaintenanceTicketDetailPage() {
   return (
     <>
       <PageHeader
-        breadcrumb="Support / Maintenance / Ticket"
         title={ticket.ticketNumber}
         actions={
           <Pill tone={statusTone(ticket.status)}>

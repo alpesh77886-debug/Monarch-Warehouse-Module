@@ -7,12 +7,12 @@ import { SectionLink } from "@/components/ui";
 export default function MastersLandingPage() {
   return (
     <>
-      <PageHeader breadcrumb="Support / Masters" title="Masters" />
+      <PageHeader title="Masters" />
       <div className="flex flex-col gap-3 bg-canvas p-4 sm:p-6">
-        <SectionLink href="/masters/materials" icon="⬡" title="Material Master" description="Create and manage FG material codes." accent="#0D9488" />
-        <SectionLink href="/masters/warehouses" icon="⌂" title="Warehouse Master" description="Create and manage warehouse locations." accent="#2563EB" />
-        <SectionLink href="/masters/sap-codes" icon="#" title="SAP Warehouse Master" description="45 FG-relevant SAP storage location codes (read-only)." accent="#475569" />
-        <SectionLink href="/masters/statuses" icon="◉" title="Status Master" description="The 10 locked pallet/material status values (read-only)." accent="#7C3AED" />
+        <SectionLink href="/masters/materials" icon="package" title="Material Master" description="Create and manage FG material codes." accent="#0D9488" />
+        <SectionLink href="/masters/warehouses" icon="building" title="Warehouse Master" description="Create and manage warehouse locations." accent="#2563EB" />
+        <SectionLink href="/masters/sap-codes" icon="hash" title="SAP Warehouse Master" description="45 FG-relevant SAP storage location codes (read-only)." accent="#475569" />
+        <SectionLink href="/masters/statuses" icon="tag" title="Status Master" description="The 10 locked pallet/material status values (read-only)." accent="#7C3AED" />
       </div>
     </>
   );

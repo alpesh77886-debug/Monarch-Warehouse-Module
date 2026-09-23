@@ -102,7 +102,7 @@ export default function PutawayPage() {
 
   return (
     <>
-      <PageHeader breadcrumb="Home / Storage / Putaway & Move" title="Putaway & Move" />
+      <PageHeader title="Putaway & Move" />
       <div className="flex flex-col gap-6 p-4 sm:p-6">
         {state === "loading" ? (
           <div className="rounded-xl border border-line bg-white p-6 text-sm text-muted shadow-card">

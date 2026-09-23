@@ -135,7 +135,7 @@ export default function TransfersPage() {
 
   return (
     <>
-      <PageHeader breadcrumb="Operations / Transfers" title="Inter-Warehouse Transfers" />
+      <PageHeader title="Inter-Warehouse Transfers" />
       <div className="flex flex-col gap-5 bg-canvas p-4 sm:p-6">
         {loadState === "ready" && orders.length > 0 ? (
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

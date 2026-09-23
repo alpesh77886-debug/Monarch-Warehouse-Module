@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { Icon, IconChip, type IconName } from "@/components/icons";
 
 // Shared visual primitives matching reference/IBF_FG_Warehouse_Frontend_Design_v5.html
 // (.card/.ch/.cb, .kpi, .pl-*, .btn-*, .note, table th/td). Visual only - no data logic.
@@ -261,40 +262,45 @@ export function SectionLink({
   accent = "#0D9488",
 }: {
   href?: string;
-  icon: string;
+  icon: IconName;
   title: string;
   description: string;
   accent?: string;
 }) {
   const body = (
     <>
-      <span
-        aria-hidden
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl"
-        style={href ? { background: `${accent}1A`, color: accent } : undefined}
-      >
-        {icon}
-      </span>
+      {href ? (
+        <IconChip name={icon} from={`color-mix(in srgb, ${accent} 70%, white)`} to={accent} size={48} iconSize={22} />
+      ) : (
+        <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-line/70 text-muted2">
+          <Icon name={icon} size={22} />
+        </span>
+      )}
       <div className="min-w-0 flex-1">
-        <div className={"text-sm font-extrabold " + (href ? "text-navy" : "text-muted")}>{title}</div>
-        <div className="mt-0.5 text-xs text-muted">{description}</div>
+        <div className={"text-[14.5px] font-extrabold tracking-tight " + (href ? "text-navy" : "text-muted")}>{title}</div>
+        <div className="mt-0.5 text-xs leading-relaxed text-muted">{description}</div>
       </div>
       {href ? (
-        <span aria-hidden className="text-lg text-teal">
-          &rarr;
+        <span
+          aria-hidden
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-canvas text-muted transition group-hover:bg-teal group-hover:text-white"
+        >
+          <Icon name="chevronRight" size={18} strokeWidth={2.4} />
         </span>
-      ) : null}
+      ) : (
+        <Pill tone="neutral">Coming soon</Pill>
+      )}
     </>
   );
   return href ? (
     <Link
       href={href}
-      className="flex min-h-[72px] items-center gap-3.5 rounded-xl border border-line bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:border-teal"
+      className="group flex min-h-[80px] items-center gap-4 rounded-2xl bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,.05),0_10px_24px_-14px_rgba(15,23,42,.25)] ring-1 ring-[#E6ECF3] transition duration-150 hover:-translate-y-0.5 hover:ring-teal/50 active:scale-[0.99]"
     >
       {body}
     </Link>
   ) : (
-    <div className="flex min-h-[72px] items-center gap-3.5 rounded-xl border border-dashed border-line bg-white/60 p-4">
+    <div className="flex min-h-[80px] items-center gap-4 rounded-2xl border border-dashed border-[#CBD5E1] bg-white/60 p-4">
       {body}
     </div>
   );

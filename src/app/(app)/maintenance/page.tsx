@@ -133,7 +133,7 @@ export default function MaintenancePage() {
 
   return (
     <>
-      <PageHeader breadcrumb="Support / Maintenance" title="Warehouse Maintenance Tickets" />
+      <PageHeader title="Warehouse Maintenance Tickets" />
       <div className="flex flex-col gap-5 bg-canvas p-4 sm:p-6">
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <KpiCard color="#475569" label="Open issues" value={openTickets.length} sub="not closed" />

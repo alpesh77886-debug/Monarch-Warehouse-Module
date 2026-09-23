@@ -1031,6 +1031,20 @@ Same session, the "Dusri baat" (second matter) from the same message: "Dashboard
 
 **Free-only confirmation:** no paid action. Production D1 writes (two schema migrations) done on Alpesh's approval; D1 free tier.
 
+## Window 25 - Premium navigation + Back button (UI only)
+
+**Asked (Alpesh):** the "More" tiles looked raw; wanted a premium, mature look with real button-style tiles; no Back option anywhere; fix all navigation/look issues.
+
+**Done:** unicode glyph icons replaced app-wide by an inline SVG icon set (`src/components/icons.tsx`, no new dependency); per-module gradient icon chips on the More sheet tiles, section landing cards, and sidebar; More sheet redesigned (elevated tiles, active ring, navy account card with a full-width Sign Out button, Escape/body-scroll lock); bottom bar with an active pill; `PageHeader` now derives a Back button (one level up the route tree, sections go to Dashboard - the architecture blueprint's Back control) and a clickable Home > Section > Page breadcrumb from the route, so the 27 hand-written breadcrumb strings were removed; branded sign-in/sign-up screens. All header/sheet touch targets are >=48px (mobile contract).
+
+**Tests:** `tests/unit/nav-items.test.ts` (8, Back target + crumbs). `app-shell.spec.ts`: header assertion moved to the breadcrumb nav, +3 (Back walks /stock/ledger -> /stock -> /dashboard; breadcrumb link navigates; Back/crumb links >=48x48 at 360px).
+
+**Verification:** `npx tsc --noEmit` clean; unit 367/367; `next build` OK; stub-mode E2E 120 passed / 1 failed - the failure is `storage-putaway.spec.ts:127`, re-run against a build of the previous commit and failing identically there (pre-existing, not this change); screenshots checked at 320/360px and 1280px, no horizontal scroll at 320.
+
+**Pre-existing, not changed here:** `npm run lint` has no ESLint config (prompts interactively; CI has no lint step); the harness package-integrity check (entities contract hash mismatch) and static-guard (transfer-orders detail route auth heuristic) fail identically on the previous commit.
+
+**Free-only confirmation:** no paid action.
+
 ## Architecture Decisions Log
 | Date | Decision | Status |
 |------|----------|--------|

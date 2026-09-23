@@ -65,7 +65,7 @@ export default function StockAgingPage() {
 
   return (
     <>
-      <PageHeader breadcrumb="Home / Stock / Stock Aging" title="Stock Aging (FIFO)" />
+      <PageHeader title="Stock Aging (FIFO)" />
       <div className="flex flex-col gap-4 p-4 sm:p-6">
         <p className="text-xs text-muted">
           Currently OK (dispatchable) stock, grouped by batch and aged from its real production date - the

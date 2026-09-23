@@ -35,9 +35,45 @@ test.describe("dashboard shell page", () => {
   test("loads and shows the page header", async ({ page }) => {
     const response = await page.goto("/dashboard");
     expect(response?.ok()).toBe(true);
-    await expect(page.getByText("Home / Dashboard")).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toContainText("Home");
     await expect(page.getByRole("heading", { name: "Warehouse Overview" })).toBeVisible();
     await expect(page.getByRole("link", { name: "+ New Receiving Sheet" })).toBeVisible();
+    // Dashboard is the root - nothing to go back to.
+    await expect(page.getByRole("link", { name: "Back" })).toHaveCount(0);
+  });
+});
+
+test.describe("back navigation and breadcrumbs", () => {
+  test("Back walks up the route tree: sub-screen -> section -> Dashboard", async ({ page }) => {
+    await page.goto("/stock/ledger");
+    await page.getByRole("link", { name: "Back" }).click();
+    await expect(page).toHaveURL(/\/stock$/);
+    await page.getByRole("link", { name: "Back" }).click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+  });
+
+  test("breadcrumb levels are clickable links", async ({ page }) => {
+    await page.goto("/masters/materials");
+    const crumbs = page.getByRole("navigation", { name: "Breadcrumb" });
+    await expect(crumbs.getByText("Material Master")).toHaveAttribute("aria-current", "page");
+    await crumbs.getByRole("link", { name: "Masters" }).click();
+    await expect(page).toHaveURL(/\/masters$/);
+  });
+
+  test("Back and breadcrumb links are >=48px touch targets on a phone", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 740 });
+    await page.goto("/stock/ledger");
+    const targets = [
+      page.getByRole("link", { name: "Back" }),
+      ...(await page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link").all()),
+    ];
+    for (const target of targets) {
+      const box = await target.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.height).toBeGreaterThanOrEqual(48);
+      expect(box!.width).toBeGreaterThanOrEqual(48);
+    }
+    expect(await hasNoHorizontalScroll(page)).toBe(true);
   });
 });
 
