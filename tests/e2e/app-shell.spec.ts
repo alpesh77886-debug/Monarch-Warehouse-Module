@@ -21,11 +21,13 @@ async function hasNoHorizontalScroll(page: Page) {
 }
 
 test.describe("homepage", () => {
-  test("loads and shows the scaffold-stage heading", async ({ page }) => {
-    const response = await page.goto("/");
-    expect(response?.ok()).toBe(true);
-    await expect(page.getByRole("heading", { name: "IBF FG Warehouse Module" })).toBeVisible();
-    await expect(page.getByText("Scaffold stage")).toBeVisible();
+  test("redirects to the Dashboard", async ({ page }) => {
+    // Next.js's server-side redirect() surfaces its 307 as page.goto's own
+    // response, not the final /dashboard response - so this checks the
+    // resulting URL and content, not response.ok() on that intermediate hop.
+    await page.goto("/");
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page.getByRole("heading", { name: "Warehouse Overview" })).toBeVisible();
   });
 });
 

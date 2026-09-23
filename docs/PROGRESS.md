@@ -993,6 +993,18 @@ Same session, the "Dusri baat" (second matter) from the same message: "Dashboard
 
 **Free-only confirmation:** no paid action, no infrastructure change - local code/test/docs work only.
 
+## Loop 51 Checkpoint, part 2 - PEN-051: root redirects to Dashboard
+
+**Asked (Alpesh):** after opening the freshly-deployed live URL's bare root and seeing the old scaffold-stage placeholder text, "root ko dashboard pe redirect kardo."
+
+**Built:** `src/app/page.tsx` replaced with a one-line server-side `redirect("/dashboard")` (Next.js `next/navigation`), removing the "Scaffold stage - application screens are not implemented yet." placeholder page entirely. `/dashboard` needs no Clerk session in the current stub-mode middleware (confirmed in `src/middleware.ts` before making this change), so the redirect lands cleanly for every visitor.
+
+**Test updated:** `tests/e2e/app-shell.spec.ts`'s homepage test now asserts the final URL is `/dashboard` and the real "Warehouse Overview" heading renders, instead of the old placeholder heading/text (which no longer exists to assert on).
+
+**Verification:** `npx tsc --noEmit` clean; `npm run build` clean; unit 345/345; `app-shell.spec.ts` 9/9 (full file re-run, not just the changed test).
+
+**Free-only confirmation:** no paid action, no infrastructure change - local code/test/docs work only.
+
 ## Architecture Decisions Log
 | Date | Decision | Status |
 |------|----------|--------|
