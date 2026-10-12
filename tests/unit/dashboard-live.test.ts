@@ -235,7 +235,9 @@ beforeAll(async () => {
     holdReason: "High Temperature",
     placedById: FIXTURE_USER_ID,
     placedByDepartment: "QC",
-    placedAt: new Date().toISOString(),
+    // Oldest possible, so it always ranks in "Top Aged Holds" (top 5 by
+    // age) whatever other open holds the shared local DB holds.
+    placedAt: "2000-01-01T00:00:00.000Z",
     status: "ACTIVE",
   });
   await db.insert(holdPallets).values({ id: crypto.randomUUID(), holdId, palletId: holdPalletId });

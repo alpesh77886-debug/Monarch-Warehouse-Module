@@ -1045,6 +1045,33 @@ Same session, the "Dusri baat" (second matter) from the same message: "Dashboard
 
 **Free-only confirmation:** no paid action.
 
+## Window 26 - Adversarial audit: negative tests, arithmetic, bug fixes
+
+**Asked (Alpesh):** negative-test the module so far (e.g. missing material cannot be loaded, QC-hold material cannot be loaded), check it is logically and mathematically right, find and repair bugs.
+
+**Method:** read every mutating route and business-rule module against the 20 locked invariants; wrote `tests/unit/adversarial-audit-live.test.ts` (31 cases, real route handlers on the real local D1 file, fixtures unique per run). Before any fix the run was 15 pass / 16 fail - every failure a bug found by reading the code. The two lock fixes were also proven failing on the original code (1200kg pallet locked; two pallets created with one number).
+
+**Fixed (each with a failing-first test):**
+- Receiving-sheet lock crashed on real Cloudflare D1: `planReceivingSheetLock` used synchronous `.all()`, which returns a Promise on D1, so the final confirmation of every sheet would fail in production. Now awaited. New `tests/unit/d1-driver-receiving-lock.test.ts` runs the lock on a real D1 binding (Miniflare) and reproduced the exact `object is not iterable` crash before the fix.
+- Same new pallet number twice on one sheet created two pallets with one number and checked the weight limit per row (60+60 cartons x 10kg = 1200kg passed a 1000kg limit). Rows are now merged into one pallet with INV-007 on the total and a running ledger balance.
+- Batch numbers with impossible days (day 00, day 35, 30 February) and non-dates in the sheet/loading/transfer `date` field were accepted; both now refused (production date is the FIFO basis; document numbers are built from the date).
+- A DRAFT sheet could be edited to BULK without a bulk reason (and a duplicate edit gave a 500); now 422 / 409.
+- Putaway/move: a DISPATCHED/IN_TRANSIT/SCRAP pallet, or one loaded on a transfer, could be put back in a rack; a pallet could be racked in another warehouse's location, silently changing its warehouse without a transfer. Both refused.
+- One pallet could be booked on two open loading sheets, or on a loading sheet and a transfer at once (the second vehicle then stuck at dispatch). Picking now refuses a pallet already on an open document (409); a duplicate pick on the same sheet is a 409, not a 500. Same check on bulk repack.
+- FIFO counted older pallets already picked onto a sheet (this one or another) as "still available", forcing false override reasons. Booked pallets are now excluded.
+- Transfers wrote quantity 0 to the ledger, so In-Out Summary and the dashboard flow never showed them. TRANSFER_OUT now records -cartons at the source and TRANSFER_IN +cartons at the destination (flow document Flow 4 Step 6).
+- A hold could list a pallet that does not carry the hold's batch (its ledger rows then named the wrong batch); refused.
+- Dashboard dropped a partly released hold entirely from On Hold and counted released pallets' cartons; it now counts every hold with an ACTIVE pallet and only those pallets' cartons.
+- FIFO Aging and Dashboard built `IN (...)` lists from unbounded id lists; D1 allows 100 bound parameters per query, so FIFO Aging would break once more than 100 sheets were dispatched. Replaced with joins.
+
+**Test-data fixes (expected results unchanged):** `loading-sheet-live` now un-books its reused fixture pallets from sheets earlier runs left open; `dashboard-live`'s fixture hold is dated 2000-01-01 so it always ranks in Top Aged Holds.
+
+**Decisions needed (recorded, not built):** PEN-055 (no QC release action for fresh stock - blocks the normal dispatch flow), PEN-056, PEN-057, PEN-058, PEN-059; recorded: PEN-060, PEN-061.
+
+**Verification:** `npx tsc --noEmit` clean; unit/live 399/399 (36 files); `next build` OK; stub-mode E2E 120 passed / 1 failed - the same pre-existing `storage-putaway.spec.ts:127`. Harness: contract guard, protected integrity, YAML lexical pass; static-guard and package-integrity report the same items as on the previous commit.
+
+**Free-only confirmation:** no paid action.
+
 ## Architecture Decisions Log
 | Date | Decision | Status |
 |------|----------|--------|

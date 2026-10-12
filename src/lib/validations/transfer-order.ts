@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isoDateString } from "./date";
 import { TRANSFER_TYPES } from "../business-rules/transfer-order";
 
 /**
@@ -6,7 +7,7 @@ import { TRANSFER_TYPES } from "../business-rules/transfer-order";
  * ENTITY-012 field-for-field.
  */
 export const transferOrderCreateSchema = z.object({
-  date: z.string().trim().min(1, "Date is required."),
+  date: isoDateString,
   sourceWarehouseId: z.string().trim().min(1, "Source warehouse is required."),
   destinationWarehouseId: z.string().trim().min(1, "Destination warehouse is required."),
   transferType: z.enum(TRANSFER_TYPES),

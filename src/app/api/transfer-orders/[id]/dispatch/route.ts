@@ -119,11 +119,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           batchId: line.batchId,
           palletId: pallet.id,
           locationId: pallet.currentLocationId,
+          // Flow 4 Step 6: "Stock deducted from Limbasi, added to destination"
+          // - the cartons leave the source warehouse's stock here.
           warehouseId: pallet.currentWarehouseId,
-          qtyChange: 0,
-          qtyAfter: pallet.totalCartons,
-          weightChangeKg: 0,
-          weightAfterKg: pallet.totalWeightKg,
+          qtyChange: -pallet.totalCartons,
+          qtyAfter: 0,
+          weightChangeKg: -pallet.totalWeightKg,
+          weightAfterKg: 0,
           statusBefore: ledgerEntry.statusBefore,
           statusAfter: ledgerEntry.statusAfter,
           referenceType: "TRANSFER_ORDER",

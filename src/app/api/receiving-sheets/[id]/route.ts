@@ -5,6 +5,7 @@ import { receivingSheets, receivingSheetPallets, materials } from "../../../../.
 import { requirePermission } from "@/lib/auth";
 import { receivingSheetUpdateSchema } from "@/lib/validations/receiving-sheet";
 import { validateBatchNumberFormat } from "@/lib/business-rules/receiving-sheet";
+import { assertBulkReasonConsistency } from "@/lib/business-rules/bulk";
 import {
   UnauthorizedError,
   ForbiddenError,
@@ -125,7 +126,26 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       }
     }
 
-    await db.update(receivingSheets).set(parsed.data).where(eq(receivingSheets.id, params.id));
+    // Validate the sheet as it will be after this edit, not just the fields
+    // sent: switching to BULK needs a reason, switching back clears it.
+    const nextStatus = parsed.data.defaultPalletStatus ?? existing.defaultPalletStatus;
+    const nextBulkReason =
+      parsed.data.bulkReason !== undefined
+        ? parsed.data.bulkReason
+        : nextStatus === "BULK"
+          ? existing.bulkReason
+          : null;
+    assertBulkReasonConsistency(nextStatus, nextBulkReason);
+
+    const updates = { ...parsed.data, bulkReason: nextBulkReason };
+    try {
+      await db.update(receivingSheets).set(updates).where(eq(receivingSheets.id, params.id));
+    } catch (e) {
+      if (e instanceof Error && /UNIQUE constraint failed/i.test(e.message)) {
+        throw new ConflictError("Sheet already exists for this material, batch, and shift.");
+      }
+      throw e;
+    }
     const [updated] = await db.select().from(receivingSheets).where(eq(receivingSheets.id, params.id));
     return NextResponse.json({ receivingSheet: updated });
   } catch (err) {

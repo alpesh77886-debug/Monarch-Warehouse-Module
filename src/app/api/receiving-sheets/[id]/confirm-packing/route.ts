@@ -77,7 +77,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     // confirmed to have matched - see planReceivingSheetLock's own doc
     // comment for why this ordering also closes a latent
     // double-materialization race the old code had.
-    const materialized = nextStatus === "LOCKED" ? planReceivingSheetLock(db, sheet.id, currentUserId) : null;
+    const materialized = nextStatus === "LOCKED" ? await planReceivingSheetLock(db, sheet.id, currentUserId) : null;
 
     const guardResult = await db
       .update(receivingSheets)

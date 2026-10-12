@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isoDateString } from "./date";
 import { CARTON_CONDITIONS } from "../business-rules/receiving-sheet";
 import { BULK_REASONS } from "../business-rules/bulk";
 
@@ -11,7 +12,7 @@ import { BULK_REASONS } from "../business-rules/bulk";
  * shared with the lock-time production-date derivation).
  */
 export const receivingSheetCreateSchema = z.object({
-  date: z.string().trim().min(1, "Date is required."),
+  date: isoDateString,
   shift: z.enum(["A", "B", "C"]),
   line: z.enum(["FF", "SPECIALITY"]),
   materialId: z.string().trim().min(1, "Material is required."),
@@ -30,7 +31,7 @@ export type ReceivingSheetCreateInput = z.infer<typeof receivingSheetCreateSchem
 // required field here, unchanged from the normal create schema, not a
 // second invented shape).
 export const bulkRepackCreateSchema = z.object({
-  date: z.string().trim().min(1, "Date is required."),
+  date: isoDateString,
   shift: z.enum(["A", "B", "C"]),
   line: z.enum(["FF", "SPECIALITY"]),
   batchNumber: z.string().trim().min(1, "Batch number is required."),
@@ -38,12 +39,13 @@ export const bulkRepackCreateSchema = z.object({
 export type BulkRepackCreateInput = z.infer<typeof bulkRepackCreateSchema>;
 
 export const receivingSheetUpdateSchema = z.object({
-  date: z.string().trim().min(1).optional(),
+  date: isoDateString.optional(),
   shift: z.enum(["A", "B", "C"]).optional(),
   line: z.enum(["FF", "SPECIALITY"]).optional(),
   materialId: z.string().trim().min(1).optional(),
   batchNumber: z.string().trim().min(1).optional(),
   defaultPalletStatus: z.enum(["QC_HOLD", "BULK"]).optional(),
+  bulkReason: z.enum(BULK_REASONS).nullable().optional(),
 });
 export type ReceivingSheetUpdateInput = z.infer<typeof receivingSheetUpdateSchema>;
 

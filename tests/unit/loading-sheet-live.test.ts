@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeAll } from "vitest";
 import { NextRequest } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 
 /**
  * Loop 41: live, end-to-end Loading Sheet flow (TASK-008, Flow 5/6).
@@ -121,6 +121,16 @@ async function findOrCreatePallet(
       .update(pallets)
       .set({ statusCode, currentLocationId })
       .where(eq(pallets.id, id));
+    // ...and un-book it from any sheet an earlier run left open, since a
+    // pallet booked on an open sheet can no longer be picked elsewhere.
+    const openPicks = await db
+      .select({ id: loadingSheetPallets.id })
+      .from(loadingSheetPallets)
+      .innerJoin(loadingSheets, eq(loadingSheetPallets.loadingSheetId, loadingSheets.id))
+      .where(and(eq(loadingSheetPallets.palletId, id), ne(loadingSheets.status, "DISPATCHED")));
+    for (const pick of openPicks) {
+      await db.delete(loadingSheetPallets).where(eq(loadingSheetPallets.id, pick.id));
+    }
   } else {
     id = crypto.randomUUID();
     await db.insert(pallets).values({

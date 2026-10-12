@@ -88,34 +88,37 @@ import { productionDateFromBatchNumber } from "./business-rules/receiving-sheet"
  * so only one pallet UPDATE and one pallet_batches row result, not one
  * per row - see palletTargets below.
  */
-export function planReceivingSheetLock(
+// Every read below is awaited: on Cloudflare D1 queries return Promises
+// (better-sqlite3 returns plain values, which `await` passes through), so a
+// missing await only breaks in production. Guarded by
+// tests/unit/d1-driver-receiving-lock.test.ts, which runs this on real D1.
+export async function planReceivingSheetLock(
   database: ReturnType<typeof getDb>,
   sheetId: string,
   confirmingUserId: string
 ) {
-  const [sheet] = database.select().from(receivingSheets).where(eq(receivingSheets.id, sheetId)).all();
+  const [sheet] = await database.select().from(receivingSheets).where(eq(receivingSheets.id, sheetId));
   if (!sheet) {
     throw new ValidationError(`Receiving sheet "${sheetId}" not found during lock.`);
   }
-  const rows = database
+  const rows = await database
     .select()
     .from(receivingSheetPallets)
     .where(eq(receivingSheetPallets.receivingSheetId, sheetId))
-    .all();
+    .orderBy(receivingSheetPallets.srNo);
   if (rows.length === 0) {
     throw new ValidationError("Cannot lock a receiving sheet with no pallet rows.");
   }
 
-  const [material] = database.select().from(materials).where(eq(materials.id, sheet.materialId)).all();
+  const [material] = await database.select().from(materials).where(eq(materials.id, sheet.materialId));
   if (!material) {
     throw new ValidationError(`Material "${sheet.materialId}" not found during lock.`);
   }
 
-  const [warehouse] = database
+  const [warehouse] = await database
     .select()
     .from(warehouses)
-    .where(and(eq(warehouses.plant, material.plantOrigin), eq(warehouses.active, 1)))
-    .all();
+    .where(and(eq(warehouses.plant, material.plantOrigin), eq(warehouses.active, 1)));
   if (!warehouse) {
     throw new ValidationError(
       `No active warehouse is seeded for plant "${material.plantOrigin}" - cannot lock this sheet ` +
@@ -123,7 +126,7 @@ export function planReceivingSheetLock(
     );
   }
 
-  const [existingBatch] = database.select().from(batches).where(eq(batches.batchNumber, sheet.batchNumber)).all();
+  const [existingBatch] = await database.select().from(batches).where(eq(batches.batchNumber, sheet.batchNumber));
   let batchId: string;
   const statements: UnrunStatement[] = [];
   if (!existingBatch) {
@@ -162,13 +165,16 @@ export function planReceivingSheetLock(
     { existing: ExistingPallet; addedQty: number; addedWeightKg: number; existingBatchRow: (typeof palletBatches.$inferSelect) | undefined }
   >();
 
+  // Rows on this sheet that name the same NEW pallet number are one physical
+  // pallet: one pallets row, with INV-007 checked on the combined weight.
+  const newPalletTotals = new Map<string, { qty: number; weightKg: number }>();
+
   for (const row of rows) {
     const weightKg = row.qty * material.uomKgPerCarton;
-    const [samePallet] = database
+    const [samePallet] = await database
       .select()
       .from(pallets)
-      .where(and(eq(pallets.palletNumber, row.palletNumber), eq(pallets.currentWarehouseId, warehouse.id)))
-      .all();
+      .where(and(eq(pallets.palletNumber, row.palletNumber), eq(pallets.currentWarehouseId, warehouse.id)));
 
     if (samePallet) {
       if (samePallet.materialId !== sheet.materialId) {
@@ -186,11 +192,10 @@ export function planReceivingSheetLock(
         target.addedQty += row.qty;
         target.addedWeightKg += weightKg;
       } else {
-        const [existingBatchRow] = database
+        const [existingBatchRow] = await database
           .select()
           .from(palletBatches)
-          .where(and(eq(palletBatches.palletId, samePallet.id), eq(palletBatches.batchId, batchId)))
-          .all();
+          .where(and(eq(palletBatches.palletId, samePallet.id), eq(palletBatches.batchId, batchId)));
         palletTargets.set(samePallet.id, {
           existing: samePallet,
           addedQty: row.qty,
@@ -199,17 +204,22 @@ export function planReceivingSheetLock(
         });
       }
     } else {
-      // INV-007 ("Pallet weight must not exceed limit") - TASK-014's own
-      // audit found this was never actually enforced anywhere: the
-      // material master's own palletWeightLimitKg field (PEN-007) was
-      // stored and editable but never compared against anything.
-      if (weightKg > material.palletWeightLimitKg) {
-        throw new ValidationError(
-          `Pallet "${row.palletNumber}" would weigh ${weightKg}kg, over the ${material.palletWeightLimitKg}kg limit for ${material.code}.`
-        );
-      }
+      const total = newPalletTotals.get(row.palletNumber) ?? { qty: 0, weightKg: 0 };
+      total.qty += row.qty;
+      total.weightKg += weightKg;
+      newPalletTotals.set(row.palletNumber, total);
     }
     rowPlans.push({ row, weightKg, existing: samePallet ?? null });
+  }
+
+  // INV-007 ("Pallet weight must not exceed limit") for every new pallet,
+  // against the combined weight of all its rows on this sheet.
+  for (const [palletNumber, total] of newPalletTotals) {
+    if (total.weightKg > material.palletWeightLimitKg) {
+      throw new ValidationError(
+        `Pallet "${palletNumber}" would weigh ${total.weightKg}kg, over the ${material.palletWeightLimitKg}kg limit for ${material.code}.`
+      );
+    }
   }
 
   // INV-007 for every existing pallet being added to: against its real
@@ -263,6 +273,7 @@ export function planReceivingSheetLock(
   for (const [id, target] of palletTargets) {
     runningBalance.set(id, { qty: target.existing.totalCartons, weightKg: target.existing.totalWeightKg });
   }
+  const newPalletIds = new Map<string, string>();
 
   for (const { row, weightKg, existing } of rowPlans) {
     let palletId: string;
@@ -281,31 +292,45 @@ export function planReceivingSheetLock(
       qtyAfter = running.qty;
       weightAfterKg = running.weightKg;
     } else {
-      palletId = crypto.randomUUID();
-      statusBefore = null;
       statusAfter = sheet.defaultPalletStatus;
-      qtyAfter = row.qty;
-      weightAfterKg = weightKg;
-      statements.push(
-        database.insert(pallets).values({
-          id: palletId,
-          palletNumber: row.palletNumber,
-          palletType: "PLASTIC",
-          materialId: sheet.materialId,
-          statusCode: sheet.defaultPalletStatus,
-          totalWeightKg: weightKg,
-          totalCartons: row.qty,
-          currentWarehouseId: warehouse.id,
-          createdBy: confirmingUserId,
-        }),
-        database.insert(palletBatches).values({
-          id: crypto.randomUUID(),
-          palletId,
-          batchId,
-          cartonQty: row.qty,
-          weightKg,
-        })
-      );
+      const created = newPalletIds.get(row.palletNumber);
+      if (created) {
+        palletId = created;
+        statusBefore = sheet.defaultPalletStatus;
+        const running = runningBalance.get(palletId)!;
+        running.qty += row.qty;
+        running.weightKg += weightKg;
+        qtyAfter = running.qty;
+        weightAfterKg = running.weightKg;
+      } else {
+        palletId = crypto.randomUUID();
+        newPalletIds.set(row.palletNumber, palletId);
+        runningBalance.set(palletId, { qty: row.qty, weightKg });
+        statusBefore = null;
+        qtyAfter = row.qty;
+        weightAfterKg = weightKg;
+        const total = newPalletTotals.get(row.palletNumber)!;
+        statements.push(
+          database.insert(pallets).values({
+            id: palletId,
+            palletNumber: row.palletNumber,
+            palletType: "PLASTIC",
+            materialId: sheet.materialId,
+            statusCode: sheet.defaultPalletStatus,
+            totalWeightKg: total.weightKg,
+            totalCartons: total.qty,
+            currentWarehouseId: warehouse.id,
+            createdBy: confirmingUserId,
+          }),
+          database.insert(palletBatches).values({
+            id: crypto.randomUUID(),
+            palletId,
+            batchId,
+            cartonQty: total.qty,
+            weightKg: total.weightKg,
+          })
+        );
+      }
     }
 
     statements.push(

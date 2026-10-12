@@ -70,41 +70,55 @@ export async function GET() {
     let holdTracking:
       | { restricted: true }
       | { restricted: false; activeCount: number; totalCartons: number; red: number; amber: number; ok: number };
+    // A hold is still open while any of its pallets is still ACTIVE (a
+    // PARTIALLY_RELEASED hold included), and only those pallets' cartons
+    // are still on hold. One join, no IN (...) list (D1's 100-parameter cap).
+    const openHolds = new Map<
+      string,
+      { id: string; placedAt: string; materialCode: string; holdReason: string; totalCartons: number }
+    >();
+    if (canViewHolds) {
+      const activeHoldPalletRows = await db
+        .select({
+          holdId: holdRecords.id,
+          placedAt: holdRecords.placedAt,
+          materialCode: materials.code,
+          holdReason: holdRecords.holdReason,
+          cartons: pallets.totalCartons,
+        })
+        .from(holdPallets)
+        .innerJoin(holdRecords, eq(holdPallets.holdId, holdRecords.id))
+        .innerJoin(pallets, eq(holdPallets.palletId, pallets.id))
+        .innerJoin(materials, eq(holdRecords.materialId, materials.id))
+        .where(eq(holdPallets.status, "ACTIVE"));
+      for (const r of activeHoldPalletRows) {
+        const hold = openHolds.get(r.holdId) ?? {
+          id: r.holdId,
+          placedAt: r.placedAt,
+          materialCode: r.materialCode,
+          holdReason: r.holdReason,
+          totalCartons: 0,
+        };
+        hold.totalCartons += r.cartons;
+        openHolds.set(r.holdId, hold);
+      }
+    }
+
     if (!canViewHolds) {
       holdTracking = { restricted: true };
     } else {
-      const activeHolds = await db
-        .select({ id: holdRecords.id, placedAt: holdRecords.placedAt })
-        .from(holdRecords)
-        .where(eq(holdRecords.status, "ACTIVE"));
-      const cartonAggregates =
-        activeHolds.length === 0
-          ? []
-          : await db
-              .select({ holdId: holdPallets.holdId, totalCartons: sum(pallets.totalCartons) })
-              .from(holdPallets)
-              .innerJoin(pallets, eq(holdPallets.palletId, pallets.id))
-              .where(
-                inArray(
-                  holdPallets.holdId,
-                  activeHolds.map((h) => h.id)
-                )
-              )
-              .groupBy(holdPallets.holdId);
-      const cartonsByHoldId = new Map(cartonAggregates.map((r) => [r.holdId, Number(r.totalCartons ?? 0)]));
-
       let totalCartons = 0;
       let red = 0;
       let amber = 0;
       let ok = 0;
-      for (const hold of activeHolds) {
-        totalCartons += cartonsByHoldId.get(hold.id) ?? 0;
+      for (const hold of openHolds.values()) {
+        totalCartons += hold.totalCartons;
         const bucket = holdAgeBucket(holdAgeDays(hold.placedAt, now));
         if (bucket === "RED") red += 1;
         else if (bucket === "AMBER") amber += 1;
         else ok += 1;
       }
-      holdTracking = { restricted: false, activeCount: activeHolds.length, totalCartons, red, amber, ok };
+      holdTracking = { restricted: false, activeCount: openHolds.size, totalCartons, red, amber, ok };
     }
 
     // D-03 Bulk Tracking
@@ -219,42 +233,14 @@ export async function GET() {
     if (!canViewHolds) {
       topAgedHolds = { restricted: true };
     } else {
-      const activeHoldRows = await db
-        .select({
-          id: holdRecords.id,
-          materialCode: materials.code,
-          holdReason: holdRecords.holdReason,
-          placedAt: holdRecords.placedAt,
-        })
-        .from(holdRecords)
-        .innerJoin(materials, eq(holdRecords.materialId, materials.id))
-        .where(eq(holdRecords.status, "ACTIVE"));
-      const cartonTotalsByHold =
-        activeHoldRows.length === 0
-          ? new Map<string, number>()
-          : new Map(
-              (
-                await db
-                  .select({ holdId: holdPallets.holdId, totalCartons: sum(pallets.totalCartons) })
-                  .from(holdPallets)
-                  .innerJoin(pallets, eq(holdPallets.palletId, pallets.id))
-                  .where(
-                    inArray(
-                      holdPallets.holdId,
-                      activeHoldRows.map((h) => h.id)
-                    )
-                  )
-                  .groupBy(holdPallets.holdId)
-              ).map((r) => [r.holdId, Number(r.totalCartons ?? 0)])
-            );
-      const withAge = activeHoldRows
+      const withAge = Array.from(openHolds.values())
         .map((h) => {
           const ageDays = holdAgeDays(h.placedAt, now);
           return {
             id: h.id,
             materialCode: h.materialCode,
             holdReason: h.holdReason,
-            totalCartons: cartonTotalsByHold.get(h.id) ?? 0,
+            totalCartons: h.totalCartons,
             placedAt: h.placedAt,
             ageDays,
             ageBucket: holdAgeBucket(ageDays),

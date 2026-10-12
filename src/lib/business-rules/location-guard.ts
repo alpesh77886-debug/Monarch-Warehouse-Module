@@ -82,6 +82,38 @@ export type PalletForGuard = {
   materialId: string;
 };
 
+// Statuses of a pallet that is no longer physically in a warehouse
+// (shipped, on the road, or destroyed) - it cannot occupy a rack slot.
+const NOT_IN_WAREHOUSE_STATUSES = ["DISPATCHED", "IN_TRANSIT", "SCRAP"];
+
+/**
+ * A pallet can only be placed in a rack of the warehouse it is physically
+ * in. Moving stock between warehouses is a transfer (Flow 4), which writes
+ * TRANSFER_OUT/TRANSFER_IN ledger rows - a rack assignment must never
+ * silently change a pallet's warehouse.
+ */
+export function assertPalletCanTakeLocation(
+  pallet: { palletNumber: string; statusCode: string; currentWarehouseId: string },
+  location: { fullCode: string; warehouseId: string },
+  loadedOnTransfer: string | null
+): void {
+  if (NOT_IN_WAREHOUSE_STATUSES.includes(pallet.statusCode)) {
+    throw new ValidationError(
+      `Pallet ${pallet.palletNumber} is ${pallet.statusCode} - it is not in the warehouse and cannot be put in a rack.`
+    );
+  }
+  if (loadedOnTransfer) {
+    throw new ValidationError(
+      `Pallet ${pallet.palletNumber} is loaded on transfer order ${loadedOnTransfer} - it cannot be put in a rack.`
+    );
+  }
+  if (location.warehouseId !== pallet.currentWarehouseId) {
+    throw new ValidationError(
+      `Location ${location.fullCode} is in a different warehouse from pallet ${pallet.palletNumber} - use a transfer order to move stock between warehouses.`
+    );
+  }
+}
+
 /**
  * Throws ValidationError if the assignment is not allowed; otherwise
  * returns the new location status the caller should persist.

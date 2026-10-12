@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { getDb, runAtomicBatch, type UnrunStatement } from "@/lib/db";
 import { transferOrders, transferOrderPallets, pallets, palletBatches } from "../../../../../../drizzle/schema";
 import { requirePermission } from "@/lib/auth";
+import { findPalletCommitments, describeCommitment } from "@/lib/pallet-commitments";
 import { transferOrderPickSchema } from "@/lib/validations/transfer-order";
 import {
   assertPalletEligibleForTransferType,
@@ -71,6 +72,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     assertPalletEligibleForTransferType(pallet.statusCode, order.transferType as TransferType);
     if (pallet.currentWarehouseId !== order.sourceWarehouseId) {
       throw new ValidationError("Pallet is not in the transfer order's own source warehouse.");
+    }
+    // One physical pallet can go on one vehicle only.
+    const [commitment] = await findPalletCommitments(db, [pallet.id]);
+    if (commitment) {
+      throw new ConflictError(describeCommitment(pallet.palletNumber, commitment));
     }
 
     const [palletBatchRow] = await db.select().from(palletBatches).where(eq(palletBatches.palletId, pallet.id));

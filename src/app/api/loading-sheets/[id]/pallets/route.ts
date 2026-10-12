@@ -4,6 +4,7 @@ import { getDb, runAtomicBatch, type UnrunStatement } from "@/lib/db";
 import { loadingSheets, loadingSheetPallets, pallets, palletBatches, batches } from "../../../../../../drizzle/schema";
 import { requirePermission } from "@/lib/auth";
 import { loadingSheetPickSchema } from "@/lib/validations/loading-sheet";
+import { findPalletCommitments, describeCommitment } from "@/lib/pallet-commitments";
 import {
   assertDispatchEligible,
   assertFifoOrderOrOverride,
@@ -73,6 +74,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
     assertDispatchEligible(pallet.statusCode);
 
+    // One physical pallet can go on one vehicle only.
+    const [commitment] = await findPalletCommitments(db, [pallet.id]);
+    if (commitment) {
+      throw new ConflictError(describeCommitment(pallet.palletNumber, commitment));
+    }
+
     const palletBatchRows = await db.select().from(palletBatches).where(eq(palletBatches.palletId, pallet.id));
     if (palletBatchRows.length !== 1) {
       throw new ValidationError(
@@ -88,14 +95,18 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     // INV-010: compare against every OTHER currently-OK pallet of the
     // same material (real data, not a guess) - if any has an earlier
-    // production date, this pick needs a logged override reason.
+    // production date, this pick needs a logged override reason. Pallets
+    // already booked on an open loading sheet (this one included) or an
+    // open transfer are not "available", so they never force an override.
     const otherOkPallets = await db
       .select({ palletId: pallets.id })
       .from(pallets)
       .where(and(eq(pallets.materialId, pallet.materialId), eq(pallets.statusCode, "OK"), ne(pallets.id, pallet.id)));
+    const bookedIds = new Set((await findPalletCommitments(db)).map((c) => c.palletId));
+    const availableOtherPallets = otherOkPallets.filter((p) => !bookedIds.has(p.palletId));
     let otherProductionDates: string[] = [];
-    if (otherOkPallets.length > 0) {
-      const otherPalletIdSet = new Set(otherOkPallets.map((p) => p.palletId));
+    if (availableOtherPallets.length > 0) {
+      const otherPalletIdSet = new Set(availableOtherPallets.map((p) => p.palletId));
       const otherPalletBatchRows = await db
         .select({ palletId: palletBatches.palletId, productionDate: batches.productionDate })
         .from(palletBatches)

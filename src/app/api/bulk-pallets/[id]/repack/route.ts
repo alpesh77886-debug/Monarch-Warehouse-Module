@@ -3,6 +3,7 @@ import { eq, and } from "drizzle-orm";
 import { getDb, runAtomicBatch, type UnrunStatement } from "@/lib/db";
 import { pallets, palletBatches, locations, stockLedger, receivingSheets } from "../../../../../../drizzle/schema";
 import { requireRole, requireCurrentUserId } from "@/lib/auth";
+import { findPalletCommitments, describeCommitment } from "@/lib/pallet-commitments";
 import { bulkRepackCreateSchema } from "@/lib/validations/receiving-sheet";
 import { validateBatchNumberFormat, receivingSheetNumberPrefix } from "@/lib/business-rules/receiving-sheet";
 import { validatePalletStatusTransition, describeLedgerEntry, type PalletStatus } from "@/lib/workflows/pallet-status";
@@ -78,6 +79,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     const transition = validatePalletStatusTransition(pallet.statusCode as PalletStatus, "QC_HOLD", role);
+
+    const [commitment] = await findPalletCommitments(db, [pallet.id]);
+    if (commitment) {
+      throw new ConflictError(describeCommitment(pallet.palletNumber, commitment));
+    }
 
     const [palletBatchRow] = await db.select().from(palletBatches).where(eq(palletBatches.palletId, pallet.id));
     if (!palletBatchRow) {

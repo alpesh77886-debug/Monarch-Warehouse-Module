@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { getDb, runAtomicBatch, type UnrunStatement } from "@/lib/db";
 import { locations, pallets, materials, palletBatches, stockLedger } from "../../../../../drizzle/schema";
 import { requirePermission, requireCurrentUserId } from "@/lib/auth";
+import { findPalletCommitments } from "@/lib/pallet-commitments";
 import { assignPalletSchema } from "@/lib/validations/putaway";
 import {
   UnauthorizedError,
@@ -12,6 +13,7 @@ import {
   AuthNotConfiguredError,
 } from "@/lib/errors";
 import {
+  assertPalletCanTakeLocation,
   validateLocationAssignment,
   asLocationStatus,
   type OccupyingPallet,
@@ -84,6 +86,8 @@ export async function POST(request: NextRequest) {
     if (!location) {
       throw new NotFoundError(`Location "${parsed.data.locationId}" not found.`);
     }
+
+    assertPalletCanTakeLocation(pallet, location, await loadedOnTransferNumber(db, pallet.id));
 
     const occupant = await loadOccupant(db, location.currentPalletId);
     const newStatus = validateLocationAssignment(
@@ -159,4 +163,13 @@ async function loadOccupant(
     .innerJoin(materials, eq(pallets.materialId, materials.id))
     .where(eq(pallets.id, currentPalletId));
   return row ?? null;
+}
+
+// A transfer that is LOADED or IN_TRANSIT has physically taken the pallet.
+async function loadedOnTransferNumber(db: ReturnType<typeof getDb>, palletId: string): Promise<string | null> {
+  const commitments = await findPalletCommitments(db, [palletId]);
+  const loaded = commitments.find(
+    (c) => c.kind === "TRANSFER_ORDER" && (c.documentStatus === "LOADED" || c.documentStatus === "IN_TRANSIT")
+  );
+  return loaded?.documentNumber ?? null;
 }

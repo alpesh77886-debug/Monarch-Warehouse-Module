@@ -115,10 +115,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           batchId: line.batchId,
           palletId: pallet.id,
           locationId: null,
+          // ...and arrive in the destination warehouse's stock here.
           warehouseId: order.destinationWarehouseId,
-          qtyChange: 0,
+          qtyChange: pallet.totalCartons,
           qtyAfter: pallet.totalCartons,
-          weightChangeKg: 0,
+          weightChangeKg: pallet.totalWeightKg,
           weightAfterKg: pallet.totalWeightKg,
           statusBefore: ledgerEntry.statusBefore,
           statusAfter: ledgerEntry.statusAfter,

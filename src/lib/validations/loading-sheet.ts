@@ -1,11 +1,12 @@
 import { z } from "zod";
+import { isoDateString } from "./date";
 
 /**
  * Loading Sheet validation (Loop 41 / TASK-008), transcribed from
  * ENTITY-013 field-for-field.
  */
 export const loadingSheetCreateSchema = z.object({
-  date: z.string().trim().min(1, "Date is required."),
+  date: isoDateString,
   vehicleNumber: z.string().trim().min(1, "Vehicle number is required."),
   driverName: z.string().trim().min(1, "Driver name is required."),
   transporter: z.string().trim().nullable().optional(),

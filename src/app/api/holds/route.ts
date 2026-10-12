@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq, desc, count, sum } from "drizzle-orm";
+import { and, eq, desc, count, sum } from "drizzle-orm";
 import { getDb, runAtomicBatch, type UnrunStatement } from "@/lib/db";
-import { holdRecords, holdPallets, materials, batches, pallets, stockLedger } from "../../../../drizzle/schema";
+import { holdRecords, holdPallets, materials, batches, pallets, palletBatches, stockLedger } from "../../../../drizzle/schema";
 import { requirePermission, requireCurrentUserId } from "@/lib/auth";
 import { holdCreateSchema } from "@/lib/validations/hold";
 import { validateHoldReason, holdAgeDays, holdAgeBucket, holdNumberPrefix } from "@/lib/business-rules/hold";
@@ -171,6 +171,15 @@ export async function POST(request: NextRequest) {
       }
       if (pallet.materialId !== material.id) {
         throw new ValidationError(`Pallet ${pallet.palletNumber} is not material "${material.code}".`);
+      }
+      // The hold and its ledger rows are recorded against this batch, so
+      // every pallet on the hold must actually carry it.
+      const [carriesBatch] = await db
+        .select({ id: palletBatches.id })
+        .from(palletBatches)
+        .where(and(eq(palletBatches.palletId, pallet.id), eq(palletBatches.batchId, batch.id)));
+      if (!carriesBatch) {
+        throw new ValidationError(`Pallet ${pallet.palletNumber} does not carry batch "${batch.batchNumber}".`);
       }
       const transition = validatePalletStatusTransition(pallet.statusCode as PalletStatus, "HOLD", role);
       holdPalletRows.push({ pallet, transition });

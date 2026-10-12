@@ -37,6 +37,22 @@ export function validateBatchNumberFormat(batchNumber: string): void {
       `Invalid batch format: "${batchNumber}" must match L + 2-digit year + month letter (A-L) + 2-digit day + 3-4 digit sequence, e.g. L26I070938.`
     );
   }
+  // The production date (FIFO basis) is derived from this number, so the
+  // day must exist in that month: no day 00, 32, or 30 February.
+  if (!isRealCalendarDate(productionDateFromBatchNumber(batchNumber))) {
+    throw new ValidationError(
+      `Invalid batch number: "${batchNumber}" encodes a day that does not exist, so it has no real production date.`
+    );
+  }
+}
+
+/** True only for a YYYY-MM-DD string naming a day that exists. */
+export function isRealCalendarDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }
 
 /**
